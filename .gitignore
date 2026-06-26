@@ -1,0 +1,15 @@
+# Dependencies
+node_modules/
+
+# Next.js build output
+app/.next/
+app/out/
+
+# Environment files — keep secrets off GitHub
+app/.env
+app/.env.local
+app/.env*.local
+
+# OS files
+.DS_Store
+Thumbs.db
