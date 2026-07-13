@@ -51,7 +51,6 @@ export async function POST(request: NextRequest) {
 
   // Persist the verified name/photo ourselves — signInWithIdToken doesn't
   // reliably populate user_metadata from the Google token on its own.
-  let metadataError: string | null = null
   if (data.user) {
     const { error: updateError } = await supabaseAdmin.auth.admin.updateUserById(data.user.id, {
       user_metadata: {
@@ -59,7 +58,7 @@ export async function POST(request: NextRequest) {
         avatar_url: payload.picture,
       },
     })
-    if (updateError) metadataError = updateError.message
+    if (updateError) console.error('Failed to persist Google profile metadata:', updateError.message)
   }
 
   return NextResponse.json({
@@ -67,6 +66,5 @@ export async function POST(request: NextRequest) {
     refresh_token: data.session.refresh_token,
     full_name:     payload.name ?? null,
     avatar_url:    payload.picture ?? null,
-    metadataError,
   })
 }
