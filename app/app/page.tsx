@@ -27,8 +27,24 @@ export default function LoginPage() {
   const router = useRouter()
   const [error, setError] = useState('')
   const [loading, setLoading] = useState(false)
-  const [googleScriptLoaded, setGoogleScriptLoaded] = useState(false)
+  const [googleScriptLoaded, setGoogleScriptLoaded] = useState(
+    () => typeof window !== 'undefined' && !!window.google,
+  )
   const googleBtnRef = useRef<HTMLDivElement>(null)
+
+  // The Google script tag persists across client-side navigations (e.g. after
+  // sign-out redirects back here), so next/script's onLoad won't fire again —
+  // poll briefly in case the script is still mid-load from a previous mount.
+  useEffect(() => {
+    if (googleScriptLoaded) return
+    const interval = setInterval(() => {
+      if (window.google) {
+        setGoogleScriptLoaded(true)
+        clearInterval(interval)
+      }
+    }, 100)
+    return () => clearInterval(interval)
+  }, [googleScriptLoaded])
 
   async function handleGoogleCredential(response: { credential: string }) {
     setError('')
