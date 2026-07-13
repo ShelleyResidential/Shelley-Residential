@@ -74,6 +74,14 @@ export default function LoginPage() {
       return
     }
 
+    // Belt-and-suspenders: set the metadata from this authenticated client
+    // context too, in case the server-side admin update didn't stick.
+    if (json.full_name || json.avatar_url) {
+      await supabase.auth.updateUser({
+        data: { full_name: json.full_name, avatar_url: json.avatar_url },
+      })
+    }
+
     router.push('/dashboard')
   }
 
