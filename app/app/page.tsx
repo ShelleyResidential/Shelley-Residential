@@ -56,6 +56,8 @@ export default function LoginPage() {
       body: JSON.stringify({ idToken: response.credential }),
     })
     const json = await res.json()
+    // TEMP-DEBUG: remove after diagnosing missing profile photo
+    console.log('google-signin response:', json)
 
     if (!res.ok) {
       setError(json.error ?? 'Google sign-in failed.')
