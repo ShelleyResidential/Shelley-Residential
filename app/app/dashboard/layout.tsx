@@ -6,12 +6,22 @@ import { useRouter, usePathname } from 'next/navigation'
 import Link from 'next/link'
 import Image from 'next/image'
 
-const NAV = [
-  { label: 'Dashboard',   href: '/dashboard' },
-  { label: 'Contacts',    href: '/dashboard/contacts' },
-  { label: 'Properties',  href: '/dashboard/properties' },
-  { label: 'Evaluations', href: '/dashboard/evaluations' },
-]
+const CHILD_ROUTES = ['/dashboard/contacts', '/dashboard/properties']
+
+function navItemStyle(active: boolean, indented: boolean) {
+  const basePadding = indented ? 24 : 12
+  return {
+    display: 'block',
+    padding: '11px 12px',
+    marginBottom: 2,
+    fontSize: 14,
+    color: '#fff',
+    fontWeight: active ? 700 : 400,
+    borderLeft: active ? '2px solid #E8266F' : '2px solid transparent',
+    paddingLeft: active ? basePadding - 2 : basePadding,
+    textDecoration: 'none',
+  } as const
+}
 
 export default function DashboardLayout({ children }: { children: React.ReactNode }) {
   const router   = useRouter()
@@ -45,39 +55,44 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
 
   const displayName = email.split('@')[0] ?? email
 
+  const dashboardActive   = pathname === '/dashboard'
+  const evaluationsActive = pathname.startsWith('/dashboard/evaluations')
+  const childSectionOpen  = evaluationsActive || CHILD_ROUTES.some(r => pathname.startsWith(r))
+
   return (
     <div style={{ display: 'grid', gridTemplateColumns: '240px 1fr', minHeight: '100vh' }}>
 
       {/* ── Sidebar ── */}
       <aside style={{ background: '#2A2A2A', color: '#fff', padding: '28px 24px', display: 'flex', flexDirection: 'column' }}>
-        <div style={{ marginBottom: 40 }}>
+        <div style={{ marginBottom: 40, textAlign: 'center' }}>
           <Image src="/logo.png" alt="Shelley Residential" width={160} height={80} style={{ filter: 'brightness(0) invert(1)' }} />
         </div>
 
         <nav style={{ flex: 1 }}>
-          {NAV.map(item => {
-            const active = pathname === item.href || (item.href !== '/dashboard' && pathname.startsWith(item.href))
-            return (
-              <Link
-                key={item.href}
-                href={item.href}
-                style={{
-                  display: 'block',
-                  padding: '11px 12px',
-                  marginBottom: 2,
-                  fontSize: 14,
-                  color: active ? '#fff' : '#cfcfcf',
-                  fontWeight: active ? 700 : 400,
-                  borderLeft: active ? '2px solid #E8266F' : '2px solid transparent',
-                  paddingLeft: active ? 10 : 12,
-                  textDecoration: 'none',
-                }}
-              >
-                {item.label}
+          <Link href="/dashboard" style={navItemStyle(dashboardActive, false)}>
+            Dashboard
+          </Link>
+
+          <Link href="/dashboard/evaluations" style={navItemStyle(evaluationsActive, false)}>
+            Evaluations
+          </Link>
+
+          {childSectionOpen && (
+            <div>
+              <Link href="/dashboard/contacts" style={navItemStyle(pathname.startsWith('/dashboard/contacts'), true)}>
+                Contacts
               </Link>
-            )
-          })}
+              <Link href="/dashboard/properties" style={navItemStyle(pathname.startsWith('/dashboard/properties'), true)}>
+                Properties
+              </Link>
+            </div>
+          )}
         </nav>
+
+        {/* Slogan */}
+        <p style={{ fontSize: 11, color: '#fff', textAlign: 'left', paddingLeft: 12, marginBottom: 16, lineHeight: 1.6 }}>
+          One Name. One Team. <span style={{ color: '#E8266F', fontWeight: 700 }}>One Standard.</span>
+        </p>
 
         {/* ── User section ── */}
         <div style={{ borderTop: '1px solid #3a3a3a', paddingTop: 20, position: 'relative' }} ref={menuRef}>
@@ -176,7 +191,7 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
       </aside>
 
       {/* ── Main ── */}
-      <main style={{ background: '#F1F0EE', minHeight: '100vh' }}>
+      <main style={{ background: '#FAFAF9', minHeight: '100vh' }}>
         {children}
       </main>
 
