@@ -10,6 +10,8 @@ function SettingsContent() {
   const searchParams = useSearchParams()
   const [userId, setUserId]           = useState<string | null>(null)
   const [userEmail, setUserEmail]     = useState('')
+  const [fullName, setFullName]       = useState('')
+  const [avatarUrl, setAvatarUrl]     = useState<string | null>(null)
   const [connected, setConnected]     = useState(false)
   const [loading, setLoading]         = useState(true)
   const [disconnecting, setDisconnecting] = useState(false)
@@ -18,8 +20,11 @@ function SettingsContent() {
   useEffect(() => {
     supabase.auth.getUser().then(({ data }) => {
       if (!data.user) { router.push('/'); return }
+      const meta = data.user.user_metadata ?? {}
       setUserId(data.user.id)
       setUserEmail(data.user.email ?? '')
+      setFullName(meta.full_name ?? meta.name ?? '')
+      setAvatarUrl(meta.avatar_url ?? meta.picture ?? null)
 
       supabase.from('user_google_tokens')
         .select('id')
@@ -64,11 +69,12 @@ function SettingsContent() {
 
   return (
     <div className="p-10 max-w-2xl">
-      <button onClick={signOut} className={`${btn.danger} mb-6`}>
-        Sign out
-      </button>
-
-      <h1 className="text-2xl font-bold text-[#1a1a1a] mb-8">Settings</h1>
+      <div className="flex items-center justify-between mb-8">
+        <h1 className="text-2xl font-bold text-[#1a1a1a]">Settings</h1>
+        <button onClick={signOut} className={btn.danger}>
+          Sign out
+        </button>
+      </div>
 
       {message && (
         <div className={`mb-6 px-4 py-3 rounded-lg text-sm ${
@@ -81,9 +87,28 @@ function SettingsContent() {
       {/* Account */}
       <div className={`${card} p-6 mb-4`}>
         <h3 className={sectionTitle}>Account</h3>
-        <div className="text-sm text-gray-600">
-          <span className={labelCls}>Email</span>
-          <p className="text-[#1a1a1a] font-medium">{userEmail}</p>
+        <div className="flex items-center gap-4 mb-5">
+          {avatarUrl ? (
+            <img src={avatarUrl} alt={fullName || userEmail} className="w-14 h-14 rounded-full object-cover flex-shrink-0" />
+          ) : (
+            <div className="w-14 h-14 rounded-full bg-[#E8266F] text-white flex items-center justify-center text-lg font-bold flex-shrink-0">
+              {(fullName || userEmail).charAt(0).toUpperCase()}
+            </div>
+          )}
+          <div>
+            <p className="text-[#1a1a1a] font-semibold">{fullName || '—'}</p>
+            <p className="text-sm text-gray-400">{userEmail}</p>
+          </div>
+        </div>
+        <div className="grid grid-cols-2 gap-x-8 gap-y-3 text-sm">
+          <div>
+            <span className={labelCls}>Full Name</span>
+            <p className="text-[#1a1a1a] font-medium">{fullName || '—'}</p>
+          </div>
+          <div>
+            <span className={labelCls}>Email</span>
+            <p className="text-[#1a1a1a] font-medium">{userEmail}</p>
+          </div>
         </div>
       </div>
 
