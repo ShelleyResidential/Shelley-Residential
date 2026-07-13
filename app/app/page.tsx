@@ -95,8 +95,8 @@ export default function LoginPage() {
             <Image
               src="/logo.png"
               alt="Shelley Residential"
-              width={140}
-              height={70}
+              width={280}
+              height={140}
               className="mx-auto"
               priority
             />
