@@ -1,6 +1,6 @@
 'use client'
 
-import { useEffect, useState, useRef } from 'react'
+import { useEffect, useState } from 'react'
 import { supabase } from '@/lib/supabase'
 import { useRouter, usePathname } from 'next/navigation'
 import Link from 'next/link'
@@ -26,34 +26,19 @@ function navItemStyle(active: boolean, indented: boolean) {
 export default function DashboardLayout({ children }: { children: React.ReactNode }) {
   const router   = useRouter()
   const pathname = usePathname()
-  const [email, setEmail]     = useState('')
-  const [menuOpen, setMenuOpen] = useState(false)
-  const menuRef = useRef<HTMLDivElement>(null)
+  const [email, setEmail]         = useState('')
+  const [displayName, setDisplayName] = useState('')
+  const [avatarUrl, setAvatarUrl] = useState<string | null>(null)
 
   useEffect(() => {
     supabase.auth.getUser().then(({ data }) => {
-      if (!data.user) router.push('/')
-      else setEmail(data.user.email ?? '')
+      if (!data.user) { router.push('/'); return }
+      const meta = data.user.user_metadata ?? {}
+      setEmail(data.user.email ?? '')
+      setDisplayName(meta.full_name ?? meta.name ?? (data.user.email ?? '').split('@')[0])
+      setAvatarUrl(meta.avatar_url ?? meta.picture ?? null)
     })
   }, [router])
-
-  // Close menu when clicking outside
-  useEffect(() => {
-    function handleClick(e: MouseEvent) {
-      if (menuRef.current && !menuRef.current.contains(e.target as Node)) {
-        setMenuOpen(false)
-      }
-    }
-    document.addEventListener('mousedown', handleClick)
-    return () => document.removeEventListener('mousedown', handleClick)
-  }, [])
-
-  async function signOut() {
-    await supabase.auth.signOut()
-    router.push('/')
-  }
-
-  const displayName = email.split('@')[0] ?? email
 
   const dashboardActive   = pathname === '/dashboard'
   const evaluationsActive = pathname.startsWith('/dashboard/evaluations')
@@ -95,89 +80,46 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
         </p>
 
         {/* ── User section ── */}
-        <div style={{ borderTop: '1px solid #3a3a3a', paddingTop: 20, position: 'relative' }} ref={menuRef}>
-
-          {/* Popup menu */}
-          {menuOpen && (
-            <div style={{
-              position: 'absolute',
-              bottom: '100%',
-              left: 0,
-              right: 0,
-              marginBottom: 8,
-              background: '#333',
-              borderRadius: 10,
-              overflow: 'hidden',
-              boxShadow: '0 4px 16px rgba(0,0,0,0.4)',
-            }}>
-              <Link
-                href="/dashboard/settings"
-                onClick={() => setMenuOpen(false)}
-                style={{
-                  display: 'block',
-                  padding: '11px 16px',
-                  fontSize: 13,
-                  color: '#fff',
-                  textDecoration: 'none',
-                  borderBottom: '1px solid #3a3a3a',
-                }}
-              >
-                Settings
-              </Link>
-              <button
-                onClick={signOut}
-                style={{
-                  display: 'block',
-                  width: '100%',
-                  textAlign: 'left',
-                  padding: '11px 16px',
-                  fontSize: 13,
-                  color: '#ff6b6b',
-                  background: 'none',
-                  border: 'none',
-                  cursor: 'pointer',
-                }}
-              >
-                Sign out
-              </button>
-            </div>
-          )}
-
-          {/* Clickable user row */}
-          <button
-            onClick={() => setMenuOpen(o => !o)}
+        <div style={{ borderTop: '1px solid #3a3a3a', paddingTop: 20 }}>
+          <Link
+            href="/dashboard/settings"
             style={{
               display: 'flex',
               alignItems: 'center',
               gap: 10,
               width: '100%',
-              background: 'none',
-              border: 'none',
-              cursor: 'pointer',
               padding: '6px 8px',
               borderRadius: 8,
-              textAlign: 'left',
+              textDecoration: 'none',
               transition: 'background 0.15s',
             }}
             onMouseEnter={e => (e.currentTarget.style.background = '#333')}
             onMouseLeave={e => (e.currentTarget.style.background = 'none')}
           >
-            {/* Avatar initials */}
-            <div style={{
-              width: 30,
-              height: 30,
-              borderRadius: '50%',
-              background: '#E8266F',
-              display: 'flex',
-              alignItems: 'center',
-              justifyContent: 'center',
-              fontSize: 12,
-              fontWeight: 700,
-              color: '#fff',
-              flexShrink: 0,
-            }}>
-              {displayName.charAt(0).toUpperCase()}
-            </div>
+            {/* Avatar: Google photo if available, else initials */}
+            {avatarUrl ? (
+              <img
+                src={avatarUrl}
+                alt={displayName}
+                style={{ width: 30, height: 30, borderRadius: '50%', flexShrink: 0, objectFit: 'cover' }}
+              />
+            ) : (
+              <div style={{
+                width: 30,
+                height: 30,
+                borderRadius: '50%',
+                background: '#E8266F',
+                display: 'flex',
+                alignItems: 'center',
+                justifyContent: 'center',
+                fontSize: 12,
+                fontWeight: 700,
+                color: '#fff',
+                flexShrink: 0,
+              }}>
+                {displayName.charAt(0).toUpperCase()}
+              </div>
+            )}
             <div style={{ minWidth: 0 }}>
               <p style={{ fontSize: 13, color: '#fff', fontWeight: 500, margin: 0, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
                 {displayName}
@@ -186,7 +128,7 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
                 {email}
               </p>
             </div>
-          </button>
+          </Link>
         </div>
       </aside>
 

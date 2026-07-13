@@ -48,6 +48,11 @@ function SettingsContent() {
     window.location.href = `/api/auth/google?uid=${userId}`
   }
 
+  async function signOut() {
+    await supabase.auth.signOut()
+    router.push('/')
+  }
+
   async function disconnectGoogle() {
     if (!userId) return
     setDisconnecting(true)
@@ -59,6 +64,10 @@ function SettingsContent() {
 
   return (
     <div className="p-10 max-w-2xl">
+      <button onClick={signOut} className={`${btn.danger} mb-6`}>
+        Sign out
+      </button>
+
       <h1 className="text-2xl font-bold text-[#1a1a1a] mb-8">Settings</h1>
 
       {message && (
