@@ -101,6 +101,7 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
               <img
                 src={avatarUrl}
                 alt={displayName}
+                referrerPolicy="no-referrer"
                 style={{ width: 30, height: 30, borderRadius: '50%', flexShrink: 0, objectFit: 'cover' }}
               />
             ) : (

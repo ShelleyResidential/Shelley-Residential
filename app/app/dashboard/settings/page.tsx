@@ -68,7 +68,7 @@ function SettingsContent() {
   }
 
   return (
-    <div className="p-10 max-w-2xl">
+    <div className="p-10">
       <div className="flex items-center justify-between mb-8">
         <h1 className="text-2xl font-bold text-[#1a1a1a]">Settings</h1>
         <button onClick={signOut} className={btn.danger}>
@@ -76,66 +76,73 @@ function SettingsContent() {
         </button>
       </div>
 
-      {message && (
-        <div className={`mb-6 px-4 py-3 rounded-lg text-sm ${
-          message.type === 'success' ? 'bg-green-50 text-green-700' : 'bg-red-50 text-red-600'
-        }`}>
-          {message.text}
-        </div>
-      )}
-
-      {/* Account */}
-      <div className={`${card} p-6 mb-4`}>
-        <h3 className={sectionTitle}>Account</h3>
-        <div className="flex items-center gap-4 mb-5">
-          {avatarUrl ? (
-            <img src={avatarUrl} alt={fullName || userEmail} className="w-14 h-14 rounded-full object-cover flex-shrink-0" />
-          ) : (
-            <div className="w-14 h-14 rounded-full bg-[#E8266F] text-white flex items-center justify-center text-lg font-bold flex-shrink-0">
-              {(fullName || userEmail).charAt(0).toUpperCase()}
-            </div>
-          )}
-          <div>
-            <p className="text-[#1a1a1a] font-semibold">{fullName || '—'}</p>
-            <p className="text-sm text-gray-400">{userEmail}</p>
+      <div className="max-w-2xl">
+        {message && (
+          <div className={`mb-6 px-4 py-3 rounded-lg text-sm ${
+            message.type === 'success' ? 'bg-green-50 text-green-700' : 'bg-red-50 text-red-600'
+          }`}>
+            {message.text}
           </div>
-        </div>
-        <div className="grid grid-cols-2 gap-x-8 gap-y-3 text-sm">
-          <div>
-            <span className={labelCls}>Full Name</span>
-            <p className="text-[#1a1a1a] font-medium">{fullName || '—'}</p>
-          </div>
-          <div>
-            <span className={labelCls}>Email</span>
-            <p className="text-[#1a1a1a] font-medium">{userEmail}</p>
-          </div>
-        </div>
-      </div>
-
-      {/* Google Calendar */}
-      <div className={`${card} p-6`}>
-        <h3 className={sectionTitle}>Google Calendar</h3>
-        <p className="text-sm text-gray-500 mb-5">
-          When connected, you can sync evaluation appointments to your Google Calendar directly from the evaluation page.
-        </p>
-
-        {loading ? (
-          <p className="text-sm text-gray-400">Checking connection…</p>
-        ) : connected ? (
-          <div className="flex items-center justify-between gap-4">
-            <div className="flex items-center gap-2.5">
-              <div className="w-2 h-2 rounded-full bg-green-500 flex-shrink-0" />
-              <span className="text-sm font-medium text-[#1a1a1a]">Connected</span>
-            </div>
-            <button onClick={disconnectGoogle} disabled={disconnecting} className={btn.danger}>
-              {disconnecting ? 'Disconnecting…' : 'Disconnect'}
-            </button>
-          </div>
-        ) : (
-          <button onClick={connectGoogle} className={btn.primary}>
-            Connect Google Calendar
-          </button>
         )}
+
+        {/* Account */}
+        <div className={`${card} p-6 mb-4`}>
+          <h3 className={sectionTitle}>Account</h3>
+          <div className="flex items-center gap-4 mb-5">
+            {avatarUrl ? (
+              <img
+                src={avatarUrl}
+                alt={fullName || userEmail}
+                referrerPolicy="no-referrer"
+                className="w-14 h-14 rounded-full object-cover flex-shrink-0"
+              />
+            ) : (
+              <div className="w-14 h-14 rounded-full bg-[#E8266F] text-white flex items-center justify-center text-lg font-bold flex-shrink-0">
+                {(fullName || userEmail).charAt(0).toUpperCase()}
+              </div>
+            )}
+            <div>
+              <p className="text-[#1a1a1a] font-semibold">{fullName || '—'}</p>
+              <p className="text-sm text-gray-400">{userEmail}</p>
+            </div>
+          </div>
+          <div className="grid grid-cols-2 gap-x-8 gap-y-3 text-sm">
+            <div>
+              <span className={labelCls}>Full Name</span>
+              <p className="text-[#1a1a1a] font-medium">{fullName || '—'}</p>
+            </div>
+            <div>
+              <span className={labelCls}>Email</span>
+              <p className="text-[#1a1a1a] font-medium">{userEmail}</p>
+            </div>
+          </div>
+        </div>
+
+        {/* Google Calendar */}
+        <div className={`${card} p-6`}>
+          <h3 className={sectionTitle}>Google Calendar</h3>
+          <p className="text-sm text-gray-500 mb-5">
+            When connected, you can sync evaluation appointments to your Google Calendar directly from the evaluation page.
+          </p>
+
+          {loading ? (
+            <p className="text-sm text-gray-400">Checking connection…</p>
+          ) : connected ? (
+            <div className="flex items-center justify-between gap-4">
+              <div className="flex items-center gap-2.5">
+                <div className="w-2 h-2 rounded-full bg-green-500 flex-shrink-0" />
+                <span className="text-sm font-medium text-[#1a1a1a]">Connected</span>
+              </div>
+              <button onClick={disconnectGoogle} disabled={disconnecting} className={btn.danger}>
+                {disconnecting ? 'Disconnecting…' : 'Disconnect'}
+              </button>
+            </div>
+          ) : (
+            <button onClick={connectGoogle} className={btn.primary}>
+              Connect Google Calendar
+            </button>
+          )}
+        </div>
       </div>
     </div>
   )
