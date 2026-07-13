@@ -57,7 +57,15 @@ export async function POST(request: NextRequest) {
   }
 
   // Build human-readable address
-  const prop = ev.properties as Record<string, string | null> | null
+  type PropertyInfo = {
+    property_type: string | null
+    unit_number: string | null
+    complex_or_building_name: string | null
+    street_number: string | null
+    street_name: string | null
+    suburb: string | null
+  }
+  const prop = ev.properties as unknown as PropertyInfo | null
   let address = 'Unknown address'
   if (prop) {
     if (prop.property_type === 'sectional_title' && prop.unit_number) {
@@ -67,10 +75,11 @@ export async function POST(request: NextRequest) {
     }
   }
 
-  const contacts    = (ev.evaluation_contacts as { is_primary: boolean; contacts: { first_name: string; last_name: string } | null }[]) ?? []
+  type ContactRow = { is_primary: boolean; contacts: { first_name: string; last_name: string } | null }
+  const contacts    = (ev.evaluation_contacts as unknown as ContactRow[]) ?? []
   const primary     = contacts.find(c => c.is_primary) ?? contacts[0]
   const contactName = primary?.contacts ? `${primary.contacts.first_name} ${primary.contacts.last_name}`.trim() : ''
-  const leadSource  = (ev.lead_source_picklist as { label: string } | null)?.label ?? ''
+  const leadSource  = (ev.lead_source_picklist as unknown as { label: string } | null)?.label ?? ''
 
   const start = new Date(ev.scheduled_at).toISOString()
   const end   = new Date(new Date(ev.scheduled_at).getTime() + 60 * 60 * 1000).toISOString()
