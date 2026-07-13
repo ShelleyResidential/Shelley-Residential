@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { createClient } from '@supabase/supabase-js'
 import { verifyGoogleIdToken } from '@/lib/google-signin'
+import { supabaseAdmin } from '@/lib/supabase-admin'
 
 const ALLOWED_DOMAIN = 'shelley.co.za'
 
@@ -46,6 +47,17 @@ export async function POST(request: NextRequest) {
 
   if (error || !data.session) {
     return NextResponse.json({ error: error?.message ?? 'Sign-in failed.' }, { status: 400 })
+  }
+
+  // Persist the verified name/photo ourselves — signInWithIdToken doesn't
+  // reliably populate user_metadata from the Google token on its own.
+  if (data.user) {
+    await supabaseAdmin.auth.admin.updateUserById(data.user.id, {
+      user_metadata: {
+        full_name:  payload.name,
+        avatar_url: payload.picture,
+      },
+    })
   }
 
   return NextResponse.json({
