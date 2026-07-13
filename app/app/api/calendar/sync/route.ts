@@ -42,7 +42,7 @@ export async function POST(request: NextRequest) {
     .from('evaluations')
     .select(`
       scheduled_at, google_calendar_event_id,
-      properties (property_type, unit_number, complex_or_building_name, street_number, street_name, suburb),
+      properties (property_type, unit_number, complex_or_building_name, street_number, street_name, suburb, google_maps_url),
       lead_source_picklist:lead_source_option_id (label),
       evaluation_contacts (
         is_primary,
@@ -56,7 +56,7 @@ export async function POST(request: NextRequest) {
     return NextResponse.json({ error: 'Evaluation has no scheduled date set.' }, { status: 400 })
   }
 
-  // Build human-readable address
+  // Build human-readable address + Google Maps link (same logic used on the evaluation detail page)
   type PropertyInfo = {
     property_type: string | null
     unit_number: string | null
@@ -64,6 +64,7 @@ export async function POST(request: NextRequest) {
     street_number: string | null
     street_name: string | null
     suburb: string | null
+    google_maps_url: string | null
   }
   const prop = ev.properties as unknown as PropertyInfo | null
   let address = 'Unknown address'
@@ -74,6 +75,8 @@ export async function POST(request: NextRequest) {
       address = [prop.street_number, prop.street_name, prop.suburb].filter(Boolean).join(' ') || 'Unknown address'
     }
   }
+  const mapsLink = prop?.google_maps_url
+    || (address !== 'Unknown address' ? `https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(address)}` : null)
 
   type ContactRow = { is_primary: boolean; contacts: { first_name: string; last_name: string } | null }
   const contacts    = (ev.evaluation_contacts as unknown as ContactRow[]) ?? []
@@ -87,9 +90,9 @@ export async function POST(request: NextRequest) {
   const calEvent = await upsertCalendarEvent(
     accessToken,
     {
-      summary:     `Evaluation — ${address}`,
+      summary:     `Evaluation | ${address}`,
       description: [contactName && `Contact: ${contactName}`, leadSource && `Source: ${leadSource}`].filter(Boolean).join('\n'),
-      location:    address,
+      location:    mapsLink ?? address,
       start,
       end,
     },
