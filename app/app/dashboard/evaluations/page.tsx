@@ -6,7 +6,7 @@ import { btn, card, input } from '@/lib/styles'
 import { useRouter } from 'next/navigation'
 import Link from 'next/link'
 
-type Profile = { full_name: string | null; email: string | null }
+type Profile = { id: string; full_name: string | null; email: string | null }
 
 type Evaluation = {
   id: string
@@ -16,6 +16,8 @@ type Evaluation = {
   property_status: string | null
   evaluation_price: number | null
   marketing_price: number | null
+  sellers_agent_user_id: string | null
+  transaction_coordinator_user_id: string | null
   properties: {
     unit_number: string | null
     complex_or_building_name: string | null
@@ -25,8 +27,6 @@ type Evaluation = {
     city: string | null
     property_type: string | null
   } | null
-  agent_profile: Profile | null
-  tc_profile: Profile | null
   lead_source_picklist: { label: string } | null
   lead_source_other_text: string | null
   evaluation_contacts: {
@@ -75,6 +75,7 @@ const STATUS_TABS = [
 export default function EvaluationsPage() {
   const router = useRouter()
   const [evaluations, setEvaluations] = useState<Evaluation[]>([])
+  const [profiles, setProfiles]       = useState<Record<string, Profile>>({})
   const [loading, setLoading]         = useState(true)
   const [search, setSearch]           = useState('')
   const [filterStatus, setFilterStatus] = useState('')
@@ -86,9 +87,8 @@ export default function EvaluationsPage() {
       .select(`
         id, status, date_captured, scheduled_at, property_status,
         evaluation_price, marketing_price,
+        sellers_agent_user_id, transaction_coordinator_user_id,
         properties (unit_number, complex_or_building_name, street_number, street_name, suburb, city, property_type),
-        agent_profile:sellers_agent_user_id (full_name, email),
-        tc_profile:transaction_coordinator_user_id (full_name, email),
         lead_source_picklist:lead_source_option_id (label),
         lead_source_other_text,
         evaluation_contacts (is_primary, contacts (first_name, last_name), picklist_options:tag_option_id (label))
@@ -115,6 +115,11 @@ export default function EvaluationsPage() {
 
   useEffect(() => {
     supabase.auth.getUser().then(({ data }) => { if (!data.user) router.push('/') })
+    supabase.from('profiles').select('id, full_name, email').then(({ data }) => {
+      const map: Record<string, Profile> = {}
+      for (const p of (data ?? []) as Profile[]) map[p.id] = p
+      setProfiles(map)
+    })
   }, [router])
 
   useEffect(() => {
@@ -194,6 +199,8 @@ export default function EvaluationsPage() {
                 const statusMeta = STATUS_LABELS[ev.status] ?? { label: ev.status, colour: 'bg-gray-100 text-gray-500' }
                 const date = new Date(ev.date_captured).toLocaleDateString('en-ZA', { day: 'numeric', month: 'short', year: 'numeric' })
                 const leadSource = ev.lead_source_picklist?.label ?? ev.lead_source_other_text ?? '—'
+                const agent = ev.sellers_agent_user_id ? profiles[ev.sellers_agent_user_id] : null
+                const tc = ev.transaction_coordinator_user_id ? profiles[ev.transaction_coordinator_user_id] : null
 
                 return (
                   <tr
@@ -208,8 +215,8 @@ export default function EvaluationsPage() {
                     </td>
                     <td className="px-4 py-3 font-medium text-[#1a1a1a] whitespace-nowrap">{formatAddress(ev.properties)}</td>
                     <td className="px-4 py-3 text-gray-500 whitespace-nowrap">{date}</td>
-                    <td className="px-4 py-3 text-gray-500 whitespace-nowrap">{ev.agent_profile?.full_name ?? ev.agent_profile?.email ?? '—'}</td>
-                    <td className="px-4 py-3 text-gray-500 whitespace-nowrap">{ev.tc_profile?.full_name ?? ev.tc_profile?.email ?? '—'}</td>
+                    <td className="px-4 py-3 text-gray-500 whitespace-nowrap">{agent?.full_name ?? agent?.email ?? '—'}</td>
+                    <td className="px-4 py-3 text-gray-500 whitespace-nowrap">{tc?.full_name ?? tc?.email ?? '—'}</td>
                     <td className="px-4 py-3 text-gray-500 whitespace-nowrap">{sellerName(ev)}</td>
                     <td className="px-4 py-3 text-gray-500 whitespace-nowrap">{leadSource}</td>
                     <td className="px-4 py-3 text-gray-500 whitespace-nowrap">{formatCurrency(ev.evaluation_price)}</td>

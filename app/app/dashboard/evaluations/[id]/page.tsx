@@ -46,8 +46,6 @@ type Evaluation = {
   lead_source_picklist: { label: string } | null
   motivation_picklist: { label: string } | null
   timeline_picklist: { label: string } | null
-  agent_profile: Profile | null
-  tc_profile: Profile | null
   evaluation_contacts: EvalContact[]
   evaluation_pipeline_steps: PipelineStep[]
 }
@@ -139,8 +137,6 @@ export default function EvaluationDetailPage() {
         lead_source_picklist:lead_source_option_id (label),
         motivation_picklist:motivation_for_selling_option_id (label),
         timeline_picklist:selling_timeline_option_id (label),
-        agent_profile:sellers_agent_user_id (id, full_name, email),
-        tc_profile:transaction_coordinator_user_id (id, full_name, email),
         evaluation_contacts (
           id, is_primary, sort_order, tag_option_id,
           contacts (id, first_name, last_name, title, phone_number, email_address),
@@ -237,6 +233,8 @@ export default function EvaluationDetailPage() {
   const sortedSteps    = [...(ev.evaluation_pipeline_steps ?? [])].sort((a, b) => a.sort_order - b.sort_order)
   const stepsComplete  = sortedSteps.filter(s => s.is_complete).length
   const dateStr = new Date(ev.date_captured).toLocaleDateString('en-ZA', { day: 'numeric', month: 'long', year: 'numeric' })
+  const agentProfile = profiles.find(p => p.id === ev.sellers_agent_user_id) ?? null
+  const tcProfile     = profiles.find(p => p.id === ev.transaction_coordinator_user_id) ?? null
 
   return (
     <div className="p-10 max-w-4xl">
@@ -409,8 +407,8 @@ export default function EvaluationDetailPage() {
                   {ev.calendar_event_link && (
                     <InfoRow label="Calendar" value={<a href={ev.calendar_event_link} target="_blank" rel="noopener noreferrer" className="text-blue-600 hover:underline">View event ↗</a>} />
                   )}
-                  <InfoRow label="Agent" value={ev.agent_profile?.full_name ?? ev.agent_profile?.email ?? '—'} />
-                  <InfoRow label="TC" value={ev.tc_profile?.full_name ?? ev.tc_profile?.email ?? '—'} />
+                  <InfoRow label="Agent" value={agentProfile?.full_name ?? agentProfile?.email ?? '—'} />
+                  <InfoRow label="TC" value={tcProfile?.full_name ?? tcProfile?.email ?? '—'} />
                   <InfoRow label="Evaluation Price" value={formatCurrency(ev.evaluation_price)} />
                   <InfoRow label="Marketing Price" value={formatCurrency(ev.marketing_price)} />
                 </div>
