@@ -14,12 +14,6 @@ export default function AuthCompletePage() {
     const accessToken  = params.get('access_token')
     const refreshToken = params.get('refresh_token')
 
-    // TEMP-DEBUG: remove after diagnosing missing photo
-    console.log('google sign-in debug:', {
-      name:    params.get('debug_name'),
-      picture: params.get('debug_picture'),
-    })
-
     if (!accessToken || !refreshToken) {
       router.replace('/?error=signin_failed')
       return
