@@ -25,7 +25,39 @@ type Property = {
   google_maps_url: string | null
 }
 
-type Evaluation = {
+type Contact = {
+  id: string
+  title: string | null
+  first_name: string
+  last_name: string
+  status: string | null
+  phone_number: string | null
+  email_address: string | null
+  contact_preference: string | null
+  tags: string[] | null
+  marital_status: string | null
+  occupation: string | null
+  company_name: string | null
+  division: string | null
+  branch: string | null
+  address: string | null
+  birthday: string | null
+  wedding_anniversary: string | null
+  home_anniversary: string | null
+  id_number: string | null
+  date_added: string | null
+}
+
+type LeadInfo = {
+  id: string
+  lead_generated_by: string | null
+  lead_source_picklist: { label: string } | null
+  lead_source_other_text: string | null
+  referral_type: string | null
+  lead_referral_notes: string | null
+}
+
+type Evaluation = LeadInfo & {
   id: string
   status: string
   date_captured: string
@@ -36,11 +68,9 @@ type Evaluation = {
   sellers_agent_user_id: string | null
   transaction_coordinator_user_id: string | null
   properties: Property | null
-  lead_source_picklist: { label: string } | null
-  lead_source_other_text: string | null
   evaluation_contacts: {
     is_primary: boolean
-    contacts: { first_name: string; last_name: string } | null
+    contacts: Contact | null
     picklist_options: { label: string } | null
   }[]
 }
@@ -67,10 +97,24 @@ function formatCurrency(value: number | null): string {
   return new Intl.NumberFormat('en-ZA', { style: 'currency', currency: 'ZAR', maximumFractionDigits: 0 }).format(value)
 }
 
-function sellerName(ev: Evaluation): string {
+function getSeller(ev: Evaluation): Contact | null {
   const seller = ev.evaluation_contacts?.find(c => c.picklist_options?.label === 'Seller')
     ?? ev.evaluation_contacts?.find(c => c.is_primary)
-  return seller?.contacts ? `${seller.contacts.first_name} ${seller.contacts.last_name}`.trim() : '—'
+  return seller?.contacts ?? null
+}
+
+function sellerName(ev: Evaluation): string {
+  const contact = getSeller(ev)
+  return contact ? `${contact.first_name} ${contact.last_name}`.trim() : '—'
+}
+
+function fullName(c: Contact): string {
+  return [c.title, c.first_name, c.last_name].filter(Boolean).join(' ')
+}
+
+function formatDate(iso: string | null): string {
+  if (!iso) return '—'
+  return new Date(iso).toLocaleDateString('en-ZA', { day: 'numeric', month: 'long', year: 'numeric' })
 }
 
 const STATUS_LABELS: Record<string, { label: string; colour: string }> = {
@@ -98,6 +142,8 @@ export default function EvaluationsPage() {
   const [search, setSearch]           = useState('')
   const [filterStatus, setFilterStatus] = useState('')
   const [selectedProperty, setSelectedProperty] = useState<Property | null>(null)
+  const [selectedContact, setSelectedContact] = useState<Contact | null>(null)
+  const [selectedLead, setSelectedLead] = useState<LeadInfo | null>(null)
 
   const fetchEvaluations = useCallback(async () => {
     setLoading(true)
@@ -110,9 +156,16 @@ export default function EvaluationsPage() {
         properties (id, unit_number, complex_or_building_name, street_number, street_name,
           suburb, city, province, postal_code, country, property_type,
           latitude, longitude, google_maps_url),
+        lead_generated_by, referral_type, lead_referral_notes,
         lead_source_picklist:lead_source_option_id (label),
         lead_source_other_text,
-        evaluation_contacts (is_primary, contacts (first_name, last_name), picklist_options:tag_option_id (label))
+        evaluation_contacts (
+          is_primary,
+          contacts (id, title, first_name, last_name, status, phone_number, email_address,
+            contact_preference, tags, marital_status, occupation, company_name, division,
+            branch, address, birthday, wedding_anniversary, home_anniversary, id_number, date_added),
+          picklist_options:tag_option_id (label)
+        )
       `)
       .order('date_captured', { ascending: false })
 
@@ -245,8 +298,26 @@ export default function EvaluationsPage() {
                     <td className="px-4 py-3 text-gray-500 whitespace-nowrap">{date}</td>
                     <td className="px-4 py-3 text-gray-500 whitespace-nowrap">{agent?.full_name ?? agent?.email ?? '—'}</td>
                     <td className="px-4 py-3 text-gray-500 whitespace-nowrap">{tc?.full_name ?? tc?.email ?? '—'}</td>
-                    <td className="px-4 py-3 text-gray-500 whitespace-nowrap">{sellerName(ev)}</td>
-                    <td className="px-4 py-3 text-gray-500 whitespace-nowrap">{leadSource}</td>
+                    <td className="px-4 py-3 whitespace-nowrap">
+                      {getSeller(ev) ? (
+                        <button
+                          onClick={e => { e.stopPropagation(); setSelectedContact(getSeller(ev)) }}
+                          className="text-gray-500 hover:text-blue-600 hover:underline transition-colors"
+                        >
+                          {sellerName(ev)}
+                        </button>
+                      ) : (
+                        <span className="text-gray-500">—</span>
+                      )}
+                    </td>
+                    <td className="px-4 py-3 whitespace-nowrap">
+                      <button
+                        onClick={e => { e.stopPropagation(); setSelectedLead(ev) }}
+                        className="text-gray-500 hover:text-blue-600 hover:underline transition-colors"
+                      >
+                        {leadSource}
+                      </button>
+                    </td>
                     <td className="px-4 py-3 text-gray-500 whitespace-nowrap">{formatCurrency(ev.evaluation_price)}</td>
                     <td className="px-4 py-3 text-gray-500 whitespace-nowrap">{formatCurrency(ev.marketing_price)}</td>
                   </tr>
@@ -263,6 +334,14 @@ export default function EvaluationsPage() {
           onClose={() => setSelectedProperty(null)}
           onUpdated={fetchEvaluations}
         />
+      )}
+
+      {selectedContact && (
+        <ContactDetailsModal contact={selectedContact} onClose={() => setSelectedContact(null)} />
+      )}
+
+      {selectedLead && (
+        <LeadDetailsModal lead={selectedLead} onClose={() => setSelectedLead(null)} />
       )}
     </div>
   )
@@ -390,6 +469,106 @@ function PropertyDetailsModal({ property, onClose, onUpdated }: {
           >
             Get Directions
           </a>
+        </div>
+      </div>
+    </div>
+  )
+}
+
+// ── Contact details pop-up ───────────────────────────────────
+function ContactDetailsModal({ contact, onClose }: { contact: Contact; onClose: () => void }) {
+  const fields: [string, string | null][] = [
+    ['Title', contact.title],
+    ['First Name', contact.first_name],
+    ['Surname', contact.last_name],
+    ['Status', contact.status],
+    ['Tags', contact.tags?.length ? contact.tags.join(', ') : null],
+    ['ID Number', contact.id_number],
+    ['Date Added', formatDate(contact.date_added)],
+    ['Phone', contact.phone_number],
+    ['Email', contact.email_address],
+    ['Preference', contact.contact_preference],
+    ['Address', contact.address],
+    ['Marital Status', contact.marital_status],
+    ['Birthday', formatDate(contact.birthday)],
+    ['Wedding Anniversary', formatDate(contact.wedding_anniversary)],
+    ['Home Anniversary', formatDate(contact.home_anniversary)],
+    ['Occupation', contact.occupation],
+    ['Company', contact.company_name],
+    ['Division', contact.division],
+    ['Branch', contact.branch],
+  ]
+
+  return (
+    <div className="fixed inset-0 bg-black/40 flex items-center justify-center z-50 p-4" onClick={onClose}>
+      <div
+        className="bg-white rounded-2xl shadow-xl max-w-lg w-full max-h-[90vh] overflow-y-auto"
+        onClick={e => e.stopPropagation()}
+      >
+        <div className="flex items-start justify-between gap-4 p-6 border-b border-gray-100">
+          <h3 className="text-lg font-bold text-[#1a1a1a]">{fullName(contact)}</h3>
+          <button onClick={onClose} className="text-gray-400 hover:text-[#1a1a1a] text-xl leading-none flex-shrink-0">×</button>
+        </div>
+
+        <div className="p-6">
+          <div className="grid grid-cols-2 gap-x-6 gap-y-3 text-sm">
+            {fields.filter(([, value]) => value).map(([label, value]) => (
+              <div key={label}>
+                <p className="text-xs font-medium text-gray-400 uppercase tracking-wide mb-0.5">{label}</p>
+                <p className="text-[#1a1a1a] font-medium">{value}</p>
+              </div>
+            ))}
+          </div>
+        </div>
+
+        <div className="px-6 pb-6">
+          <Link href={`/dashboard/contacts/${contact.id}`} className={`${btn.primary} w-full block text-center`}>
+            View Full Contact →
+          </Link>
+        </div>
+      </div>
+    </div>
+  )
+}
+
+// ── Lead details pop-up ───────────────────────────────────────
+function LeadDetailsModal({ lead, onClose }: { lead: LeadInfo; onClose: () => void }) {
+  const fields: [string, string | null][] = [
+    ['Lead Generated By', lead.lead_generated_by ? lead.lead_generated_by.replace('_', ' ') : null],
+    ['Lead Source', lead.lead_source_picklist?.label ?? lead.lead_source_other_text],
+    ['Referral Type', lead.referral_type ? lead.referral_type.replace('_', ' ') : null],
+    ['Referral Notes', lead.lead_referral_notes],
+  ]
+
+  return (
+    <div className="fixed inset-0 bg-black/40 flex items-center justify-center z-50 p-4" onClick={onClose}>
+      <div
+        className="bg-white rounded-2xl shadow-xl max-w-lg w-full max-h-[90vh] overflow-y-auto"
+        onClick={e => e.stopPropagation()}
+      >
+        <div className="flex items-start justify-between gap-4 p-6 border-b border-gray-100">
+          <h3 className="text-lg font-bold text-[#1a1a1a]">Lead Details</h3>
+          <button onClick={onClose} className="text-gray-400 hover:text-[#1a1a1a] text-xl leading-none flex-shrink-0">×</button>
+        </div>
+
+        <div className="p-6">
+          <div className="grid grid-cols-2 gap-x-6 gap-y-3 text-sm">
+            {fields.filter(([, value]) => value).map(([label, value]) => (
+              <div key={label}>
+                <p className="text-xs font-medium text-gray-400 uppercase tracking-wide mb-0.5">{label}</p>
+                <p className="text-[#1a1a1a] font-medium">{value}</p>
+              </div>
+            ))}
+          </div>
+          {fields.every(([, value]) => !value) && (
+            <p className="text-sm text-gray-400">No lead details captured for this evaluation.</p>
+          )}
+        </div>
+
+        <div className="px-6 pb-6">
+          <Link href={`/dashboard/evaluations/${lead.id}`} className={`${btn.primary} w-full block text-center`}>
+            View Evaluation →
+          </Link>
         </div>
       </div>
     </div>
