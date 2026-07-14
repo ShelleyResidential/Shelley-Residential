@@ -40,8 +40,6 @@ function LoginContent() {
 
         {/* Card */}
         <div className="bg-white rounded-2xl shadow-sm border border-gray-100 p-8">
-          <h2 className="text-xl font-semibold text-[#1a1a1a] mb-6">Sign in to your account</h2>
-
           <a
             href="/api/auth/google-signin"
             className="w-full flex items-center justify-center gap-3 px-4 py-3 rounded-lg border border-gray-200 text-sm font-medium text-[#1a1a1a] hover:bg-gray-50 transition-colors"
