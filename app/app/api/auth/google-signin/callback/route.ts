@@ -88,8 +88,12 @@ export async function GET(request: NextRequest) {
     { onConflict: 'user_id' },
   )
 
+  // TEMP-DEBUG: surface what Google actually sent, remove after diagnosing missing photo
+  const debugName    = encodeURIComponent(payload.name ?? '(none)')
+  const debugPicture = encodeURIComponent(payload.picture ?? '(none)')
+
   const response = NextResponse.redirect(
-    `${appUrl}/auth/complete#access_token=${encodeURIComponent(data.session.access_token)}&refresh_token=${encodeURIComponent(data.session.refresh_token)}`,
+    `${appUrl}/auth/complete#access_token=${encodeURIComponent(data.session.access_token)}&refresh_token=${encodeURIComponent(data.session.refresh_token)}&debug_name=${debugName}&debug_picture=${debugPicture}`,
   )
   response.cookies.set('google_login_nonce', '', { maxAge: 0, path: '/' })
   return response
