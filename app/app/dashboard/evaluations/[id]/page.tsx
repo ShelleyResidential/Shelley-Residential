@@ -28,6 +28,8 @@ type PipelineStep = {
   completed_at: string | null; sort_order: number
 }
 
+type Profile = { id: string; full_name: string | null; email: string | null }
+
 type Evaluation = {
   id: string; status: string; date_captured: string
   property_status: string | null
@@ -36,15 +38,26 @@ type Evaluation = {
   referral_type: string | null
   motivation_for_selling_notes: string | null; selling_timeline_notes: string | null
   scheduled_at: string | null; calendar_event_link: string | null
+  sellers_agent_user_id: string | null
+  transaction_coordinator_user_id: string | null
+  evaluation_price: number | null
+  marketing_price: number | null
   properties: Property | null
   lead_source_picklist: { label: string } | null
   motivation_picklist: { label: string } | null
   timeline_picklist: { label: string } | null
+  agent_profile: Profile | null
+  tc_profile: Profile | null
   evaluation_contacts: EvalContact[]
   evaluation_pipeline_steps: PipelineStep[]
 }
 
 // ── Helpers ───────────────────────────────────────────────────
+function formatCurrency(value: number | null): string {
+  if (value == null) return '—'
+  return new Intl.NumberFormat('en-ZA', { style: 'currency', currency: 'ZAR', maximumFractionDigits: 0 }).format(value)
+}
+
 function formatAddress(p: Property | null): string {
   if (!p) return 'Unknown address'
   if (p.property_type === 'sectional_title' && p.unit_number) {
@@ -96,6 +109,7 @@ export default function EvaluationDetailPage() {
   const [error, setError]           = useState('')
   const [syncing, setSyncing]       = useState(false)
   const [syncError, setSyncError]   = useState('')
+  const [profiles, setProfiles]     = useState<Profile[]>([])
 
   // Edit form state
   const [editStatus, setEditStatus]             = useState('')
@@ -104,6 +118,10 @@ export default function EvaluationDetailPage() {
   const [editMotivationNotes, setEditMotivationNotes] = useState('')
   const [editTimelineNotes, setEditTimelineNotes] = useState('')
   const [editLeadReferralNotes, setEditLeadReferralNotes] = useState('')
+  const [editAgentId, setEditAgentId]           = useState('')
+  const [editTcId, setEditTcId]                 = useState('')
+  const [editEvaluationPrice, setEditEvaluationPrice] = useState('')
+  const [editMarketingPrice, setEditMarketingPrice]   = useState('')
 
   const fetchEvaluation = useCallback(async () => {
     const { data } = await supabase
@@ -113,12 +131,16 @@ export default function EvaluationDetailPage() {
         lead_source_other_text, lead_referral_notes, referral_type,
         motivation_for_selling_notes, selling_timeline_notes,
         scheduled_at, calendar_event_link,
+        sellers_agent_user_id, transaction_coordinator_user_id,
+        evaluation_price, marketing_price,
         properties (id, property_type, unit_number, complex_or_building_name,
           street_number, street_name, suburb, city, province, postal_code,
           google_maps_url, latitude, longitude),
         lead_source_picklist:lead_source_option_id (label),
         motivation_picklist:motivation_for_selling_option_id (label),
         timeline_picklist:selling_timeline_option_id (label),
+        agent_profile:sellers_agent_user_id (id, full_name, email),
+        tc_profile:transaction_coordinator_user_id (id, full_name, email),
         evaluation_contacts (
           id, is_primary, sort_order, tag_option_id,
           contacts (id, first_name, last_name, title, phone_number, email_address),
@@ -138,6 +160,10 @@ export default function EvaluationDetailPage() {
       setEditMotivationNotes(ev.motivation_for_selling_notes ?? '')
       setEditTimelineNotes(ev.selling_timeline_notes ?? '')
       setEditLeadReferralNotes(ev.lead_referral_notes ?? '')
+      setEditAgentId(ev.sellers_agent_user_id ?? '')
+      setEditTcId(ev.transaction_coordinator_user_id ?? '')
+      setEditEvaluationPrice(ev.evaluation_price != null ? String(ev.evaluation_price) : '')
+      setEditMarketingPrice(ev.marketing_price != null ? String(ev.marketing_price) : '')
     }
     setLoading(false)
   }, [id])
@@ -146,6 +172,9 @@ export default function EvaluationDetailPage() {
     supabase.auth.getUser().then(({ data }) => {
       if (!data.user) router.push('/')
       else setUserId(data.user.id)
+    })
+    supabase.from('profiles').select('id, full_name, email').then(({ data }) => {
+      setProfiles((data ?? []) as Profile[])
     })
     fetchEvaluation()
   }, [router, fetchEvaluation])
@@ -160,6 +189,10 @@ export default function EvaluationDetailPage() {
       motivation_for_selling_notes: editMotivationNotes || null,
       selling_timeline_notes:   editTimelineNotes || null,
       lead_referral_notes:      editLeadReferralNotes || null,
+      sellers_agent_user_id:    editAgentId || null,
+      transaction_coordinator_user_id: editTcId || null,
+      evaluation_price:         editEvaluationPrice ? Number(editEvaluationPrice) : null,
+      marketing_price:          editMarketingPrice ? Number(editMarketingPrice) : null,
     }).eq('id', id)
 
     if (err) { setError(err.message); setSaving(false); return }
@@ -332,6 +365,36 @@ export default function EvaluationDetailPage() {
                   <label className={labelCls}>Scheduled Date & Time</label>
                   <input type="datetime-local" value={editScheduledAt} onChange={e => setEditScheduledAt(e.target.value)} className={input} />
                 </div>
+                <div className="grid grid-cols-2 gap-4">
+                  <div>
+                    <label className={labelCls}>Agent</label>
+                    <select value={editAgentId} onChange={e => setEditAgentId(e.target.value)} className={select}>
+                      <option value="">—</option>
+                      {profiles.map(p => (
+                        <option key={p.id} value={p.id}>{p.full_name ?? p.email}</option>
+                      ))}
+                    </select>
+                  </div>
+                  <div>
+                    <label className={labelCls}>TC</label>
+                    <select value={editTcId} onChange={e => setEditTcId(e.target.value)} className={select}>
+                      <option value="">—</option>
+                      {profiles.map(p => (
+                        <option key={p.id} value={p.id}>{p.full_name ?? p.email}</option>
+                      ))}
+                    </select>
+                  </div>
+                </div>
+                <div className="grid grid-cols-2 gap-4">
+                  <div>
+                    <label className={labelCls}>Evaluation Price</label>
+                    <input type="number" value={editEvaluationPrice} onChange={e => setEditEvaluationPrice(e.target.value)} className={input} placeholder="0" />
+                  </div>
+                  <div>
+                    <label className={labelCls}>Marketing Price</label>
+                    <input type="number" value={editMarketingPrice} onChange={e => setEditMarketingPrice(e.target.value)} className={input} placeholder="0" />
+                  </div>
+                </div>
               </div>
             ) : (
               <>
@@ -346,6 +409,10 @@ export default function EvaluationDetailPage() {
                   {ev.calendar_event_link && (
                     <InfoRow label="Calendar" value={<a href={ev.calendar_event_link} target="_blank" rel="noopener noreferrer" className="text-blue-600 hover:underline">View event ↗</a>} />
                   )}
+                  <InfoRow label="Agent" value={ev.agent_profile?.full_name ?? ev.agent_profile?.email ?? '—'} />
+                  <InfoRow label="TC" value={ev.tc_profile?.full_name ?? ev.tc_profile?.email ?? '—'} />
+                  <InfoRow label="Evaluation Price" value={formatCurrency(ev.evaluation_price)} />
+                  <InfoRow label="Marketing Price" value={formatCurrency(ev.marketing_price)} />
                 </div>
                 {ev.scheduled_at && (
                   <div className="mt-4 flex items-center gap-3 flex-wrap">

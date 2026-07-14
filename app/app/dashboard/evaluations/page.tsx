@@ -2,9 +2,11 @@
 
 import { useState, useEffect, useCallback } from 'react'
 import { supabase } from '@/lib/supabase'
-import { btn, card, input, select } from '@/lib/styles'
+import { btn, card, input } from '@/lib/styles'
 import { useRouter } from 'next/navigation'
 import Link from 'next/link'
+
+type Profile = { full_name: string | null; email: string | null }
 
 type Evaluation = {
   id: string
@@ -12,6 +14,8 @@ type Evaluation = {
   date_captured: string
   scheduled_at: string | null
   property_status: string | null
+  evaluation_price: number | null
+  marketing_price: number | null
   properties: {
     unit_number: string | null
     complex_or_building_name: string | null
@@ -21,9 +25,14 @@ type Evaluation = {
     city: string | null
     property_type: string | null
   } | null
+  agent_profile: Profile | null
+  tc_profile: Profile | null
+  lead_source_picklist: { label: string } | null
+  lead_source_other_text: string | null
   evaluation_contacts: {
     is_primary: boolean
     contacts: { first_name: string; last_name: string } | null
+    picklist_options: { label: string } | null
   }[]
 }
 
@@ -35,6 +44,17 @@ function formatAddress(p: Evaluation['properties']): string {
   return [p.street_number, p.street_name, p.suburb].filter(Boolean).join(' ') || p.city || 'Unknown address'
 }
 
+function formatCurrency(value: number | null): string {
+  if (value == null) return '—'
+  return new Intl.NumberFormat('en-ZA', { style: 'currency', currency: 'ZAR', maximumFractionDigits: 0 }).format(value)
+}
+
+function sellerName(ev: Evaluation): string {
+  const seller = ev.evaluation_contacts?.find(c => c.picklist_options?.label === 'Seller')
+    ?? ev.evaluation_contacts?.find(c => c.is_primary)
+  return seller?.contacts ? `${seller.contacts.first_name} ${seller.contacts.last_name}`.trim() : '—'
+}
+
 const STATUS_LABELS: Record<string, { label: string; colour: string }> = {
   in_progress: { label: 'In Progress', colour: 'bg-blue-50 text-blue-700' },
   open:        { label: 'Open',        colour: 'bg-green-50 text-green-700' },
@@ -42,6 +62,15 @@ const STATUS_LABELS: Record<string, { label: string; colour: string }> = {
   lost:        { label: 'Lost',        colour: 'bg-red-50 text-red-600' },
   future:      { label: 'Future',      colour: 'bg-yellow-50 text-yellow-700' },
 }
+
+const STATUS_TABS = [
+  { key: '',           label: 'All' },
+  { key: 'future',     label: 'Future' },
+  { key: 'in_progress', label: 'In Progress' },
+  { key: 'lost',       label: 'Lost' },
+  { key: 'open',       label: 'Open Mandate' },
+  { key: 'won',        label: 'Won' },
+]
 
 export default function EvaluationsPage() {
   const router = useRouter()
@@ -56,8 +85,13 @@ export default function EvaluationsPage() {
       .from('evaluations')
       .select(`
         id, status, date_captured, scheduled_at, property_status,
+        evaluation_price, marketing_price,
         properties (unit_number, complex_or_building_name, street_number, street_name, suburb, city, property_type),
-        evaluation_contacts (is_primary, contacts (first_name, last_name))
+        agent_profile:sellers_agent_user_id (full_name, email),
+        tc_profile:transaction_coordinator_user_id (full_name, email),
+        lead_source_picklist:lead_source_option_id (label),
+        lead_source_other_text,
+        evaluation_contacts (is_primary, contacts (first_name, last_name), picklist_options:tag_option_id (label))
       `)
       .order('date_captured', { ascending: false })
 
@@ -70,11 +104,8 @@ export default function EvaluationsPage() {
       const q = search.toLowerCase()
       results = results.filter(e => {
         const addr = formatAddress(e.properties).toLowerCase()
-        const primaryContact = e.evaluation_contacts?.find(c => c.is_primary)
-        const name = primaryContact?.contacts
-          ? `${primaryContact.contacts.first_name} ${primaryContact.contacts.last_name}`.toLowerCase()
-          : ''
-        return addr.includes(q) || name.includes(q)
+        const seller = sellerName(e).toLowerCase()
+        return addr.includes(q) || seller.includes(q)
       })
     }
 
@@ -98,25 +129,32 @@ export default function EvaluationsPage() {
         <Link href="/dashboard/evaluations/new" className={btn.primary}>+ New Evaluation</Link>
       </div>
 
-      {/* Filters */}
+      {/* Status filter tabs */}
+      <div className="flex gap-1 mb-6 border-b border-gray-200">
+        {STATUS_TABS.map(tab => (
+          <button
+            key={tab.key}
+            onClick={() => setFilterStatus(tab.key)}
+            className={`px-4 py-2 text-sm font-medium border-b-2 -mb-px transition-colors ${
+              filterStatus === tab.key ? 'border-[#1a1a1a] text-[#1a1a1a]' : 'border-transparent text-gray-400 hover:text-[#1a1a1a]'
+            }`}
+          >
+            {tab.label}
+          </button>
+        ))}
+      </div>
+
+      {/* Search */}
       <div className={`${card} p-4 mb-6 flex gap-3 flex-wrap items-center`}>
         <input
           type="text"
-          placeholder="Search by address or contact…"
+          placeholder="Search by address or seller…"
           value={search}
           onChange={e => setSearch(e.target.value)}
           className={`${input} flex-1 min-w-[200px]`}
         />
-        <select value={filterStatus} onChange={e => setFilterStatus(e.target.value)} className={`${select} w-auto`}>
-          <option value="">All statuses</option>
-          <option value="in_progress">In Progress</option>
-          <option value="open">Open</option>
-          <option value="won">Won</option>
-          <option value="lost">Lost</option>
-          <option value="future">Future</option>
-        </select>
-        {(search || filterStatus) && (
-          <button onClick={() => { setSearch(''); setFilterStatus('') }} className={btn.secondary}>
+        {search && (
+          <button onClick={() => setSearch('')} className={btn.secondary}>
             Clear
           </button>
         )}
@@ -136,40 +174,51 @@ export default function EvaluationsPage() {
           <Link href="/dashboard/evaluations/new" className={btn.primary}>Create your first evaluation</Link>
         </div>
       ) : (
-        <div className="space-y-2">
-          {evaluations.map(ev => {
-            const statusMeta = STATUS_LABELS[ev.status] ?? { label: ev.status, colour: 'bg-gray-100 text-gray-500' }
-            const primaryContact = ev.evaluation_contacts?.find(c => c.is_primary)
-            const contactName = primaryContact?.contacts
-              ? `${primaryContact.contacts.first_name} ${primaryContact.contacts.last_name}`.trim()
-              : null
-            const address = formatAddress(ev.properties)
-            const scheduled = ev.scheduled_at
-              ? new Date(ev.scheduled_at).toLocaleDateString('en-ZA', { day: 'numeric', month: 'short', year: 'numeric', hour: '2-digit', minute: '2-digit' })
-              : null
+        <div className={`${card} overflow-x-auto`}>
+          <table className="w-full text-sm">
+            <thead>
+              <tr className="border-b border-gray-100 text-left">
+                <th className="px-4 py-3 font-semibold text-[#1a1a1a] whitespace-nowrap">Status</th>
+                <th className="px-4 py-3 font-semibold text-[#1a1a1a] whitespace-nowrap">Address</th>
+                <th className="px-4 py-3 font-semibold text-[#1a1a1a] whitespace-nowrap">Date</th>
+                <th className="px-4 py-3 font-semibold text-[#1a1a1a] whitespace-nowrap">Agent</th>
+                <th className="px-4 py-3 font-semibold text-[#1a1a1a] whitespace-nowrap">TC</th>
+                <th className="px-4 py-3 font-semibold text-[#1a1a1a] whitespace-nowrap">Seller</th>
+                <th className="px-4 py-3 font-semibold text-[#1a1a1a] whitespace-nowrap">Lead Source</th>
+                <th className="px-4 py-3 font-semibold text-[#1a1a1a] whitespace-nowrap">Evaluation Price</th>
+                <th className="px-4 py-3 font-semibold text-[#1a1a1a] whitespace-nowrap">Marketing Price</th>
+              </tr>
+            </thead>
+            <tbody>
+              {evaluations.map((ev, i) => {
+                const statusMeta = STATUS_LABELS[ev.status] ?? { label: ev.status, colour: 'bg-gray-100 text-gray-500' }
+                const date = new Date(ev.date_captured).toLocaleDateString('en-ZA', { day: 'numeric', month: 'short', year: 'numeric' })
+                const leadSource = ev.lead_source_picklist?.label ?? ev.lead_source_other_text ?? '—'
 
-            return (
-              <Link
-                key={ev.id}
-                href={`/dashboard/evaluations/${ev.id}`}
-                className={`${card} flex items-center justify-between px-5 py-4 hover:shadow-md hover:border-gray-200 transition-all`}
-              >
-                <div className="min-w-0">
-                  <div className="flex items-center gap-2 flex-wrap">
-                    <span className="font-semibold text-[#1a1a1a]">{address}</span>
-                    <span className={`text-xs px-2 py-0.5 rounded-full font-medium ${statusMeta.colour}`}>
-                      {statusMeta.label}
-                    </span>
-                  </div>
-                  <div className="flex gap-4 mt-1 text-sm text-[#1a1a1a] flex-wrap">
-                    {contactName && <span>{contactName}</span>}
-                    {scheduled && <span className="text-gray-400">📅 {scheduled}</span>}
-                  </div>
-                </div>
-                <span className="text-gray-300 text-lg flex-shrink-0 ml-4">›</span>
-              </Link>
-            )
-          })}
+                return (
+                  <tr
+                    key={ev.id}
+                    onClick={() => router.push(`/dashboard/evaluations/${ev.id}`)}
+                    className={`cursor-pointer hover:bg-gray-100 transition-colors ${i % 2 === 0 ? 'bg-white' : 'bg-gray-50'}`}
+                  >
+                    <td className="px-4 py-3 whitespace-nowrap">
+                      <span className={`text-xs px-2 py-0.5 rounded-full font-medium ${statusMeta.colour}`}>
+                        {statusMeta.label}
+                      </span>
+                    </td>
+                    <td className="px-4 py-3 font-medium text-[#1a1a1a] whitespace-nowrap">{formatAddress(ev.properties)}</td>
+                    <td className="px-4 py-3 text-gray-500 whitespace-nowrap">{date}</td>
+                    <td className="px-4 py-3 text-gray-500 whitespace-nowrap">{ev.agent_profile?.full_name ?? ev.agent_profile?.email ?? '—'}</td>
+                    <td className="px-4 py-3 text-gray-500 whitespace-nowrap">{ev.tc_profile?.full_name ?? ev.tc_profile?.email ?? '—'}</td>
+                    <td className="px-4 py-3 text-gray-500 whitespace-nowrap">{sellerName(ev)}</td>
+                    <td className="px-4 py-3 text-gray-500 whitespace-nowrap">{leadSource}</td>
+                    <td className="px-4 py-3 text-gray-500 whitespace-nowrap">{formatCurrency(ev.evaluation_price)}</td>
+                    <td className="px-4 py-3 text-gray-500 whitespace-nowrap">{formatCurrency(ev.marketing_price)}</td>
+                  </tr>
+                )
+              })}
+            </tbody>
+          </table>
         </div>
       )}
     </div>
