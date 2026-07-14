@@ -16,6 +16,31 @@ type Property = {
 
 type PicklistOption = { id: string; value: string; label: string; allow_free_text?: boolean }
 
+// ── Address helpers ────────────────────────────────────────────
+function capitalizeWords(text: string): string {
+  return text.replace(/\b\w/g, c => c.toUpperCase())
+}
+
+function parseAddressParts(raw: string): { street_name: string; suburb: string | null; city: string | null; postal_code: string | null } {
+  const parts = raw.split(',').map(p => p.trim()).filter(Boolean)
+
+  let postal_code: string | null = null
+  if (parts.length > 1 && /^\d{4}$/.test(parts[parts.length - 1])) {
+    postal_code = parts.pop()!
+  }
+
+  if (parts.length >= 3) {
+    const city = parts.pop()!
+    const suburb = parts.pop()!
+    return { street_name: capitalizeWords(parts.join(', ')), suburb: capitalizeWords(suburb), city: capitalizeWords(city), postal_code }
+  }
+  if (parts.length === 2) {
+    const suburb = parts.pop()!
+    return { street_name: capitalizeWords(parts.join(', ')), suburb: capitalizeWords(suburb), city: null, postal_code }
+  }
+  return { street_name: capitalizeWords(parts[0] ?? raw), suburb: null, city: null, postal_code }
+}
+
 type ContactSlot = {
   contact_id: string
   contact_name: string
@@ -108,11 +133,16 @@ export default function NewEvaluationPage() {
     if (!newPropertyAddress.trim()) { setError('Please enter an address.'); return }
     setError('')
 
+    const parsed = parseAddressParts(newPropertyAddress.trim())
+
     const { data, error: err } = await supabase
       .from('properties')
       .insert({
         property_type: newPropertyType,
-        street_name: newPropertyAddress.trim(),
+        street_name: parsed.street_name,
+        suburb: parsed.suburb,
+        city: parsed.city,
+        postal_code: parsed.postal_code,
         created_by_user_id: userId,
       })
       .select('id, property_type, street_name, suburb, city')
