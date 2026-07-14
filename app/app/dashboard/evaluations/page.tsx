@@ -58,6 +58,10 @@ function mapQuery(p: Property): string {
   return [p.street_number, p.street_name, p.suburb, p.city, p.province, p.postal_code, p.country].filter(Boolean).join(' ')
 }
 
+function capitalizeWords(text: string): string {
+  return text.replace(/\b\w/g, c => c.toUpperCase())
+}
+
 function formatCurrency(value: number | null): string {
   if (value == null) return '—'
   return new Intl.NumberFormat('en-ZA', { style: 'currency', currency: 'ZAR', maximumFractionDigits: 0 }).format(value)
@@ -254,32 +258,85 @@ export default function EvaluationsPage() {
       )}
 
       {selectedProperty && (
-        <PropertyDetailsModal property={selectedProperty} onClose={() => setSelectedProperty(null)} />
+        <PropertyDetailsModal
+          property={selectedProperty}
+          onClose={() => setSelectedProperty(null)}
+          onUpdated={fetchEvaluations}
+        />
       )}
     </div>
   )
 }
 
 // ── Property details pop-up ──────────────────────────────────
-function PropertyDetailsModal({ property, onClose }: { property: Property; onClose: () => void }) {
-  const address = formatAddress(property)
-  const query   = mapQuery(property)
+function PropertyDetailsModal({ property, onClose, onUpdated }: {
+  property: Property; onClose: () => void; onUpdated: () => void
+}) {
+  const [current, setCurrent] = useState(property)
+  const [refreshing, setRefreshing] = useState(false)
+  const [refreshError, setRefreshError] = useState('')
+
+  const address = formatAddress(current)
+  const query   = mapQuery(current)
   const mapSrc  = `https://www.google.com/maps?q=${encodeURIComponent(query)}&output=embed`
   const directionsUrl = `https://www.google.com/maps/dir/?api=1&destination=${encodeURIComponent(query)}`
 
   const fields: [string, string | null][] = [
-    ['Property Type', property.property_type ? property.property_type.replace('_', ' ') : null],
-    ['Unit Number', property.unit_number],
-    ['Complex / Building', property.complex_or_building_name],
-    ['Street Number', property.street_number],
-    ['Street Name', property.street_name],
-    ['Suburb', property.suburb],
-    ['City', property.city],
-    ['Province', property.province],
-    ['Postal Code', property.postal_code],
-    ['Country', property.country],
-    ['Coordinates', property.latitude != null && property.longitude != null ? `${property.latitude}, ${property.longitude}` : null],
+    ['Property Type', current.property_type ? current.property_type.replace('_', ' ') : null],
+    ['Unit Number', current.unit_number],
+    ['Complex / Building', current.complex_or_building_name],
+    ['Street Number', current.street_number],
+    ['Street Name', current.street_name],
+    ['Suburb', current.suburb],
+    ['City', current.city],
+    ['Province', current.province],
+    ['Postal Code', current.postal_code],
+    ['Country', current.country],
+    ['Coordinates', current.latitude != null && current.longitude != null ? `${current.latitude}, ${current.longitude}` : null],
   ]
+
+  async function refreshFromGoogle() {
+    setRefreshing(true)
+    setRefreshError('')
+
+    const raw = [current.street_number, current.street_name, current.suburb, current.city].filter(Boolean).join(' ') || address
+    const res = await fetch('/api/geocode', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ address: raw }),
+    })
+
+    if (!res.ok) {
+      setRefreshError('Could not find this address on Google. Try editing it manually.')
+      setRefreshing(false)
+      return
+    }
+
+    const geo = await res.json()
+    const streetLine = [geo.street_number, geo.route].filter(Boolean).join(' ')
+    const updates = {
+      street_number: geo.street_number,
+      street_name:   streetLine ? capitalizeWords(streetLine) : current.street_name,
+      suburb:        geo.suburb ? capitalizeWords(geo.suburb) : null,
+      city:          geo.city ? capitalizeWords(geo.city) : null,
+      province:      geo.province,
+      postal_code:   geo.postal_code,
+      country:       geo.country ?? current.country,
+      latitude:      geo.latitude,
+      longitude:     geo.longitude,
+      google_place_id: geo.google_place_id,
+      google_maps_url: geo.formatted_address
+        ? `https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(geo.formatted_address)}`
+        : current.google_maps_url,
+    }
+
+    const { error } = await supabase.from('properties').update(updates).eq('id', current.id)
+    setRefreshing(false)
+
+    if (error) { setRefreshError(error.message); return }
+    setCurrent({ ...current, ...updates })
+    onUpdated()
+  }
 
   return (
     <div
@@ -295,13 +352,22 @@ function PropertyDetailsModal({ property, onClose }: { property: Property; onClo
           <button onClick={onClose} className="text-gray-400 hover:text-[#1a1a1a] text-xl leading-none flex-shrink-0">×</button>
         </div>
 
-        <div className="p-6 grid grid-cols-2 gap-x-6 gap-y-3 text-sm">
-          {fields.filter(([, value]) => value).map(([label, value]) => (
-            <div key={label}>
-              <p className="text-xs font-medium text-gray-400 uppercase tracking-wide mb-0.5">{label}</p>
-              <p className="text-[#1a1a1a] font-medium">{value}</p>
-            </div>
-          ))}
+        <div className="p-6">
+          <div className="flex items-center justify-between mb-4">
+            <button onClick={refreshFromGoogle} disabled={refreshing} className={btn.secondary}>
+              {refreshing ? 'Refreshing…' : '↻ Refresh from Google'}
+            </button>
+          </div>
+          {refreshError && <p className="text-xs text-red-500 mb-4">{refreshError}</p>}
+
+          <div className="grid grid-cols-2 gap-x-6 gap-y-3 text-sm">
+            {fields.filter(([, value]) => value).map(([label, value]) => (
+              <div key={label}>
+                <p className="text-xs font-medium text-gray-400 uppercase tracking-wide mb-0.5">{label}</p>
+                <p className="text-[#1a1a1a] font-medium">{value}</p>
+              </div>
+            ))}
+          </div>
         </div>
 
         <div className="px-6 pb-6">
