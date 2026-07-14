@@ -361,11 +361,6 @@ function PropertyDetailsModal({ property, onClose, onUpdated }: {
         </div>
 
         <div className="p-6">
-          <div className="flex items-center justify-between mb-4">
-            <button onClick={refreshFromGoogle} disabled={refreshing} className={btn.secondary}>
-              {refreshing ? 'Refreshing…' : '↻ Refresh from Google'}
-            </button>
-          </div>
           {refreshError && <p className="text-xs text-red-500 mb-4">{refreshError}</p>}
 
           <div className="grid grid-cols-2 gap-x-6 gap-y-3 text-sm">
