@@ -1,19 +1,6 @@
 const GOOGLE_TOKEN_URL = 'https://oauth2.googleapis.com/token'
 const CALENDAR_BASE    = 'https://www.googleapis.com/calendar/v3/calendars/primary/events'
 
-export function buildGoogleAuthUrl(state: string, redirectUri: string) {
-  const params = new URLSearchParams({
-    client_id:     process.env.GOOGLE_CLIENT_ID!,
-    redirect_uri:  redirectUri,
-    response_type: 'code',
-    scope:         'https://www.googleapis.com/auth/calendar.events',
-    access_type:   'offline',
-    prompt:        'consent',
-    state,
-  })
-  return `https://accounts.google.com/o/oauth2/v2/auth?${params}`
-}
-
 // Combined sign-in + Calendar consent — used by the login flow so Calendar
 // access is granted automatically as part of signing in with Google.
 export function buildGoogleLoginAuthUrl(state: string, redirectUri: string) {
