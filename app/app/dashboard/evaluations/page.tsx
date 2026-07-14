@@ -8,6 +8,23 @@ import Link from 'next/link'
 
 type Profile = { id: string; full_name: string | null; email: string | null }
 
+type Property = {
+  id: string
+  unit_number: string | null
+  complex_or_building_name: string | null
+  street_number: string | null
+  street_name: string | null
+  suburb: string | null
+  city: string | null
+  province: string | null
+  postal_code: string | null
+  country: string | null
+  property_type: string | null
+  latitude: number | null
+  longitude: number | null
+  google_maps_url: string | null
+}
+
 type Evaluation = {
   id: string
   status: string
@@ -18,15 +35,7 @@ type Evaluation = {
   marketing_price: number | null
   sellers_agent_user_id: string | null
   transaction_coordinator_user_id: string | null
-  properties: {
-    unit_number: string | null
-    complex_or_building_name: string | null
-    street_number: string | null
-    street_name: string | null
-    suburb: string | null
-    city: string | null
-    property_type: string | null
-  } | null
+  properties: Property | null
   lead_source_picklist: { label: string } | null
   lead_source_other_text: string | null
   evaluation_contacts: {
@@ -42,6 +51,11 @@ function formatAddress(p: Evaluation['properties']): string {
     return `Unit ${p.unit_number}${p.complex_or_building_name ? ' ' + p.complex_or_building_name : ''}${p.suburb ? ', ' + p.suburb : ''}`
   }
   return [p.street_number, p.street_name, p.suburb].filter(Boolean).join(' ') || p.city || 'Unknown address'
+}
+
+function mapQuery(p: Property): string {
+  if (p.latitude != null && p.longitude != null) return `${p.latitude},${p.longitude}`
+  return [p.street_number, p.street_name, p.suburb, p.city, p.province, p.postal_code, p.country].filter(Boolean).join(' ')
 }
 
 function formatCurrency(value: number | null): string {
@@ -79,6 +93,7 @@ export default function EvaluationsPage() {
   const [loading, setLoading]         = useState(true)
   const [search, setSearch]           = useState('')
   const [filterStatus, setFilterStatus] = useState('')
+  const [selectedProperty, setSelectedProperty] = useState<Property | null>(null)
 
   const fetchEvaluations = useCallback(async () => {
     setLoading(true)
@@ -88,7 +103,9 @@ export default function EvaluationsPage() {
         id, status, date_captured, scheduled_at, property_status,
         evaluation_price, marketing_price,
         sellers_agent_user_id, transaction_coordinator_user_id,
-        properties (unit_number, complex_or_building_name, street_number, street_name, suburb, city, property_type),
+        properties (id, unit_number, complex_or_building_name, street_number, street_name,
+          suburb, city, province, postal_code, country, property_type,
+          latitude, longitude, google_maps_url),
         lead_source_picklist:lead_source_option_id (label),
         lead_source_other_text,
         evaluation_contacts (is_primary, contacts (first_name, last_name), picklist_options:tag_option_id (label))
@@ -213,7 +230,14 @@ export default function EvaluationsPage() {
                         {statusMeta.label}
                       </span>
                     </td>
-                    <td className="px-4 py-3 font-medium text-[#1a1a1a] whitespace-nowrap">{formatAddress(ev.properties)}</td>
+                    <td className="px-4 py-3 whitespace-nowrap">
+                      <button
+                        onClick={e => { e.stopPropagation(); if (ev.properties) setSelectedProperty(ev.properties) }}
+                        className="font-medium text-[#1a1a1a] hover:text-blue-600 hover:underline transition-colors"
+                      >
+                        {formatAddress(ev.properties)}
+                      </button>
+                    </td>
                     <td className="px-4 py-3 text-gray-500 whitespace-nowrap">{date}</td>
                     <td className="px-4 py-3 text-gray-500 whitespace-nowrap">{agent?.full_name ?? agent?.email ?? '—'}</td>
                     <td className="px-4 py-3 text-gray-500 whitespace-nowrap">{tc?.full_name ?? tc?.email ?? '—'}</td>
@@ -228,6 +252,77 @@ export default function EvaluationsPage() {
           </table>
         </div>
       )}
+
+      {selectedProperty && (
+        <PropertyDetailsModal property={selectedProperty} onClose={() => setSelectedProperty(null)} />
+      )}
+    </div>
+  )
+}
+
+// ── Property details pop-up ──────────────────────────────────
+function PropertyDetailsModal({ property, onClose }: { property: Property; onClose: () => void }) {
+  const address = formatAddress(property)
+  const query   = mapQuery(property)
+  const mapSrc  = `https://www.google.com/maps?q=${encodeURIComponent(query)}&output=embed`
+  const directionsUrl = `https://www.google.com/maps/dir/?api=1&destination=${encodeURIComponent(query)}`
+
+  const fields: [string, string | null][] = [
+    ['Property Type', property.property_type ? property.property_type.replace('_', ' ') : null],
+    ['Unit Number', property.unit_number],
+    ['Complex / Building', property.complex_or_building_name],
+    ['Street Number', property.street_number],
+    ['Street Name', property.street_name],
+    ['Suburb', property.suburb],
+    ['City', property.city],
+    ['Province', property.province],
+    ['Postal Code', property.postal_code],
+    ['Country', property.country],
+    ['Coordinates', property.latitude != null && property.longitude != null ? `${property.latitude}, ${property.longitude}` : null],
+  ]
+
+  return (
+    <div
+      className="fixed inset-0 bg-black/40 flex items-center justify-center z-50 p-4"
+      onClick={onClose}
+    >
+      <div
+        className="bg-white rounded-2xl shadow-xl max-w-lg w-full max-h-[90vh] overflow-y-auto"
+        onClick={e => e.stopPropagation()}
+      >
+        <div className="flex items-start justify-between gap-4 p-6 border-b border-gray-100">
+          <h3 className="text-lg font-bold text-[#1a1a1a]">{address}</h3>
+          <button onClick={onClose} className="text-gray-400 hover:text-[#1a1a1a] text-xl leading-none flex-shrink-0">×</button>
+        </div>
+
+        <div className="p-6 grid grid-cols-2 gap-x-6 gap-y-3 text-sm">
+          {fields.filter(([, value]) => value).map(([label, value]) => (
+            <div key={label}>
+              <p className="text-xs font-medium text-gray-400 uppercase tracking-wide mb-0.5">{label}</p>
+              <p className="text-[#1a1a1a] font-medium">{value}</p>
+            </div>
+          ))}
+        </div>
+
+        <div className="px-6 pb-6">
+          <iframe
+            src={mapSrc}
+            width="100%"
+            height="260"
+            style={{ border: 0, borderRadius: 12 }}
+            loading="lazy"
+            title="Property location map"
+          />
+          <a
+            href={directionsUrl}
+            target="_blank"
+            rel="noopener noreferrer"
+            className={`${btn.primary} w-full mt-3`}
+          >
+            Get Directions
+          </a>
+        </div>
+      </div>
     </div>
   )
 }
