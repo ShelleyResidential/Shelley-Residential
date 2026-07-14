@@ -112,7 +112,9 @@ export default function EvaluationDetailPage() {
   // Edit form state
   const [editStatus, setEditStatus]             = useState('')
   const [editPropertyStatus, setEditPropertyStatus] = useState('')
-  const [editScheduledAt, setEditScheduledAt]   = useState('')
+  const [editSchedDate, setEditSchedDate] = useState('')
+  const [editSchedTime, setEditSchedTime] = useState('')
+  const editScheduledAt = editSchedDate && editSchedTime ? `${editSchedDate}T${editSchedTime}` : ''
   const [editMotivationNotes, setEditMotivationNotes] = useState('')
   const [editTimelineNotes, setEditTimelineNotes] = useState('')
   const [editLeadReferralNotes, setEditLeadReferralNotes] = useState('')
@@ -152,7 +154,9 @@ export default function EvaluationDetailPage() {
       setEvaluation(ev)
       setEditStatus(ev.status)
       setEditPropertyStatus(ev.property_status ?? '')
-      setEditScheduledAt(ev.scheduled_at ? ev.scheduled_at.slice(0, 16) : '')
+      const schedIso = ev.scheduled_at ? ev.scheduled_at.slice(0, 16) : ''
+      setEditSchedDate(schedIso ? schedIso.slice(0, 10) : '')
+      setEditSchedTime(schedIso ? schedIso.slice(11, 16) : '')
       setEditMotivationNotes(ev.motivation_for_selling_notes ?? '')
       setEditTimelineNotes(ev.selling_timeline_notes ?? '')
       setEditLeadReferralNotes(ev.lead_referral_notes ?? '')
@@ -359,9 +363,15 @@ export default function EvaluationDetailPage() {
                     </select>
                   </div>
                 </div>
-                <div>
-                  <label className={labelCls}>Scheduled Date & Time</label>
-                  <input type="datetime-local" value={editScheduledAt} onChange={e => setEditScheduledAt(e.target.value)} className={input} />
+                <div className="grid grid-cols-2 gap-4">
+                  <div>
+                    <label className={labelCls}>Scheduled Date</label>
+                    <input type="date" value={editSchedDate} onChange={e => setEditSchedDate(e.target.value)} className={input} />
+                  </div>
+                  <div>
+                    <label className={labelCls}>Scheduled Time</label>
+                    <input type="time" value={editSchedTime} onChange={e => setEditSchedTime(e.target.value)} className={input} />
+                  </div>
                 </div>
                 <div className="grid grid-cols-2 gap-4">
                   <div>

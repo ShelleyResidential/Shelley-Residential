@@ -76,17 +76,41 @@ export async function GET(request: NextRequest) {
   })
   if (metaError) console.error('Failed to persist Google profile metadata:', metaError.message)
 
-  // Store Calendar tokens automatically — this is the "auto-connect" step
+  // Store Calendar tokens automatically — this is the "auto-connect" step.
+  // Google only returns a refresh_token on the first-ever grant (or when
+  // prompt=consent forces re-consent); repeat sign-ins omit it, so we must
+  // not overwrite a previously stored refresh_token with null here.
   const expiry = new Date(Date.now() + tokens.expires_in * 1000).toISOString()
-  await supabaseAdmin.from('user_google_tokens').upsert(
-    {
-      user_id:       data.user.id,
-      access_token:  tokens.access_token,
-      refresh_token: tokens.refresh_token ?? null,
-      token_expiry:  expiry,
-    },
-    { onConflict: 'user_id' },
-  )
+  if (tokens.refresh_token) {
+    await supabaseAdmin.from('user_google_tokens').upsert(
+      {
+        user_id:       data.user.id,
+        access_token:  tokens.access_token,
+        refresh_token: tokens.refresh_token,
+        token_expiry:  expiry,
+      },
+      { onConflict: 'user_id' },
+    )
+  } else {
+    const { data: existingTokens } = await supabaseAdmin
+      .from('user_google_tokens')
+      .select('id')
+      .eq('user_id', data.user.id)
+      .maybeSingle()
+
+    if (existingTokens) {
+      await supabaseAdmin.from('user_google_tokens')
+        .update({ access_token: tokens.access_token, token_expiry: expiry })
+        .eq('user_id', data.user.id)
+    } else {
+      await supabaseAdmin.from('user_google_tokens').insert({
+        user_id:       data.user.id,
+        access_token:  tokens.access_token,
+        refresh_token: null,
+        token_expiry:  expiry,
+      })
+    }
+  }
 
   const response = NextResponse.redirect(
     `${appUrl}/auth/complete#access_token=${encodeURIComponent(data.session.access_token)}&refresh_token=${encodeURIComponent(data.session.refresh_token)}`,

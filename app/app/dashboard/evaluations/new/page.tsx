@@ -116,7 +116,9 @@ export default function NewEvaluationPage() {
   const [timelineNotes, setTimelineNotes] = useState('')
 
   // Scheduling
-  const [scheduledAt, setScheduledAt] = useState('')
+  const [schedDate, setSchedDate] = useState('')
+  const [schedTime, setSchedTime] = useState('')
+  const scheduledAt = schedDate && schedTime ? `${schedDate}T${schedTime}` : ''
 
   const [saving, setSaving] = useState(false)
   const [error, setError]   = useState('')
@@ -481,10 +483,17 @@ export default function NewEvaluationPage() {
 
           {/* ── Scheduling ── */}
           <Section title="Schedule Evaluation">
-            <div>
-              <label className={labelCls}>Date & Time</label>
-              <input type="datetime-local" value={scheduledAt} onChange={e => setScheduledAt(e.target.value)}
-                className={input} />
+            <div className="grid grid-cols-2 gap-4">
+              <div>
+                <label className={labelCls}>Date</label>
+                <input type="date" value={schedDate} onChange={e => setSchedDate(e.target.value)}
+                  className={input} />
+              </div>
+              <div>
+                <label className={labelCls}>Time</label>
+                <input type="time" value={schedTime} onChange={e => setSchedTime(e.target.value)}
+                  className={input} />
+              </div>
             </div>
           </Section>
 

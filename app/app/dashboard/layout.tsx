@@ -75,7 +75,7 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
         </nav>
 
         {/* Slogan */}
-        <p style={{ fontSize: 11, color: '#fff', textAlign: 'left', paddingLeft: 12, marginBottom: 16, lineHeight: 1.6 }}>
+        <p style={{ fontSize: 10, color: '#fff', textAlign: 'left', paddingLeft: 4, marginBottom: 16, whiteSpace: 'nowrap' }}>
           One Name. One Team. <span style={{ color: '#E8266F', fontWeight: 700 }}>One Standard.</span>
         </p>
 

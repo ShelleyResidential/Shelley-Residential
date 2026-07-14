@@ -10,7 +10,7 @@ export function buildGoogleLoginAuthUrl(state: string, redirectUri: string) {
     response_type: 'code',
     scope:         'openid email profile https://www.googleapis.com/auth/calendar.events',
     access_type:   'offline',
-    prompt:        'consent',
+    prompt:        'select_account',
     hd:            'shelley.co.za',
     state,
   })
