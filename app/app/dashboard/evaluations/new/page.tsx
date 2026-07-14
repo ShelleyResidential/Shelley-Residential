@@ -91,6 +91,7 @@ export default function NewEvaluationPage() {
   const [showAddProperty, setShowAddProperty]   = useState(false)
   const [newPropertyType, setNewPropertyType]   = useState('')
   const [newPropertyAddress, setNewPropertyAddress] = useState('')
+  const [creatingProperty, setCreatingProperty] = useState(false)
 
   // Contacts
   const [contacts, setContacts] = useState<ContactSlot[]>([])
@@ -132,22 +133,58 @@ export default function NewEvaluationPage() {
     if (!newPropertyType) { setError('Please select a property type.'); return }
     if (!newPropertyAddress.trim()) { setError('Please enter an address.'); return }
     setError('')
+    setCreatingProperty(true)
 
-    const parsed = parseAddressParts(newPropertyAddress.trim())
+    const raw = newPropertyAddress.trim()
 
-    const { data, error: err } = await supabase
-      .from('properties')
-      .insert({
+    // Try to geocode via Google for accurate suburb/city/postal code/coordinates;
+    // fall back to comma-parsing the raw text if geocoding is unavailable/fails.
+    let insertPayload: Record<string, unknown>
+    const geoRes = await fetch('/api/geocode', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ address: raw }),
+    })
+
+    if (geoRes.ok) {
+      const geo = await geoRes.json()
+      const streetLine = [geo.street_number, geo.route].filter(Boolean).join(' ') || capitalizeWords(raw)
+      insertPayload = {
+        property_type: newPropertyType,
+        street_number: geo.street_number,
+        street_name: capitalizeWords(streetLine),
+        suburb: geo.suburb ? capitalizeWords(geo.suburb) : null,
+        city: geo.city ? capitalizeWords(geo.city) : null,
+        province: geo.province,
+        postal_code: geo.postal_code,
+        country: geo.country ?? 'South Africa',
+        latitude: geo.latitude,
+        longitude: geo.longitude,
+        google_place_id: geo.google_place_id,
+        google_maps_url: geo.formatted_address
+          ? `https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(geo.formatted_address)}`
+          : null,
+        created_by_user_id: userId,
+      }
+    } else {
+      const parsed = parseAddressParts(raw)
+      insertPayload = {
         property_type: newPropertyType,
         street_name: parsed.street_name,
         suburb: parsed.suburb,
         city: parsed.city,
         postal_code: parsed.postal_code,
         created_by_user_id: userId,
-      })
+      }
+    }
+
+    const { data, error: err } = await supabase
+      .from('properties')
+      .insert(insertPayload)
       .select('id, property_type, street_name, suburb, city')
       .single()
 
+    setCreatingProperty(false)
     if (err) { setError(err.message); return }
     setSelectedProperty(data as Property)
     setShowAddProperty(false)
@@ -289,8 +326,8 @@ export default function NewEvaluationPage() {
                 <div className="flex gap-2 pt-1">
                   <button type="button" onClick={() => { setShowAddProperty(false); setNewPropertyType(''); setNewPropertyAddress('') }}
                     className={`${btn.secondary} flex-1`}>Cancel</button>
-                  <button type="button" onClick={createProperty} className={`${btn.primary} flex-1`}>
-                    Add Property
+                  <button type="button" onClick={createProperty} disabled={creatingProperty} className={`${btn.primary} flex-1`}>
+                    {creatingProperty ? 'Looking up address…' : 'Add Property'}
                   </button>
                 </div>
               </div>
