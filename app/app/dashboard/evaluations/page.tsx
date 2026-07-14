@@ -276,6 +276,15 @@ function PropertyDetailsModal({ property, onClose, onUpdated }: {
   const [refreshing, setRefreshing] = useState(false)
   const [refreshError, setRefreshError] = useState('')
 
+  // Auto-populate missing suburb/city/postal code on open, for properties
+  // created before geocoding existed — no manual click needed.
+  useEffect(() => {
+    if (!current.suburb || !current.city || !current.postal_code) {
+      refreshFromGoogle()
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [])
+
   const address = formatAddress(current)
   const query   = mapQuery(current)
   const mapSrc  = `https://www.google.com/maps?q=${encodeURIComponent(query)}&output=embed`
@@ -313,10 +322,9 @@ function PropertyDetailsModal({ property, onClose, onUpdated }: {
     }
 
     const geo = await res.json()
-    const streetLine = [geo.street_number, geo.route].filter(Boolean).join(' ')
     const updates = {
       street_number: geo.street_number,
-      street_name:   streetLine ? capitalizeWords(streetLine) : current.street_name,
+      street_name:   geo.route ? capitalizeWords(geo.route) : current.street_name,
       suburb:        geo.suburb ? capitalizeWords(geo.suburb) : null,
       city:          geo.city ? capitalizeWords(geo.city) : null,
       province:      geo.province,

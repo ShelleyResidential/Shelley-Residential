@@ -148,11 +148,10 @@ export default function NewEvaluationPage() {
 
     if (geoRes.ok) {
       const geo = await geoRes.json()
-      const streetLine = [geo.street_number, geo.route].filter(Boolean).join(' ') || capitalizeWords(raw)
       insertPayload = {
         property_type: newPropertyType,
         street_number: geo.street_number,
-        street_name: capitalizeWords(streetLine),
+        street_name: geo.route ? capitalizeWords(geo.route) : capitalizeWords(raw),
         suburb: geo.suburb ? capitalizeWords(geo.suburb) : null,
         city: geo.city ? capitalizeWords(geo.city) : null,
         province: geo.province,
