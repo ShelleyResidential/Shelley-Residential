@@ -359,7 +359,6 @@ export default function EvaluationDetailPage() {
                       <option value="">—</option>
                       <option value="off_market">Off Market</option>
                       <option value="on_market">On Market</option>
-                      <option value="deceased_estate">Deceased Estate</option>
                     </select>
                   </div>
                 </div>

@@ -14,6 +14,35 @@ type Property = {
   city: string | null
 }
 
+type DraftProperty = {
+  unit_number: string
+  complex_or_building_name: string
+  sectional_title_number: string
+  street_number: string
+  street_name: string
+  suburb: string
+  city: string
+  province: string
+  postal_code: string
+  country: string
+  latitude: number | null
+  longitude: number | null
+  google_place_id: string | null
+  google_maps_url: string | null
+}
+
+const EMPTY_DRAFT: DraftProperty = {
+  unit_number: '', complex_or_building_name: '', sectional_title_number: '',
+  street_number: '', street_name: '', suburb: '', city: '', province: '',
+  postal_code: '', country: 'South Africa', latitude: null, longitude: null,
+  google_place_id: null, google_maps_url: null,
+}
+
+function draftMapQuery(d: DraftProperty): string {
+  if (d.latitude != null && d.longitude != null) return `${d.latitude},${d.longitude}`
+  return [d.street_number, d.street_name, d.suburb, d.city, d.province, d.postal_code, d.country].filter(Boolean).join(' ')
+}
+
 type PicklistOption = { id: string; value: string; label: string; allow_free_text?: boolean }
 
 // ── Address helpers ────────────────────────────────────────────
@@ -118,7 +147,10 @@ export default function NewEvaluationPage() {
   const [showAddProperty, setShowAddProperty]   = useState(false)
   const [newPropertyType, setNewPropertyType]   = useState('')
   const [newPropertyAddress, setNewPropertyAddress] = useState('')
-  const [creatingProperty, setCreatingProperty] = useState(false)
+  const [lookingUpAddress, setLookingUpAddress] = useState(false)
+  const [showPropertyReview, setShowPropertyReview] = useState(false)
+  const [propertyDraft, setPropertyDraft]       = useState<DraftProperty>(EMPTY_DRAFT)
+  const [savingProperty, setSavingProperty]     = useState(false)
 
   // Contacts
   const [contacts, setContacts] = useState<ContactSlot[]>([])
@@ -159,18 +191,17 @@ export default function NewEvaluationPage() {
     })
   }, [router])
 
-  // ── Create property ──────────────────────────────────────
-  async function createProperty() {
+  // ── Add property: look up address, then review/edit fields before saving ──
+  async function lookupAddress() {
     if (!newPropertyType) { setError('Please select a property type.'); return }
     if (!newPropertyAddress.trim()) { setError('Please enter an address.'); return }
     setError('')
-    setCreatingProperty(true)
+    setLookingUpAddress(true)
 
     const raw = newPropertyAddress.trim()
 
     // Try to geocode via Google for accurate suburb/city/postal code/coordinates;
     // fall back to comma-parsing the raw text if geocoding is unavailable/fails.
-    let insertPayload: Record<string, unknown>
     const geoRes = await fetch('/api/geocode', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
@@ -179,47 +210,80 @@ export default function NewEvaluationPage() {
 
     if (geoRes.ok) {
       const geo = await geoRes.json()
-      insertPayload = {
-        property_type: newPropertyType,
-        street_number: geo.street_number,
-        street_name: geo.route ? capitalizeWords(geo.route) : capitalizeWords(raw),
-        suburb: geo.suburb ? capitalizeWords(geo.suburb) : null,
-        city: geo.city ? capitalizeWords(geo.city) : null,
-        province: geo.province,
-        postal_code: geo.postal_code,
-        country: geo.country ?? 'South Africa',
-        latitude: geo.latitude,
-        longitude: geo.longitude,
-        google_place_id: geo.google_place_id,
+      setPropertyDraft({
+        ...EMPTY_DRAFT,
+        street_number: geo.street_number ?? '',
+        street_name:   geo.route ? capitalizeWords(geo.route) : capitalizeWords(raw),
+        suburb:        geo.suburb ? capitalizeWords(geo.suburb) : '',
+        city:          geo.city ? capitalizeWords(geo.city) : '',
+        province:      geo.province ?? '',
+        postal_code:   geo.postal_code ?? '',
+        country:       geo.country ?? 'South Africa',
+        latitude:      geo.latitude ?? null,
+        longitude:     geo.longitude ?? null,
+        google_place_id: geo.google_place_id ?? null,
         google_maps_url: geo.formatted_address
           ? `https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(geo.formatted_address)}`
           : null,
-        created_by_user_id: userId,
-      }
+      })
     } else {
       const parsed = parseAddressParts(raw)
-      insertPayload = {
-        property_type: newPropertyType,
+      setPropertyDraft({
+        ...EMPTY_DRAFT,
         street_name: parsed.street_name,
-        suburb: parsed.suburb,
-        city: parsed.city,
-        postal_code: parsed.postal_code,
-        created_by_user_id: userId,
-      }
+        suburb:      parsed.suburb ?? '',
+        city:        parsed.city ?? '',
+        postal_code: parsed.postal_code ?? '',
+      })
     }
+
+    setLookingUpAddress(false)
+    setShowPropertyReview(true)
+  }
+
+  function updateDraft(field: keyof DraftProperty, value: string) {
+    setPropertyDraft(d => ({ ...d, [field]: value }))
+  }
+
+  function resetAddPropertyForm() {
+    setShowAddProperty(false)
+    setShowPropertyReview(false)
+    setNewPropertyType('')
+    setNewPropertyAddress('')
+    setPropertyDraft(EMPTY_DRAFT)
+  }
+
+  async function saveProperty() {
+    setSavingProperty(true)
+    setError('')
 
     const { data, error: err } = await supabase
       .from('properties')
-      .insert(insertPayload)
+      .insert({
+        property_type:            newPropertyType,
+        unit_number:              propertyDraft.unit_number || null,
+        complex_or_building_name: propertyDraft.complex_or_building_name || null,
+        sectional_title_number:   newPropertyType === 'sectional_title' ? (propertyDraft.sectional_title_number || null) : null,
+        street_number:            propertyDraft.street_number || null,
+        street_name:              propertyDraft.street_name || null,
+        suburb:                   propertyDraft.suburb || null,
+        city:                     propertyDraft.city || null,
+        province:                 propertyDraft.province || null,
+        postal_code:              propertyDraft.postal_code || null,
+        country:                  propertyDraft.country || null,
+        latitude:                 propertyDraft.latitude,
+        longitude:                propertyDraft.longitude,
+        google_place_id:          propertyDraft.google_place_id,
+        google_maps_url:          propertyDraft.google_maps_url,
+        created_by_user_id:       userId,
+      })
       .select('id, property_type, street_name, suburb, city')
       .single()
 
-    setCreatingProperty(false)
+    setSavingProperty(false)
     if (err) { setError(err.message); return }
     setSelectedProperty(data as Property)
-    setShowAddProperty(false)
-    setNewPropertyType('')
-    setNewPropertyAddress('')
+    resetAddPropertyForm()
   }
 
   // ── Contacts ─────────────────────────────────────────────
@@ -298,9 +362,6 @@ export default function NewEvaluationPage() {
   }
 
   const primaryFilled = contacts.length > 0
-  const mapsUrl = newPropertyAddress
-    ? `https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(newPropertyAddress)}`
-    : null
 
   return (
     <div className="bg-[#f8f7f4] min-h-screen">
@@ -320,6 +381,97 @@ export default function NewEvaluationPage() {
                 </div>
                 <button type="button" onClick={() => setSelectedProperty(null)}
                   className="text-gray-400 hover:text-[#1a1a1a] text-xl transition-colors">×</button>
+              </div>
+            ) : showAddProperty && showPropertyReview ? (
+              <div className="space-y-4 border border-gray-200 rounded-xl p-4 bg-gray-50">
+                <div className="grid grid-cols-2 gap-3">
+                  <div>
+                    <label className={labelCls}>Unit Number</label>
+                    <input value={propertyDraft.unit_number} onChange={e => updateDraft('unit_number', e.target.value)} className={input} />
+                  </div>
+                  <div>
+                    <label className={labelCls}>Complex Name</label>
+                    <input value={propertyDraft.complex_or_building_name} onChange={e => updateDraft('complex_or_building_name', e.target.value)} className={input} />
+                  </div>
+                </div>
+
+                {newPropertyType === 'sectional_title' && (
+                  <div>
+                    <label className={labelCls}>Sectional Title Number</label>
+                    <input value={propertyDraft.sectional_title_number} onChange={e => updateDraft('sectional_title_number', e.target.value)} className={input} />
+                  </div>
+                )}
+
+                <div className="grid grid-cols-2 gap-3">
+                  <div>
+                    <label className={labelCls}>Street Number</label>
+                    <input value={propertyDraft.street_number} onChange={e => updateDraft('street_number', e.target.value)} className={input} />
+                  </div>
+                  <div>
+                    <label className={labelCls}>Street Name</label>
+                    <input value={propertyDraft.street_name} onChange={e => updateDraft('street_name', e.target.value)} className={input} />
+                  </div>
+                </div>
+
+                <div className="grid grid-cols-2 gap-3">
+                  <div>
+                    <label className={labelCls}>Suburb</label>
+                    <input value={propertyDraft.suburb} onChange={e => updateDraft('suburb', e.target.value)} className={input} />
+                  </div>
+                  <div>
+                    <label className={labelCls}>City</label>
+                    <input value={propertyDraft.city} onChange={e => updateDraft('city', e.target.value)} className={input} />
+                  </div>
+                </div>
+
+                <div className="grid grid-cols-2 gap-3">
+                  <div>
+                    <label className={labelCls}>Province</label>
+                    <input value={propertyDraft.province} onChange={e => updateDraft('province', e.target.value)} className={input} />
+                  </div>
+                  <div>
+                    <label className={labelCls}>Postal Code</label>
+                    <input value={propertyDraft.postal_code} onChange={e => updateDraft('postal_code', e.target.value)} className={input} />
+                  </div>
+                </div>
+
+                <div>
+                  <label className={labelCls}>Country</label>
+                  <input value={propertyDraft.country} onChange={e => updateDraft('country', e.target.value)} className={input} />
+                </div>
+
+                {propertyDraft.latitude != null && propertyDraft.longitude != null && (
+                  <div>
+                    <span className={labelCls}>Co-ordinates</span>
+                    <p className="text-sm text-[#1a1a1a]">{propertyDraft.latitude}, {propertyDraft.longitude}</p>
+                  </div>
+                )}
+
+                <div>
+                  <iframe
+                    src={`https://www.google.com/maps?q=${encodeURIComponent(draftMapQuery(propertyDraft))}&output=embed`}
+                    width="100%"
+                    height="220"
+                    style={{ border: 0, borderRadius: 12 }}
+                    loading="lazy"
+                    title="Property location map"
+                  />
+                  <a
+                    href={`https://www.google.com/maps/dir/?api=1&destination=${encodeURIComponent(draftMapQuery(propertyDraft))}`}
+                    target="_blank" rel="noopener noreferrer"
+                    className={`${btn.secondary} w-full mt-2 block text-center`}
+                  >
+                    Get Directions
+                  </a>
+                </div>
+
+                <div className="flex gap-2 pt-1">
+                  <button type="button" onClick={() => setShowPropertyReview(false)}
+                    className={`${btn.secondary} flex-1`}>Back</button>
+                  <button type="button" onClick={saveProperty} disabled={savingProperty} className={`${btn.primary} flex-1`}>
+                    {savingProperty ? 'Saving…' : 'Save Property'}
+                  </button>
+                </div>
               </div>
             ) : showAddProperty ? (
               <div className="space-y-4 border border-gray-200 rounded-xl p-4 bg-gray-50">
@@ -341,22 +493,12 @@ export default function NewEvaluationPage() {
                     placeholder="e.g. 27 Audley Road, Hillcrest, KZN"
                     className={input}
                   />
-                  {mapsUrl && (
-                    <a href={mapsUrl} target="_blank" rel="noopener noreferrer"
-                      className="inline-flex items-center gap-1 mt-1.5 text-xs text-blue-500 hover:text-blue-700 transition-colors">
-                      <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
-                        <path d="M21 10c0 7-9 13-9 13s-9-6-9-13a9 9 0 0 1 18 0z"/>
-                        <circle cx="12" cy="10" r="3"/>
-                      </svg>
-                      View on Google Maps
-                    </a>
-                  )}
                 </div>
                 <div className="flex gap-2 pt-1">
-                  <button type="button" onClick={() => { setShowAddProperty(false); setNewPropertyType(''); setNewPropertyAddress('') }}
+                  <button type="button" onClick={resetAddPropertyForm}
                     className={`${btn.secondary} flex-1`}>Cancel</button>
-                  <button type="button" onClick={createProperty} disabled={creatingProperty} className={`${btn.primary} flex-1`}>
-                    {creatingProperty ? 'Looking up address…' : 'Add Property'}
+                  <button type="button" onClick={lookupAddress} disabled={lookingUpAddress} className={`${btn.primary} flex-1`}>
+                    {lookingUpAddress ? 'Looking up address…' : 'Look Up Address'}
                   </button>
                 </div>
               </div>
@@ -421,7 +563,6 @@ export default function NewEvaluationPage() {
                   <option value="">—</option>
                   <option value="off_market">Off Market</option>
                   <option value="on_market">On Market</option>
-                  <option value="deceased_estate">Deceased Estate</option>
                 </select>
               </div>
             </div>
@@ -498,12 +639,14 @@ export default function NewEvaluationPage() {
               </>
             )}
 
-            <div>
-              <label className={labelCls}>Lead / Referral Notes</label>
-              <textarea value={leadReferralNotes} onChange={e => setLeadReferralNotes(e.target.value)}
-                placeholder="Any notes about the lead or referral…"
-                rows={3} className={`${input} resize-none`} />
-            </div>
+            {(leadSource === 'referral' || leadSource === 'other') && (
+              <div>
+                <label className={labelCls}>Lead / Referral Notes</label>
+                <textarea value={leadReferralNotes} onChange={e => setLeadReferralNotes(e.target.value)}
+                  placeholder="Any notes about the lead or referral…"
+                  rows={3} className={`${input} resize-none`} />
+              </div>
+            )}
           </Section>
 
           {/* ── Motivation & Timeline ── */}
@@ -603,7 +746,7 @@ function PropertySearch({ onSelect }: { onSelect: (p: Property) => void }) {
     <div ref={containerRef} className="relative">
       <input type="text" value={query} onChange={e => setQuery(e.target.value)}
         onFocus={() => { if (results.length > 0) setOpen(true) }}
-        placeholder="Search existing properties…"
+        placeholder="Search Property…"
         className={input} />
       {open && (
         <div className="absolute top-full left-0 right-0 z-50 bg-white border border-gray-200 border-t-0 rounded-b-lg shadow-md max-h-60 overflow-y-auto">
