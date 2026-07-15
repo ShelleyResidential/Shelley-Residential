@@ -1,6 +1,6 @@
 'use client'
 
-import { useState, useEffect, Suspense } from 'react'
+import { Suspense } from 'react'
 import Image from 'next/image'
 import { useSearchParams } from 'next/navigation'
 
@@ -15,12 +15,8 @@ const ERROR_MESSAGES: Record<string, string> = {
 
 function LoginContent() {
   const searchParams = useSearchParams()
-  const [error, setError] = useState('')
-
-  useEffect(() => {
-    const err = searchParams.get('error')
-    if (err) setError(ERROR_MESSAGES[err] ?? 'Sign-in failed. Please try again.')
-  }, [searchParams])
+  const err = searchParams.get('error')
+  const error = err ? (ERROR_MESSAGES[err] ?? 'Sign-in failed. Please try again.') : ''
 
   return (
     <div className="min-h-screen flex items-center justify-center bg-white">

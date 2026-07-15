@@ -4,6 +4,7 @@ import { useState, useEffect } from 'react'
 import { supabase } from '@/lib/supabase'
 import { card, btn, sectionTitle, label as labelCls } from '@/lib/styles'
 import { useRouter } from 'next/navigation'
+import Image from 'next/image'
 
 export default function SettingsPage() {
   const router = useRouter()
@@ -41,9 +42,11 @@ export default function SettingsPage() {
           <h3 className={sectionTitle}>Account</h3>
           <div className="flex items-center gap-4 mb-5">
             {avatarUrl ? (
-              <img
+              <Image
                 src={avatarUrl}
                 alt={fullName || userEmail}
+                width={56}
+                height={56}
                 referrerPolicy="no-referrer"
                 className="w-14 h-14 rounded-full object-cover flex-shrink-0"
               />

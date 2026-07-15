@@ -352,17 +352,7 @@ function PropertyDetailsModal({ property, onClose, onUpdated }: {
   property: Property; onClose: () => void; onUpdated: () => void
 }) {
   const [current, setCurrent] = useState(property)
-  const [refreshing, setRefreshing] = useState(false)
   const [refreshError, setRefreshError] = useState('')
-
-  // Auto-populate missing suburb/city/postal code on open, for properties
-  // created before geocoding existed — no manual click needed.
-  useEffect(() => {
-    if (!current.suburb || !current.city || !current.postal_code) {
-      refreshFromGoogle()
-    }
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [])
 
   const address = formatAddress(current)
   const query   = mapQuery(current)
@@ -384,7 +374,6 @@ function PropertyDetailsModal({ property, onClose, onUpdated }: {
   ]
 
   async function refreshFromGoogle() {
-    setRefreshing(true)
     setRefreshError('')
 
     const raw = [current.street_number, current.street_name, current.suburb, current.city].filter(Boolean).join(' ') || address
@@ -396,7 +385,6 @@ function PropertyDetailsModal({ property, onClose, onUpdated }: {
 
     if (!res.ok) {
       setRefreshError('Could not find this address on Google. Try editing it manually.')
-      setRefreshing(false)
       return
     }
 
@@ -418,12 +406,20 @@ function PropertyDetailsModal({ property, onClose, onUpdated }: {
     }
 
     const { error } = await supabase.from('properties').update(updates).eq('id', current.id)
-    setRefreshing(false)
 
     if (error) { setRefreshError(error.message); return }
     setCurrent({ ...current, ...updates })
     onUpdated()
   }
+
+  // Auto-populate missing suburb/city/postal code on open, for properties
+  // created before geocoding existed — no manual click needed.
+  useEffect(() => {
+    if (!current.suburb || !current.city || !current.postal_code) {
+      refreshFromGoogle()
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [])
 
   return (
     <div

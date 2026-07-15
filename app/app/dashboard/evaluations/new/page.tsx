@@ -43,8 +43,6 @@ function draftMapQuery(d: DraftProperty): string {
   return [d.street_number, d.street_name, d.suburb, d.city, d.province, d.postal_code, d.country].filter(Boolean).join(' ')
 }
 
-type PicklistOption = { id: string; value: string; label: string; allow_free_text?: boolean }
-
 // ── Address helpers ────────────────────────────────────────────
 function capitalizeWords(text: string): string {
   return text.replace(/\b\w/g, c => c.toUpperCase())
@@ -360,8 +358,6 @@ export default function NewEvaluationPage() {
 
     router.push(`/dashboard/evaluations/${ev.id}`)
   }
-
-  const primaryFilled = contacts.length > 0
 
   return (
     <div className="bg-[#f8f7f4] min-h-screen">

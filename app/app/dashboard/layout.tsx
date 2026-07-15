@@ -98,11 +98,13 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
           >
             {/* Avatar: Google photo if available, else initials */}
             {avatarUrl ? (
-              <img
+              <Image
                 src={avatarUrl}
                 alt={displayName}
+                width={30}
+                height={30}
                 referrerPolicy="no-referrer"
-                style={{ width: 30, height: 30, borderRadius: '50%', flexShrink: 0, objectFit: 'cover' }}
+                style={{ borderRadius: '50%', flexShrink: 0, objectFit: 'cover' }}
               />
             ) : (
               <div style={{

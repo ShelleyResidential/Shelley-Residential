@@ -15,14 +15,6 @@ const STATUS_LABELS: Record<string, string> = {
   in_progress: 'In Progress', open: 'Open', won: 'Won', lost: 'Lost', future: 'Future',
 }
 
-const STATUS_COLOURS: Record<string, string> = {
-  in_progress: '#3b82f6',
-  open:        '#22c55e',
-  won:         '#10b981',
-  lost:        '#ef4444',
-  future:      '#eab308',
-}
-
 export default function DashboardPage() {
   const [stats, setStats] = useState<Stats>({
     contacts: 0, properties: 0, evaluations: 0, evaluationsByStatus: {},
@@ -67,19 +59,16 @@ export default function DashboardPage() {
           label="Total Contacts"
           value={loading ? '—' : stats.contacts}
           href="/dashboard/contacts"
-          accent="#E8266F"
         />
         <StatBlock
           label="Total Properties"
           value={loading ? '—' : stats.properties}
           href="/dashboard/properties"
-          accent="#1a1a1a"
         />
         <StatBlock
           label="Total Evaluations"
           value={loading ? '—' : stats.evaluations}
           href="/dashboard/evaluations"
-          accent="#6366f1"
         />
       </div>
 
@@ -105,8 +94,8 @@ export default function DashboardPage() {
   )
 }
 
-function StatBlock({ label, value, href, accent }: {
-  label: string; value: number | string; href: string; accent: string
+function StatBlock({ label, value, href }: {
+  label: string; value: number | string; href: string
 }) {
   return (
     <Link
