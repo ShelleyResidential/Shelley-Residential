@@ -142,7 +142,7 @@ const REASONS_LOST = [
 
 const CONTACT_TAGS = ['Seller', 'Attorney', 'Managing Agent', 'Tenant']
 
-type Profile = { id: string; full_name: string | null; email: string | null }
+type Profile = { id: string; full_name: string | null; email: string | null; role: string | null }
 
 // ── Address helper ────────────────────────────────────────────
 function displayAddress(p: Property): string {
@@ -207,7 +207,7 @@ export default function NewEvaluationPage() {
       if (!data.user) { router.push('/'); return }
       setUserId(data.user.id)
     })
-    supabase.from('profiles').select('id, full_name, email').then(({ data }) => {
+    supabase.from('profiles').select('id, full_name, email, role').then(({ data }) => {
       setProfiles((data ?? []) as Profile[])
     })
   }, [router])
@@ -673,7 +673,7 @@ export default function NewEvaluationPage() {
                 <label className={labelCls}>Agent</label>
                 <select value={agentId} onChange={e => setAgentId(e.target.value)} className={select}>
                   <option value="">—</option>
-                  {profiles.map(p => (
+                  {profiles.filter(p => p.role === 'agent').map(p => (
                     <option key={p.id} value={p.id}>{p.full_name ?? p.email}</option>
                   ))}
                 </select>
@@ -682,7 +682,7 @@ export default function NewEvaluationPage() {
                 <label className={labelCls}>Transaction Coordinator</label>
                 <select value={tcId} onChange={e => setTcId(e.target.value)} className={select}>
                   <option value="">—</option>
-                  {profiles.map(p => (
+                  {profiles.filter(p => p.role === 'transaction_coordinator').map(p => (
                     <option key={p.id} value={p.id}>{p.full_name ?? p.email}</option>
                   ))}
                 </select>

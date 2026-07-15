@@ -28,7 +28,7 @@ type PipelineStep = {
   completed_at: string | null; sort_order: number
 }
 
-type Profile = { id: string; full_name: string | null; email: string | null }
+type Profile = { id: string; full_name: string | null; email: string | null; role: string | null }
 
 type Evaluation = {
   id: string; status: string; date_captured: string
@@ -187,7 +187,7 @@ export default function EvaluationDetailPage() {
       if (!data.user) router.push('/')
       else setUserId(data.user.id)
     })
-    supabase.from('profiles').select('id, full_name, email').then(({ data }) => {
+    supabase.from('profiles').select('id, full_name, email, role').then(({ data }) => {
       setProfiles((data ?? []) as Profile[])
     })
     fetchEvaluation()
@@ -401,7 +401,7 @@ export default function EvaluationDetailPage() {
                     <label className={labelCls}>Agent</label>
                     <select value={editAgentId} onChange={e => setEditAgentId(e.target.value)} className={select}>
                       <option value="">—</option>
-                      {profiles.map(p => (
+                      {profiles.filter(p => p.role === 'agent').map(p => (
                         <option key={p.id} value={p.id}>{p.full_name ?? p.email}</option>
                       ))}
                     </select>
@@ -410,7 +410,7 @@ export default function EvaluationDetailPage() {
                     <label className={labelCls}>TC</label>
                     <select value={editTcId} onChange={e => setEditTcId(e.target.value)} className={select}>
                       <option value="">—</option>
-                      {profiles.map(p => (
+                      {profiles.filter(p => p.role === 'transaction_coordinator').map(p => (
                         <option key={p.id} value={p.id}>{p.full_name ?? p.email}</option>
                       ))}
                     </select>

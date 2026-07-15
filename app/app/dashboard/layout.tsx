@@ -5,6 +5,7 @@ import { supabase } from '@/lib/supabase'
 import { useRouter, usePathname } from 'next/navigation'
 import Link from 'next/link'
 import Image from 'next/image'
+import { btn, select as selectCls, label as labelCls } from '@/lib/styles'
 
 const CHILD_ROUTES = ['/dashboard/contacts', '/dashboard/properties']
 
@@ -29,6 +30,8 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
   const [email, setEmail]         = useState('')
   const [displayName, setDisplayName] = useState('')
   const [avatarUrl, setAvatarUrl] = useState<string | null>(null)
+  const [userId, setUserId]       = useState<string | null>(null)
+  const [needsRole, setNeedsRole] = useState(false)
 
   useEffect(() => {
     supabase.auth.getUser().then(({ data }) => {
@@ -37,6 +40,11 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
       setEmail(data.user.email ?? '')
       setDisplayName(meta.full_name ?? meta.name ?? (data.user.email ?? '').split('@')[0])
       setAvatarUrl(meta.avatar_url ?? meta.picture ?? null)
+      setUserId(data.user.id)
+
+      supabase.from('profiles').select('role').eq('id', data.user.id).single().then(({ data: profile }) => {
+        if (!profile?.role) setNeedsRole(true)
+      })
     })
   }, [router])
 
@@ -140,6 +148,48 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
         {children}
       </main>
 
+      {needsRole && userId && (
+        <RoleQuestionnaireModal userId={userId} onAnswered={() => setNeedsRole(false)} />
+      )}
+
+    </div>
+  )
+}
+
+// ── One-time "What is your role?" questionnaire ──────────────
+function RoleQuestionnaireModal({ userId, onAnswered }: { userId: string; onAnswered: () => void }) {
+  const [role, setRole] = useState('')
+  const [saving, setSaving] = useState(false)
+  const [error, setError]   = useState('')
+
+  async function save() {
+    if (!role) return
+    setSaving(true)
+    setError('')
+    const { error: err } = await supabase.from('profiles').update({ role }).eq('id', userId)
+    if (err) { setError(err.message); setSaving(false); return }
+    onAnswered()
+  }
+
+  return (
+    <div className="fixed inset-0 bg-black/40 flex items-center justify-center z-50 p-4">
+      <div className="bg-white rounded-2xl shadow-xl max-w-sm w-full p-6">
+        <h3 className="text-lg font-bold text-[#1a1a1a] mb-1">Welcome!</h3>
+        <p className="text-sm text-gray-500 mb-4">What is your role at Shelley Residential?</p>
+
+        <label className={labelCls}>Role</label>
+        <select value={role} onChange={e => setRole(e.target.value)} className={selectCls}>
+          <option value="">Select role…</option>
+          <option value="agent">Agent</option>
+          <option value="transaction_coordinator">Transaction Coordinator</option>
+        </select>
+
+        {error && <p className="text-sm text-red-500 mt-3">{error}</p>}
+
+        <button onClick={save} disabled={!role || saving} className={`${btn.primary} w-full mt-4`}>
+          {saving ? 'Saving…' : 'Continue'}
+        </button>
+      </div>
     </div>
   )
 }
