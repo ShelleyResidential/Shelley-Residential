@@ -589,7 +589,7 @@ export default function NewEvaluationPage() {
               <div className="space-y-3">
                 <PropertySearch onSelect={setSelectedProperty} />
                 <p className="text-xs text-gray-400 text-center">— or —</p>
-                <button type="button" onClick={() => setShowAddProperty(true)} className={`${btn.secondary} w-full`}>
+                <button type="button" onClick={() => setShowAddProperty(true)} className={`${btn.primary} w-full`}>
                   + Add New Property
                 </button>
               </div>
@@ -625,6 +625,11 @@ export default function NewEvaluationPage() {
               onSelect={addContact}
               excludeIds={contacts.map(c => c.contact_id)}
             />
+            <p className="text-xs text-gray-400 text-center mt-3">— or —</p>
+            <a href="/dashboard/contacts/new" target="_blank" rel="noopener noreferrer"
+              className={`${btn.primary} w-full mt-3 block text-center`}>
+              + Add New Contact
+            </a>
           </Section>
 
           {/* ── Deal Details ── */}
@@ -764,7 +769,7 @@ export default function NewEvaluationPage() {
                         excludeIds={[]}
                       />
                       <a href="/dashboard/contacts/new" target="_blank" rel="noopener noreferrer"
-                        className="inline-block text-xs text-blue-500 hover:text-blue-700 transition-colors">
+                        className={`${btn.primary} w-full block text-center`}>
                         + Add New Contact
                       </a>
                     </div>

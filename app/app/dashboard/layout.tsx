@@ -56,7 +56,11 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
     <div style={{ display: 'grid', gridTemplateColumns: '240px 1fr', minHeight: '100vh' }}>
 
       {/* ── Sidebar ── */}
-      <aside style={{ background: '#2A2A2A', color: '#fff', padding: '28px 24px', display: 'flex', flexDirection: 'column' }}>
+      <aside style={{
+        background: '#2A2A2A', color: '#fff', padding: '28px 24px',
+        display: 'flex', flexDirection: 'column',
+        position: 'sticky', top: 0, height: '100vh', overflowY: 'auto',
+      }}>
         <div style={{ marginBottom: 40, textAlign: 'center' }}>
           <Image src="/logo.png" alt="Shelley Residential" width={160} height={80} style={{ filter: 'brightness(0) invert(1)' }} />
         </div>
