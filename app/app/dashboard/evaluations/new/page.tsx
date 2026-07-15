@@ -62,17 +62,28 @@ const LEAD_SOURCES = [
 ]
 
 const MOTIVATIONS = [
-  { value: 'upsizing',   label: 'Upsizing' },
-  { value: 'downsizing', label: 'Downsizing' },
-  { value: 'other',      label: 'Other' },
+  { value: 'upsizing',                    label: 'Upsizing' },
+  { value: 'downsizing',                  label: 'Downsizing' },
+  { value: 'relocating',                  label: 'Relocating' },
+  { value: 'emigration',                  label: 'Emigration' },
+  { value: 'lifestyle_change',            label: 'Lifestyle Change' },
+  { value: 'retirement',                  label: 'Retirement' },
+  { value: 'financial_reasons',           label: 'Financial Reasons' },
+  { value: 'investment_decision',         label: 'Investment Decision' },
+  { value: 'divorce_separation',          label: 'Divorce / Separation' },
+  { value: 'deceased_estate',             label: 'Deceased Estate' },
+  { value: 'not_selling_evaluation_only', label: 'Not Selling, Evaluation Only' },
+  { value: 'other',                       label: 'Other (please specify)' },
 ]
 
 const TIMELINES = [
-  { value: 'now',                label: 'Now' },
-  { value: 'within_3_6_months',  label: 'Within 3–6 Months' },
-  { value: 'within_6_12_months', label: 'Within 6–12 Months' },
-  { value: '12_months_plus',     label: '12 Months+' },
-  { value: 'unknown',            label: 'Unknown' },
+  { value: 'ready_now',         label: 'Ready to list now' },
+  { value: 'within_30_days',    label: 'Within the next 30 days' },
+  { value: 'within_3_months',   label: 'Within the next 3 months' },
+  { value: 'within_6_months',   label: 'Within the next 6 months' },
+  { value: 'within_12_months',  label: 'Within the next 12 months' },
+  { value: 'no_fixed_timeline', label: 'No fixed timeline – planning ahead' },
+  { value: 'just_curious',      label: "Just curious about home's value" },
 ]
 
 const CONTACT_TAGS = ['Seller', 'Attorney', 'Managing Agent', 'Tenant']
@@ -113,7 +124,6 @@ export default function NewEvaluationPage() {
 
   // Timeline
   const [timeline, setTimeline]         = useState('')
-  const [timelineNotes, setTimelineNotes] = useState('')
 
   // Scheduling
   const [schedDate, setSchedDate] = useState('')
@@ -217,7 +227,6 @@ export default function NewEvaluationPage() {
     setSaving(true)
 
     const motivationNotes = motivation === 'other' ? motivationOther : null
-    const sellingTimelineNotes = timeline === 'unknown' ? timelineNotes : null
 
     const { data: ev, error: evErr } = await supabase.from('evaluations').insert({
       property_id:                      selectedProperty.id,
@@ -229,7 +238,6 @@ export default function NewEvaluationPage() {
       lead_referral_notes:              leadReferralNotes || null,
       referral_type:                    referralType || null,
       motivation_for_selling_notes:     motivationNotes,
-      selling_timeline_notes:           sellingTimelineNotes,
       scheduled_at:                     scheduledAt || null,
     }).select('id').single()
 
@@ -242,9 +250,7 @@ export default function NewEvaluationPage() {
       motivation_for_selling_notes: motivation === 'other'
         ? `Other: ${motivationOther}`
         : (MOTIVATIONS.find(m => m.value === motivation)?.label ?? null),
-      selling_timeline_notes: timeline === 'unknown'
-        ? `Unknown: ${timelineNotes}`
-        : (TIMELINES.find(t => t.value === timeline)?.label ?? null),
+      selling_timeline_notes: TIMELINES.find(t => t.value === timeline)?.label ?? null,
     }).eq('id', ev.id)
 
     // Insert contacts
@@ -470,15 +476,6 @@ export default function NewEvaluationPage() {
                 {TIMELINES.map(t => <option key={t.value} value={t.value}>{t.label}</option>)}
               </select>
             </div>
-
-            {timeline === 'unknown' && (
-              <div>
-                <label className={labelCls}>Timeline Notes</label>
-                <textarea value={timelineNotes} onChange={e => setTimelineNotes(e.target.value)}
-                  placeholder="Any context about the uncertain timeline…"
-                  rows={3} className={`${input} resize-none`} />
-              </div>
-            )}
           </Section>
 
           {/* ── Scheduling ── */}
