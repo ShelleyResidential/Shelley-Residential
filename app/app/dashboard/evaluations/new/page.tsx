@@ -49,16 +49,32 @@ type ContactSlot = {
 
 // ── Hardcoded options (from spec) ─────────────────────────────
 const LEAD_SOURCES = [
-  { value: 'cold_calling',    label: 'Cold Calling' },
-  { value: 'current_client',  label: 'Current Client' },
-  { value: 'facebook',        label: 'Facebook' },
-  { value: 'flyer',           label: 'Flyer' },
-  { value: 'for_sale_board',  label: 'For Sale Board' },
-  { value: 'instagram',       label: 'Instagram' },
-  { value: 'office_phone_in', label: 'Office Phone-In' },
-  { value: 'referral',        label: 'Referral' },
-  { value: 'website',         label: 'Website' },
-  { value: 'other',           label: 'Other' },
+  { value: 'google',                 label: 'Google' },
+  { value: 'social_media',           label: 'Social Media' },
+  { value: 'property_portal',        label: 'Property Portal' },
+  { value: 'signage_boards',         label: 'Signage / Boards' },
+  { value: 'print_flyer_letter',     label: 'Print Flyer or Letter' },
+  { value: 'community_promo_event',  label: 'Community / Promo Event' },
+  { value: 'office_phone_in',        label: 'Office Phone-In' },
+  { value: 'website',                label: 'Website' },
+  { value: 'past_client',            label: 'Past Client' },
+  { value: 'referral',               label: 'Referral' },
+  { value: 'other',                  label: 'Other (please specify)' },
+]
+
+const REFERRAL_TYPES = [
+  { value: 'friend',                                  label: 'Friend' },
+  { value: 'family_member',                           label: 'Family Member' },
+  { value: 'neighbour',                               label: 'Neighbour' },
+  { value: 'past_shelley_client',                     label: 'Past Shelley Client' },
+  { value: 'estate_agent',                            label: 'Estate Agent' },
+  { value: 'attorney',                                label: 'Attorney' },
+  { value: 'bond_originator',                         label: 'Bond Originator' },
+  { value: 'financial_adviser',                       label: 'Financial Adviser' },
+  { value: 'builder_contractor',                       label: 'Builder / Contractor' },
+  { value: 'interior_designer',                       label: 'Interior Designer' },
+  { value: 'community_group_resident_association',    label: 'Community Group / Resident Association' },
+  { value: 'other',                                   label: 'Other (please specify)' },
 ]
 
 const MOTIVATIONS = [
@@ -116,6 +132,9 @@ export default function NewEvaluationPage() {
   const [leadSource, setLeadSource]               = useState('')
   const [leadSourceOther, setLeadSourceOther]     = useState('')
   const [referralType, setReferralType]           = useState('')
+  const [referralTypeOther, setReferralTypeOther] = useState('')
+  const [referredByContactId, setReferredByContactId]     = useState('')
+  const [referredByContactName, setReferredByContactName] = useState('')
   const [leadReferralNotes, setLeadReferralNotes] = useState('')
 
   // Motivation
@@ -226,7 +245,18 @@ export default function NewEvaluationPage() {
     setError('')
     setSaving(true)
 
-    const motivationNotes = motivation === 'other' ? motivationOther : null
+    // Hardcoded dropdowns aren't backed by picklist_options rows, so the
+    // resolved label is stored directly as text.
+    const motivationNotes   = motivation === 'other'
+      ? `Other: ${motivationOther}`
+      : (MOTIVATIONS.find(m => m.value === motivation)?.label ?? null)
+    const leadSourceLabel   = leadSource === 'other'
+      ? `Other: ${leadSourceOther}`
+      : (LEAD_SOURCES.find(s => s.value === leadSource)?.label ?? null)
+    const referralTypeLabel = referralType === 'other'
+      ? `Other: ${referralTypeOther}`
+      : (REFERRAL_TYPES.find(r => r.value === referralType)?.label ?? null)
+    const timelineLabel     = TIMELINES.find(t => t.value === timeline)?.label ?? null
 
     const { data: ev, error: evErr } = await supabase.from('evaluations').insert({
       property_id:                      selectedProperty.id,
@@ -234,24 +264,16 @@ export default function NewEvaluationPage() {
       status,
       property_status:                  propertyStatus || null,
       lead_generated_by:                leadGeneratedBy || null,
-      lead_source_other_text:           leadSource === 'other' ? leadSourceOther : null,
+      lead_source_other_text:           leadSourceLabel,
       lead_referral_notes:              leadReferralNotes || null,
-      referral_type:                    referralType || null,
+      referral_type:                    referralTypeLabel,
+      referral_contact_id:              referredByContactId || null,
       motivation_for_selling_notes:     motivationNotes,
+      selling_timeline_notes:           timelineLabel,
       scheduled_at:                     scheduledAt || null,
     }).select('id').single()
 
     if (evErr || !ev) { setError(evErr?.message ?? 'Failed to save.'); setSaving(false); return }
-
-    // Store lead_source and motivation as text in notes columns since they're hardcoded values
-    // (picklist option IDs are not used here — values stored directly)
-    await supabase.from('evaluations').update({
-      lead_source_other_text: leadSource || null,
-      motivation_for_selling_notes: motivation === 'other'
-        ? `Other: ${motivationOther}`
-        : (MOTIVATIONS.find(m => m.value === motivation)?.label ?? null),
-      selling_timeline_notes: TIMELINES.find(t => t.value === timeline)?.label ?? null,
-    }).eq('id', ev.id)
 
     // Insert contacts
     await supabase.from('evaluation_contacts').insert(
@@ -412,8 +434,8 @@ export default function NewEvaluationPage() {
                 <label className={labelCls}>Lead Generated By</label>
                 <select value={leadGeneratedBy} onChange={e => setLeadGeneratedBy(e.target.value)} className={select}>
                   <option value="">—</option>
+                  <option value="seller_agent_partner">Agent</option>
                   <option value="shelley_residential">Shelley Residential</option>
-                  <option value="seller_agent_partner">Seller Agent Partner</option>
                 </select>
               </div>
               <div>
@@ -433,17 +455,51 @@ export default function NewEvaluationPage() {
               </div>
             )}
 
-            <div>
-              <label className={labelCls}>Referral Type</label>
-              <select value={referralType} onChange={e => setReferralType(e.target.value)} className={select}>
-                <option value="">—</option>
-                <option value="agent_referral">Agent Referral</option>
-                <option value="past_client_referral">Past Client Referral</option>
-              </select>
-            </div>
+            {leadSource === 'referral' && (
+              <>
+                <div>
+                  <label className={labelCls}>Referral Type</label>
+                  <select value={referralType} onChange={e => setReferralType(e.target.value)} className={select}>
+                    <option value="">—</option>
+                    {REFERRAL_TYPES.map(r => <option key={r.value} value={r.value}>{r.label}</option>)}
+                  </select>
+                </div>
+
+                {referralType === 'other' && (
+                  <div>
+                    <label className={labelCls}>Other — please specify</label>
+                    <input value={referralTypeOther} onChange={e => setReferralTypeOther(e.target.value)}
+                      placeholder="Describe the referral type" className={input} />
+                  </div>
+                )}
+
+                <div>
+                  <label className={labelCls}>Referred By</label>
+                  {referredByContactId ? (
+                    <div className="flex items-center justify-between px-4 py-2.5 bg-gray-50 rounded-lg border border-gray-200">
+                      <span className="text-sm text-[#1a1a1a]">{referredByContactName}</span>
+                      <button type="button" onClick={() => { setReferredByContactId(''); setReferredByContactName('') }}
+                        className="text-gray-400 hover:text-[#1a1a1a] text-lg leading-none transition-colors">×</button>
+                    </div>
+                  ) : (
+                    <div className="space-y-2">
+                      <ContactSearch
+                        placeholder="Search contacts…"
+                        onSelect={(id, name) => { setReferredByContactId(id); setReferredByContactName(name) }}
+                        excludeIds={[]}
+                      />
+                      <a href="/dashboard/contacts/new" target="_blank" rel="noopener noreferrer"
+                        className="inline-block text-xs text-blue-500 hover:text-blue-700 transition-colors">
+                        + Add New Contact
+                      </a>
+                    </div>
+                  )}
+                </div>
+              </>
+            )}
 
             <div>
-              <label className={labelCls}>Referral Notes</label>
+              <label className={labelCls}>Lead / Referral Notes</label>
               <textarea value={leadReferralNotes} onChange={e => setLeadReferralNotes(e.target.value)}
                 placeholder="Any notes about the lead or referral…"
                 rows={3} className={`${input} resize-none`} />
