@@ -118,16 +118,16 @@ function formatDate(iso: string | null): string {
 }
 
 const STATUS_LABELS: Record<string, { label: string; colour: string }> = {
-  in_progress: { label: 'In Progress', colour: 'bg-blue-50 text-blue-700' },
-  open:        { label: 'Open',        colour: 'bg-green-50 text-green-700' },
-  won:         { label: 'Won',         colour: 'bg-emerald-50 text-emerald-700' },
-  lost:        { label: 'Lost',        colour: 'bg-red-50 text-red-600' },
-  future:      { label: 'Future',      colour: 'bg-yellow-50 text-yellow-700' },
+  in_progress: { label: 'In Progress',    colour: 'bg-blue-50 text-blue-700' },
+  open:        { label: 'Open Mandate',   colour: 'bg-green-50 text-green-700' },
+  won:         { label: 'Won',            colour: 'bg-emerald-50 text-emerald-700' },
+  lost:        { label: 'Lost',           colour: 'bg-red-50 text-red-600' },
+  future:      { label: 'Future Mandate', colour: 'bg-yellow-50 text-yellow-700' },
 }
 
 const STATUS_TABS = [
   { key: '',           label: 'All' },
-  { key: 'future',     label: 'Future' },
+  { key: 'future',     label: 'Future Mandate' },
   { key: 'in_progress', label: 'In Progress' },
   { key: 'lost',       label: 'Lost' },
   { key: 'open',       label: 'Open Mandate' },

@@ -129,7 +129,20 @@ const TIMELINES = [
   { value: 'just_curious',      label: "Just curious about home's value" },
 ]
 
+const REASONS_LOST = [
+  { value: 'evaluation_price',  label: 'Evaluation Price' },
+  { value: 'commission',        label: 'Commission' },
+  { value: 'mandate_terms',     label: 'Mandate Terms' },
+  { value: 'agency_size',       label: 'Agency Size' },
+  { value: 'not_mls_member',    label: 'Not an MLS Member' },
+  { value: 'another_agency',    label: 'Another Agency' },
+  { value: 'not_selling',       label: 'Not Selling' },
+  { value: 'other',             label: 'Other (please specify)' },
+]
+
 const CONTACT_TAGS = ['Seller', 'Attorney', 'Managing Agent', 'Tenant']
+
+type Profile = { id: string; full_name: string | null; email: string | null }
 
 // ── Address helper ────────────────────────────────────────────
 function displayAddress(p: Property): string {
@@ -139,12 +152,15 @@ function displayAddress(p: Property): string {
 export default function NewEvaluationPage() {
   const router = useRouter()
   const [userId, setUserId] = useState<string | null>(null)
+  const [profiles, setProfiles] = useState<Profile[]>([])
 
   // Property
   const [selectedProperty, setSelectedProperty] = useState<Property | null>(null)
   const [showAddProperty, setShowAddProperty]   = useState(false)
   const [newPropertyType, setNewPropertyType]   = useState('')
   const [newPropertyAddress, setNewPropertyAddress] = useState('')
+  const [addressMatches, setAddressMatches]     = useState<Property[]>([])
+  const [checkingMatches, setCheckingMatches]   = useState(false)
   const [lookingUpAddress, setLookingUpAddress] = useState(false)
   const [showPropertyReview, setShowPropertyReview] = useState(false)
   const [propertyDraft, setPropertyDraft]       = useState<DraftProperty>(EMPTY_DRAFT)
@@ -156,6 +172,10 @@ export default function NewEvaluationPage() {
   // Deal details
   const [status, setStatus]               = useState('in_progress')
   const [propertyStatus, setPropertyStatus] = useState('')
+  const [reasonLost, setReasonLost]         = useState('')
+  const [reasonLostOther, setReasonLostOther] = useState('')
+  const [agentId, setAgentId]             = useState('')
+  const [tcId, setTcId]                   = useState('')
 
   // Lead info
   const [leadGeneratedBy, setLeadGeneratedBy]     = useState('')
@@ -187,7 +207,33 @@ export default function NewEvaluationPage() {
       if (!data.user) { router.push('/'); return }
       setUserId(data.user.id)
     })
+    supabase.from('profiles').select('id, full_name, email').then(({ data }) => {
+      setProfiles((data ?? []) as Profile[])
+    })
   }, [router])
+
+  // ── Check for existing properties matching the typed address, so agents
+  // don't accidentally create a duplicate property record.
+  useEffect(() => {
+    if (!newPropertyAddress.trim() || newPropertyAddress.trim().length < 3) { setAddressMatches([]); return }
+    const timer = setTimeout(async () => {
+      setCheckingMatches(true)
+      const q = newPropertyAddress.trim()
+      const { data } = await supabase
+        .from('properties')
+        .select('id, property_type, street_name, suburb, city')
+        .or(`street_name.ilike.%${q}%,suburb.ilike.%${q}%,city.ilike.%${q}%`)
+        .limit(5)
+      setAddressMatches(data ?? [])
+      setCheckingMatches(false)
+    }, 300)
+    return () => clearTimeout(timer)
+  }, [newPropertyAddress])
+
+  function selectExistingProperty(p: Property) {
+    setSelectedProperty(p)
+    resetAddPropertyForm()
+  }
 
   // ── Add property: look up address, then review/edit fields before saving ──
   async function lookupAddress() {
@@ -248,6 +294,7 @@ export default function NewEvaluationPage() {
     setShowPropertyReview(false)
     setNewPropertyType('')
     setNewPropertyAddress('')
+    setAddressMatches([])
     setPropertyDraft(EMPTY_DRAFT)
   }
 
@@ -319,11 +366,17 @@ export default function NewEvaluationPage() {
       ? `Other: ${referralTypeOther}`
       : (REFERRAL_TYPES.find(r => r.value === referralType)?.label ?? null)
     const timelineLabel     = TIMELINES.find(t => t.value === timeline)?.label ?? null
+    const reasonLostLabel   = status === 'lost'
+      ? (reasonLost === 'other' ? `Other: ${reasonLostOther}` : (REASONS_LOST.find(r => r.value === reasonLost)?.label ?? null))
+      : null
 
     const { data: ev, error: evErr } = await supabase.from('evaluations').insert({
       property_id:                      selectedProperty.id,
       captured_by_user_id:              userId,
       status,
+      reason_lost:                      reasonLostLabel,
+      sellers_agent_user_id:            agentId || null,
+      transaction_coordinator_user_id:  tcId || null,
       property_status:                  propertyStatus || null,
       lead_generated_by:                leadGeneratedBy || null,
       lead_source_other_text:           leadSourceLabel,
@@ -380,22 +433,23 @@ export default function NewEvaluationPage() {
               </div>
             ) : showAddProperty && showPropertyReview ? (
               <div className="space-y-4 border border-gray-200 rounded-xl p-4 bg-gray-50">
-                <div className="grid grid-cols-2 gap-3">
-                  <div>
-                    <label className={labelCls}>Unit Number</label>
-                    <input value={propertyDraft.unit_number} onChange={e => updateDraft('unit_number', e.target.value)} className={input} />
-                  </div>
-                  <div>
-                    <label className={labelCls}>Complex Name</label>
-                    <input value={propertyDraft.complex_or_building_name} onChange={e => updateDraft('complex_or_building_name', e.target.value)} className={input} />
-                  </div>
-                </div>
-
                 {newPropertyType === 'sectional_title' && (
-                  <div>
-                    <label className={labelCls}>Sectional Title Number</label>
-                    <input value={propertyDraft.sectional_title_number} onChange={e => updateDraft('sectional_title_number', e.target.value)} className={input} />
-                  </div>
+                  <>
+                    <div className="grid grid-cols-2 gap-3">
+                      <div>
+                        <label className={labelCls}>Unit Number</label>
+                        <input value={propertyDraft.unit_number} onChange={e => updateDraft('unit_number', e.target.value)} className={input} />
+                      </div>
+                      <div>
+                        <label className={labelCls}>Complex Name</label>
+                        <input value={propertyDraft.complex_or_building_name} onChange={e => updateDraft('complex_or_building_name', e.target.value)} className={input} />
+                      </div>
+                    </div>
+                    <div>
+                      <label className={labelCls}>Sectional Title Number</label>
+                      <input value={propertyDraft.sectional_title_number} onChange={e => updateDraft('sectional_title_number', e.target.value)} className={input} />
+                    </div>
+                  </>
                 )}
 
                 <div className="grid grid-cols-2 gap-3">
@@ -490,6 +544,27 @@ export default function NewEvaluationPage() {
                     className={input}
                   />
                 </div>
+
+                {checkingMatches && (
+                  <p className="text-xs text-gray-400">Checking for existing properties…</p>
+                )}
+                {!checkingMatches && addressMatches.length > 0 && (
+                  <div className="border border-amber-200 bg-amber-50 rounded-lg p-3 space-y-2">
+                    <p className="text-xs font-medium text-amber-700">
+                      This address may already exist — select it instead of creating a duplicate:
+                    </p>
+                    {addressMatches.map(p => (
+                      <button key={p.id} type="button" onClick={() => selectExistingProperty(p)}
+                        className="w-full text-left px-3 py-2 rounded-md bg-white border border-amber-200 hover:border-amber-400 text-sm text-[#1a1a1a] transition-colors">
+                        <span className="font-medium">{displayAddress(p)}</span>
+                        {p.property_type && (
+                          <span className="ml-2 text-xs text-gray-400 capitalize">{p.property_type.replace('_', ' ')}</span>
+                        )}
+                      </button>
+                    ))}
+                  </div>
+                )}
+
                 <div className="flex gap-2 pt-1">
                   <button type="button" onClick={resetAddPropertyForm}
                     className={`${btn.secondary} flex-1`}>Cancel</button>
@@ -544,13 +619,29 @@ export default function NewEvaluationPage() {
           <Section title="Deal Details">
             <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
               <div>
+                <span className={labelCls}>Date &amp; Time Captured</span>
+                <p className="text-sm text-[#1a1a1a] py-2.5">
+                  {new Date().toLocaleString('en-ZA', { dateStyle: 'medium', timeStyle: 'short' })}
+                </p>
+              </div>
+              <div>
+                <span className={labelCls}>Captured By</span>
+                <p className="text-sm text-[#1a1a1a] py-2.5">
+                  {profiles.find(p => p.id === userId)?.full_name
+                    ?? profiles.find(p => p.id === userId)?.email
+                    ?? '—'}
+                </p>
+              </div>
+            </div>
+
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+              <div>
                 <label className={labelCls}>Evaluation Status</label>
                 <select value={status} onChange={e => setStatus(e.target.value)} className={select}>
                   <option value="in_progress">In Progress</option>
-                  <option value="open">Open</option>
-                  <option value="won">Won</option>
+                  <option value="future">Future Mandate</option>
                   <option value="lost">Lost</option>
-                  <option value="future">Future</option>
+                  <option value="won">Won</option>
                 </select>
               </div>
               <div>
@@ -559,6 +650,41 @@ export default function NewEvaluationPage() {
                   <option value="">—</option>
                   <option value="off_market">Off Market</option>
                   <option value="on_market">On Market</option>
+                </select>
+              </div>
+            </div>
+
+            {status === 'lost' && (
+              <div>
+                <label className={labelCls}>Reason Lost</label>
+                <select value={reasonLost} onChange={e => setReasonLost(e.target.value)} className={select}>
+                  <option value="">—</option>
+                  {REASONS_LOST.map(r => <option key={r.value} value={r.value}>{r.label}</option>)}
+                </select>
+                {reasonLost === 'other' && (
+                  <input value={reasonLostOther} onChange={e => setReasonLostOther(e.target.value)}
+                    placeholder="Describe the reason" className={`${input} mt-2`} />
+                )}
+              </div>
+            )}
+
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+              <div>
+                <label className={labelCls}>Agent</label>
+                <select value={agentId} onChange={e => setAgentId(e.target.value)} className={select}>
+                  <option value="">—</option>
+                  {profiles.map(p => (
+                    <option key={p.id} value={p.id}>{p.full_name ?? p.email}</option>
+                  ))}
+                </select>
+              </div>
+              <div>
+                <label className={labelCls}>Transaction Coordinator</label>
+                <select value={tcId} onChange={e => setTcId(e.target.value)} className={select}>
+                  <option value="">—</option>
+                  {profiles.map(p => (
+                    <option key={p.id} value={p.id}>{p.full_name ?? p.email}</option>
+                  ))}
                 </select>
               </div>
             </div>

@@ -32,6 +32,7 @@ type Profile = { id: string; full_name: string | null; email: string | null }
 
 type Evaluation = {
   id: string; status: string; date_captured: string
+  reason_lost: string | null
   property_status: string | null
   lead_generated_by: string | null
   lead_source_other_text: string | null; lead_referral_notes: string | null
@@ -89,8 +90,19 @@ const STATUS_COLOURS: Record<string, string> = {
 }
 
 const STATUS_LABELS: Record<string, string> = {
-  in_progress: 'In Progress', open: 'Open', won: 'Won', lost: 'Lost', future: 'Future',
+  in_progress: 'In Progress', open: 'Open Mandate', won: 'Won', lost: 'Lost', future: 'Future Mandate',
 }
+
+const REASONS_LOST = [
+  { value: 'evaluation_price',  label: 'Evaluation Price' },
+  { value: 'commission',        label: 'Commission' },
+  { value: 'mandate_terms',     label: 'Mandate Terms' },
+  { value: 'agency_size',       label: 'Agency Size' },
+  { value: 'not_mls_member',    label: 'Not an MLS Member' },
+  { value: 'another_agency',    label: 'Another Agency' },
+  { value: 'not_selling',       label: 'Not Selling' },
+  { value: 'other',             label: 'Other (please specify)' },
+]
 
 // ── Page ──────────────────────────────────────────────────────
 export default function EvaluationDetailPage() {
@@ -111,6 +123,7 @@ export default function EvaluationDetailPage() {
 
   // Edit form state
   const [editStatus, setEditStatus]             = useState('')
+  const [editReasonLost, setEditReasonLost]     = useState('')
   const [editPropertyStatus, setEditPropertyStatus] = useState('')
   const [editSchedDate, setEditSchedDate] = useState('')
   const [editSchedTime, setEditSchedTime] = useState('')
@@ -127,7 +140,7 @@ export default function EvaluationDetailPage() {
     const { data } = await supabase
       .from('evaluations')
       .select(`
-        id, status, date_captured, property_status, lead_generated_by,
+        id, status, date_captured, reason_lost, property_status, lead_generated_by,
         lead_source_other_text, lead_referral_notes, referral_type,
         motivation_for_selling_notes, selling_timeline_notes,
         scheduled_at, calendar_event_link,
@@ -153,6 +166,7 @@ export default function EvaluationDetailPage() {
       const ev = data as unknown as Evaluation
       setEvaluation(ev)
       setEditStatus(ev.status)
+      setEditReasonLost(ev.reason_lost ?? '')
       setEditPropertyStatus(ev.property_status ?? '')
       const schedIso = ev.scheduled_at ? ev.scheduled_at.slice(0, 16) : ''
       setEditSchedDate(schedIso ? schedIso.slice(0, 10) : '')
@@ -184,6 +198,7 @@ export default function EvaluationDetailPage() {
     setError('')
     const { error: err } = await supabase.from('evaluations').update({
       status:                   editStatus,
+      reason_lost:              editStatus === 'lost' ? (editReasonLost || null) : null,
       property_status:          editPropertyStatus || null,
       scheduled_at:             editScheduledAt || null,
       motivation_for_selling_notes: editMotivationNotes || null,
@@ -347,10 +362,10 @@ export default function EvaluationDetailPage() {
                     <label className={labelCls}>Status</label>
                     <select value={editStatus} onChange={e => setEditStatus(e.target.value)} className={select}>
                       <option value="in_progress">In Progress</option>
-                      <option value="open">Open</option>
+                      <option value="open">Open Mandate</option>
                       <option value="won">Won</option>
                       <option value="lost">Lost</option>
-                      <option value="future">Future</option>
+                      <option value="future">Future Mandate</option>
                     </select>
                   </div>
                   <div>
@@ -362,6 +377,15 @@ export default function EvaluationDetailPage() {
                     </select>
                   </div>
                 </div>
+                {editStatus === 'lost' && (
+                  <div>
+                    <label className={labelCls}>Reason Lost</label>
+                    <select value={editReasonLost} onChange={e => setEditReasonLost(e.target.value)} className={select}>
+                      <option value="">—</option>
+                      {REASONS_LOST.map(r => <option key={r.value} value={r.label}>{r.label}</option>)}
+                    </select>
+                  </div>
+                )}
                 <div className="grid grid-cols-2 gap-4">
                   <div>
                     <label className={labelCls}>Scheduled Date</label>
@@ -407,6 +431,7 @@ export default function EvaluationDetailPage() {
               <>
                 <div className="grid grid-cols-2 gap-x-8 gap-y-3 text-sm">
                   <InfoRow label="Status" value={STATUS_LABELS[ev.status] ?? ev.status} />
+                  {ev.status === 'lost' && ev.reason_lost && <InfoRow label="Reason Lost" value={ev.reason_lost} />}
                   <InfoRow label="Property Status" value={ev.property_status?.replace('_', ' ') ?? '—'} />
                   <InfoRow label="Scheduled"
                     value={ev.scheduled_at
