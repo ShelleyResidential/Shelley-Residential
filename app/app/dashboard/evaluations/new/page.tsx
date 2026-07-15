@@ -9,6 +9,7 @@ import { useRouter } from 'next/navigation'
 type Property = {
   id: string
   property_type: string | null
+  street_number: string | null
   street_name: string | null
   suburb: string | null
   city: string | null
@@ -146,7 +147,18 @@ type Profile = { id: string; full_name: string | null; email: string | null; rol
 
 // ── Address helper ────────────────────────────────────────────
 function displayAddress(p: Property): string {
-  return p.street_name || p.suburb || p.city || ''
+  return [p.street_number, p.street_name].filter(Boolean).join(' ') || p.suburb || p.city || ''
+}
+
+// Search across street number/name, suburb and city, requiring every word
+// in the query to match at least one of those fields (so "27 audley" finds
+// a property whose number and name are stored in separate columns).
+function applyAddressSearch<T extends { or(filters: string): T }>(query: T, raw: string): T {
+  const words = raw.trim().split(/\s+/).filter(Boolean).map(w => w.replace(/[%,_]/g, ''))
+  return words.reduce(
+    (q, word) => word ? q.or(`street_number.ilike.%${word}%,street_name.ilike.%${word}%,suburb.ilike.%${word}%,city.ilike.%${word}%`) : q,
+    query
+  )
 }
 
 export default function NewEvaluationPage() {
@@ -218,12 +230,11 @@ export default function NewEvaluationPage() {
     if (!newPropertyAddress.trim() || newPropertyAddress.trim().length < 3) { setAddressMatches([]); return }
     const timer = setTimeout(async () => {
       setCheckingMatches(true)
-      const q = newPropertyAddress.trim()
-      const { data } = await supabase
-        .from('properties')
-        .select('id, property_type, street_name, suburb, city')
-        .or(`street_name.ilike.%${q}%,suburb.ilike.%${q}%,city.ilike.%${q}%`)
-        .limit(5)
+      const query = applyAddressSearch(
+        supabase.from('properties').select('id, property_type, street_number, street_name, suburb, city'),
+        newPropertyAddress
+      )
+      const { data } = await query.limit(8)
       setAddressMatches(data ?? [])
       setCheckingMatches(false)
     }, 300)
@@ -322,7 +333,7 @@ export default function NewEvaluationPage() {
         google_maps_url:          propertyDraft.google_maps_url,
         created_by_user_id:       userId,
       })
-      .select('id, property_type, street_name, suburb, city')
+      .select('id, property_type, street_number, street_name, suburb, city')
       .single()
 
     setSavingProperty(false)
@@ -557,6 +568,7 @@ export default function NewEvaluationPage() {
                       <button key={p.id} type="button" onClick={() => selectExistingProperty(p)}
                         className="w-full text-left px-3 py-2 rounded-md bg-white border border-amber-200 hover:border-amber-400 text-sm text-[#1a1a1a] transition-colors">
                         <span className="font-medium">{displayAddress(p)}</span>
+                        {p.suburb && <span className="ml-2 text-xs text-gray-400">{p.suburb}</span>}
                         {p.property_type && (
                           <span className="ml-2 text-xs text-gray-400 capitalize">{p.property_type.replace('_', ' ')}</span>
                         )}
@@ -852,11 +864,11 @@ function PropertySearch({ onSelect }: { onSelect: (p: Property) => void }) {
     if (!query.trim()) { setResults([]); setOpen(false); return }
     const timer = setTimeout(async () => {
       setLoading(true)
-      const { data } = await supabase
-        .from('properties')
-        .select('id, property_type, street_name, suburb, city')
-        .or(`street_name.ilike.%${query}%,suburb.ilike.%${query}%,city.ilike.%${query}%`)
-        .limit(8)
+      const q = applyAddressSearch(
+        supabase.from('properties').select('id, property_type, street_number, street_name, suburb, city'),
+        query
+      )
+      const { data } = await q.limit(8)
       setResults(data ?? [])
       setOpen(true)
       setLoading(false)
@@ -878,7 +890,8 @@ function PropertySearch({ onSelect }: { onSelect: (p: Property) => void }) {
             <button key={p.id} type="button"
               onMouseDown={() => { onSelect(p); setQuery(''); setOpen(false) }}
               className="w-full text-left px-4 py-2.5 text-sm text-[#1a1a1a] hover:bg-[#f8f7f4] border-b border-gray-100 last:border-b-0 transition-colors">
-              <span className="font-medium">{p.street_name || p.suburb || p.city}</span>
+              <span className="font-medium">{displayAddress(p)}</span>
+              {p.suburb && <span className="ml-2 text-xs text-gray-400">{p.suburb}</span>}
               {p.property_type && (
                 <span className="ml-2 text-xs text-gray-400 capitalize">{p.property_type.replace('_', ' ')}</span>
               )}
