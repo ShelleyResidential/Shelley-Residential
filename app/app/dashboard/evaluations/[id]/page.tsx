@@ -82,15 +82,27 @@ const STEP_LABELS: Record<string, string> = {
 }
 
 const STATUS_COLOURS: Record<string, string> = {
-  in_progress: 'bg-blue-50 text-blue-700',
-  open:        'bg-green-50 text-green-700',
+  // Current statuses
+  new:         'bg-blue-50 text-blue-700',
+  scheduled:   'bg-indigo-50 text-indigo-700',
+  completed:   'bg-teal-50 text-teal-700',
+  presented:   'bg-purple-50 text-purple-700',
+  follow_up:   'bg-yellow-50 text-yellow-700',
   won:         'bg-emerald-50 text-emerald-700',
   lost:        'bg-red-50 text-red-600',
+  on_hold:     'bg-orange-50 text-orange-700',
+  cancelled:   'bg-gray-100 text-gray-500',
+  // Legacy statuses (kept for evaluations created before this status list changed)
+  in_progress: 'bg-blue-50 text-blue-700',
+  open:        'bg-green-50 text-green-700',
   future:      'bg-yellow-50 text-yellow-700',
 }
 
 const STATUS_LABELS: Record<string, string> = {
-  in_progress: 'In Progress', open: 'Open Mandate', won: 'Won', lost: 'Lost', future: 'Future Mandate',
+  new: 'New', scheduled: 'Scheduled', completed: 'Completed', presented: 'Presented',
+  follow_up: 'Follow-Up', won: 'Won', lost: 'Lost', on_hold: 'On Hold', cancelled: 'Cancelled',
+  // Legacy statuses (kept for evaluations created before this status list changed)
+  in_progress: 'In Progress', open: 'Open Mandate', future: 'Future Mandate',
 }
 
 const REASONS_LOST = [
@@ -361,11 +373,18 @@ export default function EvaluationDetailPage() {
                   <div>
                     <label className={labelCls}>Status</label>
                     <select value={editStatus} onChange={e => setEditStatus(e.target.value)} className={select}>
-                      <option value="in_progress">In Progress</option>
-                      <option value="open">Open Mandate</option>
+                      <option value="new">New</option>
+                      <option value="scheduled">Scheduled</option>
+                      <option value="completed">Completed</option>
+                      <option value="presented">Presented</option>
+                      <option value="follow_up">Follow-Up</option>
                       <option value="won">Won</option>
                       <option value="lost">Lost</option>
-                      <option value="future">Future Mandate</option>
+                      <option value="on_hold">On Hold</option>
+                      <option value="cancelled">Cancelled</option>
+                      <option value="in_progress">In Progress (legacy)</option>
+                      <option value="open">Open Mandate (legacy)</option>
+                      <option value="future">Future Mandate (legacy)</option>
                     </select>
                   </div>
                   <div>

@@ -182,7 +182,7 @@ export default function NewEvaluationPage() {
   const [contacts, setContacts] = useState<ContactSlot[]>([])
 
   // Deal details
-  const [status, setStatus]               = useState('in_progress')
+  const [status, setStatus]               = useState('new')
   const [propertyStatus, setPropertyStatus] = useState('')
   const [reasonLost, setReasonLost]         = useState('')
   const [reasonLostOther, setReasonLostOther] = useState('')
@@ -655,10 +655,15 @@ export default function NewEvaluationPage() {
               <div>
                 <label className={labelCls}>Evaluation Status</label>
                 <select value={status} onChange={e => setStatus(e.target.value)} className={select}>
-                  <option value="in_progress">In Progress</option>
-                  <option value="future">Future Mandate</option>
-                  <option value="lost">Lost</option>
+                  <option value="new">New</option>
+                  <option value="scheduled">Scheduled</option>
+                  <option value="completed">Completed</option>
+                  <option value="presented">Presented</option>
+                  <option value="follow_up">Follow-Up</option>
                   <option value="won">Won</option>
+                  <option value="lost">Lost</option>
+                  <option value="on_hold">On Hold</option>
+                  <option value="cancelled">Cancelled</option>
                 </select>
               </div>
               <div>

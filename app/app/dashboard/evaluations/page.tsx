@@ -118,20 +118,33 @@ function formatDate(iso: string | null): string {
 }
 
 const STATUS_LABELS: Record<string, { label: string; colour: string }> = {
-  in_progress: { label: 'In Progress',    colour: 'bg-blue-50 text-blue-700' },
-  open:        { label: 'Open Mandate',   colour: 'bg-green-50 text-green-700' },
+  // Current statuses
+  new:         { label: 'New',            colour: 'bg-blue-50 text-blue-700' },
+  scheduled:   { label: 'Scheduled',      colour: 'bg-indigo-50 text-indigo-700' },
+  completed:   { label: 'Completed',      colour: 'bg-teal-50 text-teal-700' },
+  presented:   { label: 'Presented',      colour: 'bg-purple-50 text-purple-700' },
+  follow_up:   { label: 'Follow-Up',      colour: 'bg-yellow-50 text-yellow-700' },
   won:         { label: 'Won',            colour: 'bg-emerald-50 text-emerald-700' },
   lost:        { label: 'Lost',           colour: 'bg-red-50 text-red-600' },
+  on_hold:     { label: 'On Hold',        colour: 'bg-orange-50 text-orange-700' },
+  cancelled:   { label: 'Cancelled',      colour: 'bg-gray-100 text-gray-500' },
+  // Legacy statuses (kept for evaluations created before this status list changed)
+  in_progress: { label: 'In Progress',    colour: 'bg-blue-50 text-blue-700' },
+  open:        { label: 'Open Mandate',   colour: 'bg-green-50 text-green-700' },
   future:      { label: 'Future Mandate', colour: 'bg-yellow-50 text-yellow-700' },
 }
 
 const STATUS_TABS = [
-  { key: '',           label: 'All' },
-  { key: 'future',     label: 'Future Mandate' },
-  { key: 'in_progress', label: 'In Progress' },
-  { key: 'lost',       label: 'Lost' },
-  { key: 'open',       label: 'Open Mandate' },
+  { key: '',          label: 'All' },
+  { key: 'new',        label: 'New' },
+  { key: 'scheduled',  label: 'Scheduled' },
+  { key: 'completed',  label: 'Completed' },
+  { key: 'presented',  label: 'Presented' },
+  { key: 'follow_up',  label: 'Follow-Up' },
   { key: 'won',        label: 'Won' },
+  { key: 'lost',       label: 'Lost' },
+  { key: 'on_hold',    label: 'On Hold' },
+  { key: 'cancelled',  label: 'Cancelled' },
 ]
 
 export default function EvaluationsPage() {
