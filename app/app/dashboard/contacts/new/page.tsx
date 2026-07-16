@@ -35,6 +35,8 @@ function AddContactForm() {
   const [success, setSuccess] = useState(false)
   const [userId, setUserId]   = useState<string | null>(null)
   const [form, setForm]       = useState(EMPTY_FORM)
+  const [duplicates, setDuplicates] = useState<{ id: string; first_name: string; last_name: string; phone_number: string | null; email_address: string | null }[]>([])
+  const [checkingDuplicates, setCheckingDuplicates] = useState(false)
 
   useEffect(() => {
     supabase.auth.getUser().then(({ data }) => {
@@ -42,6 +44,41 @@ function AddContactForm() {
       setUserId(data.user.id)
     })
   }, [router])
+
+  // ── Flag potential duplicate contacts as the agent types, matching on
+  // full name, phone number, or email address, so we never end up with
+  // two records for the same person.
+  useEffect(() => {
+    const firstName = form.first_name.trim()
+    const lastName = form.last_name.trim()
+    const phone = form.phone_number.trim()
+    const email = form.email_address.trim()
+
+    const clauses: string[] = []
+    if (firstName && lastName) clauses.push(`and(first_name.ilike.${firstName},last_name.ilike.${lastName})`)
+    if (phone) clauses.push(`phone_number.eq.${phone}`)
+    if (email) clauses.push(`email_address.eq.${email}`)
+
+    if (clauses.length === 0) { setDuplicates([]); return }
+
+    const timer = setTimeout(async () => {
+      setCheckingDuplicates(true)
+      const { data } = await supabase
+        .from('contacts')
+        .select('id, first_name, last_name, phone_number, email_address')
+        .or(clauses.join(','))
+        .limit(5)
+      setDuplicates(data ?? [])
+      setCheckingDuplicates(false)
+    }, 350)
+    return () => clearTimeout(timer)
+  }, [form.first_name, form.last_name, form.phone_number, form.email_address])
+
+  function useExistingContact(match: { id: string; first_name: string; last_name: string }) {
+    if (!returnTo) return
+    const name = `${match.first_name} ${match.last_name}`.trim()
+    router.push(`${returnTo}?newContactId=${match.id}&newContactName=${encodeURIComponent(name)}&for=${returnFor ?? 'contact'}`)
+  }
 
   function toggleTag(tag: string) {
     setForm(f => ({ ...f, tags: f.tags.includes(tag) ? f.tags.filter(t => t !== tag) : [...f.tags, tag] }))
@@ -251,6 +288,38 @@ function AddContactForm() {
               </div>
             </div>
           </Section>
+
+          {checkingDuplicates && (
+            <p className="text-xs text-gray-400 text-center">Checking for existing contacts…</p>
+          )}
+          {!checkingDuplicates && duplicates.length > 0 && (
+            <div className="border border-amber-200 bg-amber-50 rounded-lg p-3 space-y-2">
+              <p className="text-xs font-medium text-amber-700">
+                A contact with this name, phone number, or email may already exist:
+              </p>
+              {duplicates.map(m => (
+                <div key={m.id} className="flex items-center justify-between gap-3 px-3 py-2 rounded-md bg-white border border-amber-200 text-sm">
+                  <div className="min-w-0">
+                    <span className="font-medium text-[#1a1a1a]">{m.first_name} {m.last_name}</span>
+                    {(m.phone_number || m.email_address) && (
+                      <span className="ml-2 text-xs text-gray-400">{[m.phone_number, m.email_address].filter(Boolean).join(' · ')}</span>
+                    )}
+                  </div>
+                  {returnTo ? (
+                    <button type="button" onClick={() => useExistingContact(m)}
+                      className="text-xs text-blue-600 hover:text-blue-800 font-medium flex-shrink-0">
+                      Use this contact
+                    </button>
+                  ) : (
+                    <a href={`/dashboard/contacts/${m.id}`} target="_blank" rel="noopener noreferrer"
+                      className="text-xs text-blue-600 hover:text-blue-800 font-medium flex-shrink-0">
+                      View →
+                    </a>
+                  )}
+                </div>
+              ))}
+            </div>
+          )}
 
           {error && <p className="text-sm text-red-500 bg-red-50 px-4 py-3 rounded-lg">{error}</p>}
 
