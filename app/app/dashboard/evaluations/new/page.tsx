@@ -227,7 +227,7 @@ export default function NewEvaluationPage() {
   // ── Check for existing properties matching the typed address, so agents
   // don't accidentally create a duplicate property record.
   useEffect(() => {
-    if (!newPropertyAddress.trim() || newPropertyAddress.trim().length < 3) { setAddressMatches([]); return }
+    if (!newPropertyAddress.trim()) { setAddressMatches([]); return }
     const timer = setTimeout(async () => {
       setCheckingMatches(true)
       const query = applyAddressSearch(
