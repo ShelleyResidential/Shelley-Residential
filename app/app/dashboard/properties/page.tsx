@@ -3,6 +3,7 @@
 import { useState, useEffect, useCallback } from 'react'
 import { supabase } from '@/lib/supabase'
 import { btn, card, input, select } from '@/lib/styles'
+import { canDelete } from '@/lib/permissions'
 import { useRouter } from 'next/navigation'
 import Link from 'next/link'
 
@@ -32,15 +33,26 @@ const TYPE_LABELS: Record<string, string> = {
 }
 
 const STATUS_COLOURS: Record<string, string> = {
-  in_progress: 'bg-blue-50 text-blue-700',
-  open:        'bg-green-50 text-green-700',
+  // Current statuses
+  new:         'bg-blue-50 text-blue-700',
+  scheduled:   'bg-indigo-50 text-indigo-700',
+  completed:   'bg-teal-50 text-teal-700',
+  presented:   'bg-purple-50 text-purple-700',
+  follow_up:   'bg-yellow-50 text-yellow-700',
   won:         'bg-emerald-50 text-emerald-700',
   lost:        'bg-red-50 text-red-600',
+  cancelled:   'bg-gray-100 text-gray-500',
+  // Legacy statuses (kept for evaluations created before this status list changed)
+  in_progress: 'bg-blue-50 text-blue-700',
+  open:        'bg-green-50 text-green-700',
   future:      'bg-yellow-50 text-yellow-700',
 }
 
 const STATUS_LABELS: Record<string, string> = {
-  in_progress: 'In Progress', open: 'Open', won: 'Won', lost: 'Lost', future: 'Future',
+  new: 'New', scheduled: 'Scheduled', completed: 'Completed', presented: 'Presented',
+  follow_up: 'Follow-Up', won: 'Won', lost: 'Lost', cancelled: 'Cancelled',
+  // Legacy statuses (kept for evaluations created before this status list changed)
+  in_progress: 'In Progress', open: 'Open Mandate', future: 'Future Mandate',
 }
 
 function formatAddress(p: Property): string {
@@ -58,6 +70,8 @@ export default function PropertiesPage() {
   const [filterType, setFilterType] = useState('')
   const [filterSuburb, setFilterSuburb] = useState('')
   const [suburbs, setSuburbs]       = useState<string[]>([])
+  const [userEmail, setUserEmail]   = useState<string | null>(null)
+  const [deletingId, setDeletingId] = useState<string | null>(null)
 
   const fetchProperties = useCallback(async () => {
     setLoading(true)
@@ -88,7 +102,10 @@ export default function PropertiesPage() {
   }, [search, filterType, filterSuburb])
 
   useEffect(() => {
-    supabase.auth.getUser().then(({ data }) => { if (!data.user) router.push('/') })
+    supabase.auth.getUser().then(({ data }) => {
+      if (!data.user) { router.push('/'); return }
+      setUserEmail(data.user.email ?? null)
+    })
 
     // Load distinct suburbs for the filter dropdown
     supabase.from('properties').select('suburb').not('suburb', 'is', null).then(({ data }) => {
@@ -96,6 +113,21 @@ export default function PropertiesPage() {
       setSuburbs(unique.sort())
     })
   }, [router])
+
+  async function deleteProperty(p: Property) {
+    if (!confirm(`Delete ${formatAddress(p)}? This cannot be undone.`)) return
+    setDeletingId(p.id)
+    const { error } = await supabase.from('properties').delete().eq('id', p.id)
+    if (error) {
+      alert(error.code === '23503'
+        ? "This property has evaluations linked to it and can't be deleted. Delete those evaluations first."
+        : error.message)
+      setDeletingId(null)
+      return
+    }
+    setDeletingId(null)
+    fetchProperties()
+  }
 
   useEffect(() => {
     const timer = setTimeout(fetchProperties, 300)
@@ -198,6 +230,15 @@ export default function PropertiesPage() {
                     >
                       View evaluation →
                     </Link>
+                  )}
+                  {canDelete(userEmail) && (
+                    <button
+                      onClick={() => deleteProperty(p)}
+                      disabled={deletingId === p.id}
+                      className="text-xs font-medium text-red-500 hover:text-red-700 transition-colors disabled:opacity-50"
+                    >
+                      {deletingId === p.id ? 'Deleting…' : 'Delete'}
+                    </button>
                   )}
                 </div>
               </div>

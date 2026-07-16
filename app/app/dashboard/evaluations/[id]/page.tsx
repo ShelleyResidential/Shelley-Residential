@@ -3,6 +3,7 @@
 import { useState, useEffect, useCallback } from 'react'
 import { supabase } from '@/lib/supabase'
 import { btn, card, input, select, sectionTitle, label as labelCls } from '@/lib/styles'
+import { canDelete } from '@/lib/permissions'
 import { useRouter, useParams } from 'next/navigation'
 import Link from 'next/link'
 
@@ -125,9 +126,11 @@ export default function EvaluationDetailPage() {
   const [loading, setLoading]       = useState(true)
   const [activeTab, setActiveTab]   = useState<'details' | 'inspection' | 'pipeline'>('details')
   const [userId, setUserId]         = useState<string | null>(null)
+  const [userEmail, setUserEmail]   = useState<string | null>(null)
   const [editing, setEditing]       = useState(false)
   const [saving, setSaving]         = useState(false)
   const [error, setError]           = useState('')
+  const [deleting, setDeleting]     = useState(false)
   const [syncing, setSyncing]       = useState(false)
   const [syncError, setSyncError]   = useState('')
   const [profiles, setProfiles]     = useState<Profile[]>([])
@@ -205,13 +208,21 @@ export default function EvaluationDetailPage() {
   useEffect(() => {
     supabase.auth.getUser().then(({ data }) => {
       if (!data.user) router.push('/')
-      else setUserId(data.user.id)
+      else { setUserId(data.user.id); setUserEmail(data.user.email ?? null) }
     })
     supabase.from('profiles').select('id, full_name, email, role').then(({ data }) => {
       setProfiles((data ?? []) as Profile[])
     })
     fetchEvaluation()
   }, [router, fetchEvaluation])
+
+  async function deleteEvaluation() {
+    if (!confirm('Delete this evaluation? This cannot be undone.')) return
+    setDeleting(true)
+    const { error: err } = await supabase.from('evaluations').delete().eq('id', id)
+    if (err) { alert(err.message); setDeleting(false); return }
+    router.push('/dashboard/evaluations')
+  }
 
   async function saveEdit() {
     setSaving(true)
@@ -296,6 +307,11 @@ export default function EvaluationDetailPage() {
             </span>
             {!editing && (
               <button onClick={() => setEditing(true)} className={btn.secondary}>Edit</button>
+            )}
+            {canDelete(userEmail) && (
+              <button onClick={deleteEvaluation} disabled={deleting} className={btn.danger}>
+                {deleting ? 'Deleting…' : 'Delete'}
+              </button>
             )}
           </div>
         </div>

@@ -3,6 +3,7 @@
 import { useState, useEffect, useCallback } from 'react'
 import { supabase } from '@/lib/supabase'
 import { btn, card, input, select, sectionTitle, label as labelCls } from '@/lib/styles'
+import { canDelete } from '@/lib/permissions'
 import { useRouter, useParams } from 'next/navigation'
 import Link from 'next/link'
 
@@ -62,6 +63,8 @@ export default function ContactDetailPage() {
 
   const [contact, setContact]         = useState<Contact | null>(null)
   const [userId, setUserId]           = useState<string | null>(null)
+  const [userEmail, setUserEmail]     = useState<string | null>(null)
+  const [deleting, setDeleting]       = useState(false)
   const [loading, setLoading]         = useState(true)
   const [tab, setTab]                 = useState<'info' | 'notes'>('info')
   const [editing, setEditing]         = useState(false)
@@ -87,6 +90,7 @@ export default function ContactDetailPage() {
     supabase.auth.getUser().then(({ data }) => {
       if (!data.user) { router.push('/'); return }
       setUserId(data.user.id)
+      setUserEmail(data.user.email ?? null)
     })
     supabase.from('contacts').select('*').eq('id', id).single().then(({ data }) => {
       if (!data) { router.push('/dashboard/contacts'); return }
@@ -104,6 +108,20 @@ export default function ContactDetailPage() {
   function toggleTag(tag: string) {
     const current = (editForm.tags ?? []) as string[]
     setField('tags', current.includes(tag) ? current.filter(t => t !== tag) : [...current, tag])
+  }
+
+  async function deleteContact() {
+    if (!confirm(`Delete ${fullName(contact!)}? This cannot be undone.`)) return
+    setDeleting(true)
+    const { error } = await supabase.from('contacts').delete().eq('id', id)
+    if (error) {
+      alert(error.code === '23503'
+        ? "This contact is linked to one or more evaluations and can't be deleted. Delete those evaluations first."
+        : error.message)
+      setDeleting(false)
+      return
+    }
+    router.push('/dashboard/contacts')
   }
 
   async function saveContact() {
@@ -159,11 +177,18 @@ export default function ContactDetailPage() {
             contact.status === 'Active' ? 'bg-green-50 text-green-700' : 'bg-gray-100 text-gray-500'
           }`}>{contact.status}</span>
         </div>
-        {!editing && (
-          <button onClick={() => { setEditing(true); setEditForm(contact) }} className={btn.secondary}>
-            Edit
-          </button>
-        )}
+        <div className="flex items-center gap-2">
+          {!editing && (
+            <button onClick={() => { setEditing(true); setEditForm(contact) }} className={btn.secondary}>
+              Edit
+            </button>
+          )}
+          {canDelete(userEmail) && (
+            <button onClick={deleteContact} disabled={deleting} className={btn.danger}>
+              {deleting ? 'Deleting…' : 'Delete'}
+            </button>
+          )}
+        </div>
       </div>
 
       {/* Tabs */}
