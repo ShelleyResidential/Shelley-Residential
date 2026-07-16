@@ -920,7 +920,7 @@ function ContactSearch({ placeholder, onSelect, excludeIds }: {
   excludeIds: string[]
 }) {
   const [query, setQuery]     = useState('')
-  const [results, setResults] = useState<{ id: string; first_name: string; last_name: string; title: string | null }[]>([])
+  const [results, setResults] = useState<{ id: string; first_name: string; last_name: string }[]>([])
   const [open, setOpen]       = useState(false)
   const [loading, setLoading] = useState(false)
   const containerRef          = useRef<HTMLDivElement>(null)
@@ -939,7 +939,7 @@ function ContactSearch({ placeholder, onSelect, excludeIds }: {
       setLoading(true)
       const { data } = await supabase
         .from('contacts')
-        .select('id, first_name, last_name, title')
+        .select('id, first_name, last_name')
         .or(`first_name.ilike.%${query}%,last_name.ilike.%${query}%`)
         .order('first_name').limit(8)
       setResults((data ?? []).filter(r => !excludeIds.includes(r.id)))
@@ -961,7 +961,7 @@ function ContactSearch({ placeholder, onSelect, excludeIds }: {
           {loading && <div className="px-4 py-3 text-sm text-gray-400">Searching…</div>}
           {!loading && results.length === 0 && <div className="px-4 py-3 text-sm text-gray-400">No contacts found</div>}
           {!loading && results.map(r => {
-            const name = `${r.title ? r.title + ' ' : ''}${r.first_name} ${r.last_name}`.trim()
+            const name = `${r.first_name} ${r.last_name}`.trim()
             return (
               <button key={r.id} type="button"
                 onMouseDown={() => { onSelect(r.id, name); setQuery(''); setOpen(false) }}
