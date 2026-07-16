@@ -486,11 +486,13 @@ function NewEvaluationForm() {
     const reasonLostLabel   = status === 'lost'
       ? (reasonLost === 'other' ? `Other: ${reasonLostOther}` : (REASONS_LOST.find(r => r.value === reasonLost)?.label ?? null))
       : null
+    // Booking a date automatically moves a fresh evaluation to Scheduled.
+    const finalStatus = (scheduledAt && status === 'new') ? 'scheduled' : status
 
     const { data: ev, error: evErr } = await supabase.from('evaluations').insert({
       property_id:                      selectedProperty.id,
       captured_by_user_id:              userId,
-      status,
+      status:                           finalStatus,
       reason_lost:                      reasonLostLabel,
       sellers_agent_user_id:            agentId || null,
       transaction_coordinator_user_id:  tcId || null,
@@ -642,6 +644,42 @@ function NewEvaluationForm() {
                   rows={3} className={`${input} resize-none`} />
               </div>
             )}
+          </Section>
+
+          {/* ── Contacts ── */}
+          <Section title="Contacts">
+            <p className="text-xs text-gray-400 -mt-1 mb-3">
+              Primary contact is required. Add secondary contacts once the primary is set.
+            </p>
+
+            {contacts.map((c, i) => (
+              <div key={i} className="flex items-center gap-3 mb-2">
+                <div className="flex-1 px-4 py-2.5 rounded-lg border border-gray-200 bg-gray-50 text-sm text-[#1a1a1a] flex items-center gap-2 flex-wrap">
+                  {i === 0 && (
+                    <span className="text-xs bg-[#1a1a1a] text-white rounded-full px-2 py-0.5 flex-shrink-0">Primary</span>
+                  )}
+                  <span className="flex-1 min-w-0 truncate">{c.contact_name}</span>
+                  <select value={c.tag_option_id} onChange={e => setContactTag(i, e.target.value)}
+                    className="text-xs border border-gray-200 rounded-md px-2 py-1 bg-white text-gray-600 focus:outline-none cursor-pointer flex-shrink-0">
+                    <option value="">No tag</option>
+                    {CONTACT_TAGS.map(t => <option key={t} value={t}>{t}</option>)}
+                  </select>
+                </div>
+                <button type="button" onClick={() => removeContact(i)}
+                  className="text-gray-300 hover:text-red-400 text-xl transition-colors flex-shrink-0">×</button>
+              </div>
+            ))}
+
+            <ContactSearch
+              placeholder={contacts.length === 0 ? 'Search for primary contact…' : 'Search to add secondary contact…'}
+              onSelect={addContact}
+              excludeIds={contacts.map(c => c.contact_id)}
+            />
+            <p className="text-xs text-gray-400 text-center mt-3">— or —</p>
+            <button type="button" onClick={() => goToAddContact('contact')}
+              className={`${btn.primary} w-full mt-3`}>
+              + Add New Contact
+            </button>
           </Section>
 
           {/* ── Property Details ── */}
@@ -820,42 +858,6 @@ function NewEvaluationForm() {
             )}
           </Section>
 
-          {/* ── Contacts ── */}
-          <Section title="Contacts">
-            <p className="text-xs text-gray-400 -mt-1 mb-3">
-              Primary contact is required. Add secondary contacts once the primary is set.
-            </p>
-
-            {contacts.map((c, i) => (
-              <div key={i} className="flex items-center gap-3 mb-2">
-                <div className="flex-1 px-4 py-2.5 rounded-lg border border-gray-200 bg-gray-50 text-sm text-[#1a1a1a] flex items-center gap-2 flex-wrap">
-                  {i === 0 && (
-                    <span className="text-xs bg-[#1a1a1a] text-white rounded-full px-2 py-0.5 flex-shrink-0">Primary</span>
-                  )}
-                  <span className="flex-1 min-w-0 truncate">{c.contact_name}</span>
-                  <select value={c.tag_option_id} onChange={e => setContactTag(i, e.target.value)}
-                    className="text-xs border border-gray-200 rounded-md px-2 py-1 bg-white text-gray-600 focus:outline-none cursor-pointer flex-shrink-0">
-                    <option value="">No tag</option>
-                    {CONTACT_TAGS.map(t => <option key={t} value={t}>{t}</option>)}
-                  </select>
-                </div>
-                <button type="button" onClick={() => removeContact(i)}
-                  className="text-gray-300 hover:text-red-400 text-xl transition-colors flex-shrink-0">×</button>
-              </div>
-            ))}
-
-            <ContactSearch
-              placeholder={contacts.length === 0 ? 'Search for primary contact…' : 'Search to add secondary contact…'}
-              onSelect={addContact}
-              excludeIds={contacts.map(c => c.contact_id)}
-            />
-            <p className="text-xs text-gray-400 text-center mt-3">— or —</p>
-            <button type="button" onClick={() => goToAddContact('contact')}
-              className={`${btn.primary} w-full mt-3`}>
-              + Add New Contact
-            </button>
-          </Section>
-
           {/* ── Evaluation Details ── */}
           <Section title="Evaluation Details">
             <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
@@ -885,7 +887,6 @@ function NewEvaluationForm() {
                 <option value="follow_up">Follow-Up</option>
                 <option value="won">Won</option>
                 <option value="lost">Lost</option>
-                <option value="on_hold">On Hold</option>
                 <option value="cancelled">Cancelled</option>
               </select>
             </div>

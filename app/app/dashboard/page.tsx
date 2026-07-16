@@ -12,7 +12,8 @@ type Stats = {
 }
 
 const STATUS_LABELS: Record<string, string> = {
-  in_progress: 'In Progress', open: 'Open', won: 'Won', lost: 'Lost', future: 'Future',
+  new: 'New', scheduled: 'Scheduled', completed: 'Completed', presented: 'Presented',
+  follow_up: 'Follow-Up', won: 'Won', lost: 'Lost', cancelled: 'Cancelled',
 }
 
 export default function DashboardPage() {

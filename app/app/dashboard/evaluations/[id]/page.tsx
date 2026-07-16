@@ -90,7 +90,6 @@ const STATUS_COLOURS: Record<string, string> = {
   follow_up:   'bg-yellow-50 text-yellow-700',
   won:         'bg-emerald-50 text-emerald-700',
   lost:        'bg-red-50 text-red-600',
-  on_hold:     'bg-orange-50 text-orange-700',
   cancelled:   'bg-gray-100 text-gray-500',
   // Legacy statuses (kept for evaluations created before this status list changed)
   in_progress: 'bg-blue-50 text-blue-700',
@@ -100,7 +99,7 @@ const STATUS_COLOURS: Record<string, string> = {
 
 const STATUS_LABELS: Record<string, string> = {
   new: 'New', scheduled: 'Scheduled', completed: 'Completed', presented: 'Presented',
-  follow_up: 'Follow-Up', won: 'Won', lost: 'Lost', on_hold: 'On Hold', cancelled: 'Cancelled',
+  follow_up: 'Follow-Up', won: 'Won', lost: 'Lost', cancelled: 'Cancelled',
   // Legacy statuses (kept for evaluations created before this status list changed)
   in_progress: 'In Progress', open: 'Open Mandate', future: 'Future Mandate',
 }
@@ -176,6 +175,15 @@ export default function EvaluationDetailPage() {
 
     if (data) {
       const ev = data as unknown as Evaluation
+
+      // If the scheduled time has passed and nobody filled in the inspection
+      // (which would already have moved it to Completed), move it to
+      // Presented automatically.
+      if (ev.status === 'scheduled' && ev.scheduled_at && new Date(ev.scheduled_at) < new Date()) {
+        ev.status = 'presented'
+        await supabase.from('evaluations').update({ status: 'presented' }).eq('id', id).eq('status', 'scheduled')
+      }
+
       setEvaluation(ev)
       setEditStatus(ev.status)
       setEditReasonLost(ev.reason_lost ?? '')
@@ -208,9 +216,11 @@ export default function EvaluationDetailPage() {
   async function saveEdit() {
     setSaving(true)
     setError('')
+    // Booking a date automatically moves a fresh evaluation to Scheduled.
+    const finalStatus = (editScheduledAt && editStatus === 'new') ? 'scheduled' : editStatus
     const { error: err } = await supabase.from('evaluations').update({
-      status:                   editStatus,
-      reason_lost:              editStatus === 'lost' ? (editReasonLost || null) : null,
+      status:                   finalStatus,
+      reason_lost:              finalStatus === 'lost' ? (editReasonLost || null) : null,
       property_status:          editPropertyStatus || null,
       scheduled_at:             editScheduledAt || null,
       motivation_for_selling_notes: editMotivationNotes || null,
@@ -380,7 +390,6 @@ export default function EvaluationDetailPage() {
                       <option value="follow_up">Follow-Up</option>
                       <option value="won">Won</option>
                       <option value="lost">Lost</option>
-                      <option value="on_hold">On Hold</option>
                       <option value="cancelled">Cancelled</option>
                       <option value="in_progress">In Progress (legacy)</option>
                       <option value="open">Open Mandate (legacy)</option>
@@ -873,6 +882,11 @@ function InspectionTab({ evaluationId, onSaved }: { evaluationId: string; onSave
       await supabase.from('evaluation_pipeline_steps')
         .update({ is_complete: true, completed_at: new Date().toISOString(), completed_by_user_id: userId })
         .eq('evaluation_id', evaluationId).eq('step_key', 'description_captured')
+
+      // Filling out the inspection marks the evaluation Completed, unless
+      // it's already moved further along the pipeline manually.
+      await supabase.from('evaluations').update({ status: 'completed' })
+        .eq('id', evaluationId).in('status', ['new', 'scheduled'])
     }
 
     setSaved(true)

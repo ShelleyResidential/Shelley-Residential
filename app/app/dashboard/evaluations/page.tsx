@@ -126,7 +126,6 @@ const STATUS_LABELS: Record<string, { label: string; colour: string }> = {
   follow_up:   { label: 'Follow-Up',      colour: 'bg-yellow-50 text-yellow-700' },
   won:         { label: 'Won',            colour: 'bg-emerald-50 text-emerald-700' },
   lost:        { label: 'Lost',           colour: 'bg-red-50 text-red-600' },
-  on_hold:     { label: 'On Hold',        colour: 'bg-orange-50 text-orange-700' },
   cancelled:   { label: 'Cancelled',      colour: 'bg-gray-100 text-gray-500' },
   // Legacy statuses (kept for evaluations created before this status list changed)
   in_progress: { label: 'In Progress',    colour: 'bg-blue-50 text-blue-700' },
@@ -143,7 +142,6 @@ const STATUS_TABS = [
   { key: 'follow_up',  label: 'Follow-Up' },
   { key: 'won',        label: 'Won' },
   { key: 'lost',       label: 'Lost' },
-  { key: 'on_hold',    label: 'On Hold' },
   { key: 'cancelled',  label: 'Cancelled' },
 ]
 
@@ -186,6 +184,18 @@ export default function EvaluationsPage() {
 
     const { data } = await query
     let results = (data ?? []) as unknown as Evaluation[]
+
+    // If the scheduled time has passed and nobody filled in the inspection
+    // (which would already have moved it to Completed), move it to
+    // Presented automatically.
+    const now = new Date()
+    const overdueIds = results
+      .filter(e => e.status === 'scheduled' && e.scheduled_at && new Date(e.scheduled_at) < now)
+      .map(e => e.id)
+    if (overdueIds.length > 0) {
+      results = results.map(e => overdueIds.includes(e.id) ? { ...e, status: 'presented' } : e)
+      await supabase.from('evaluations').update({ status: 'presented' }).in('id', overdueIds).eq('status', 'scheduled')
+    }
 
     if (search) {
       const q = search.toLowerCase()
