@@ -364,9 +364,9 @@ export default function EvaluationDetailPage() {
             )}
           </div>
 
-          {/* Deal Details */}
+          {/* Property Details */}
           <div className={`${card} p-6`}>
-            <h3 className={sectionTitle}>Deal Details</h3>
+            <h3 className={sectionTitle}>Property Details</h3>
             {editing ? (
               <div className="space-y-4">
                 <div className="grid grid-cols-2 gap-4">
@@ -477,9 +477,9 @@ export default function EvaluationDetailPage() {
             )}
           </div>
 
-          {/* Lead Information */}
+          {/* Lead Details */}
           <div className={`${card} p-6`}>
-            <h3 className={sectionTitle}>Lead Information</h3>
+            <h3 className={sectionTitle}>Lead Details</h3>
             {editing ? (
               <div className="space-y-4">
                 <div>

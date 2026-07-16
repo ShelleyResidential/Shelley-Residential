@@ -1,9 +1,9 @@
 'use client'
 
-import { useState, useEffect, useRef } from 'react'
+import { Suspense, useState, useEffect, useRef } from 'react'
 import { supabase } from '@/lib/supabase'
 import { btn, card, input, select, sectionTitle, label as labelCls } from '@/lib/styles'
-import { useRouter } from 'next/navigation'
+import { useRouter, useSearchParams } from 'next/navigation'
 
 const TAGS = [
   'Current Buyer', 'Current Seller', 'Family', 'Friends', 'Homeowner',
@@ -21,12 +21,15 @@ const EMPTY_FORM = {
   title: '', first_name: '', last_name: '', phone_number: '', email_address: '',
   contact_preference: '', tags: [] as string[], marital_status: '',
   occupation: '', company_name: '', division: '', branch: '',
-  address: '', birthday: '', wedding_anniversary: '', home_anniversary: '',
+  birthday: '', wedding_anniversary: '', home_anniversary: '',
   id_number: '', linked_contact_id: '', linked_contact_name: '', relationship_type: '',
 }
 
-export default function AddContactPage() {
+function AddContactForm() {
   const router = useRouter()
+  const searchParams = useSearchParams()
+  const returnTo = searchParams.get('returnTo')
+  const returnFor = searchParams.get('for')
   const [saving, setSaving]   = useState(false)
   const [error, setError]     = useState('')
   const [success, setSuccess] = useState(false)
@@ -64,7 +67,7 @@ export default function AddContactPage() {
       contact_preference: form.contact_preference || null, tags: form.tags,
       marital_status: form.marital_status || null, occupation: form.occupation || null,
       company_name: form.company_name || null, division: form.division || null,
-      branch: form.branch || null, address: form.address || null,
+      branch: form.branch || null,
       birthday: form.birthday || null, wedding_anniversary: form.wedding_anniversary || null,
       home_anniversary: form.home_anniversary || null, id_number: form.id_number || null,
       created_by: userId, agent_id: userId,
@@ -81,6 +84,12 @@ export default function AddContactPage() {
         linked_contact_id: form.linked_contact_id,
         relationship_type: form.relationship_type,
       })
+    }
+
+    if (returnTo && contact) {
+      const name = [form.first_name.trim(), form.last_name.trim()].filter(Boolean).join(' ')
+      router.push(`${returnTo}?newContactId=${contact.id}&newContactName=${encodeURIComponent(name)}&for=${returnFor ?? 'contact'}`)
+      return
     }
 
     setSuccess(true)
@@ -168,10 +177,6 @@ export default function AddContactPage() {
                 {['WhatsApp', 'Email', 'Phone'].map(p => <option key={p}>{p}</option>)}
               </select>
             </div>
-            <div>
-              <label className={labelCls}>Address</label>
-              <input value={form.address} onChange={e => set('address', e.target.value)} placeholder="Street, suburb, city" className={input} />
-            </div>
           </Section>
 
           <Section title="Personal Details">
@@ -256,6 +261,14 @@ export default function AddContactPage() {
         </form>
       </main>
     </div>
+  )
+}
+
+export default function AddContactPage() {
+  return (
+    <Suspense fallback={<div className="min-h-screen bg-[#f8f7f4]" />}>
+      <AddContactForm />
+    </Suspense>
   )
 }
 

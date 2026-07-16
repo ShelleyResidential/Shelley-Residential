@@ -1,9 +1,11 @@
 'use client'
 
-import { useState, useEffect, useRef } from 'react'
+import { Suspense, useState, useEffect, useRef } from 'react'
 import { supabase } from '@/lib/supabase'
 import { btn, card, input, select, sectionTitle, label as labelCls } from '@/lib/styles'
-import { useRouter } from 'next/navigation'
+import { useRouter, useSearchParams } from 'next/navigation'
+
+const DRAFT_STORAGE_KEY = 'evaluationFormDraft'
 
 // ── Types ─────────────────────────────────────────────────────
 type Property = {
@@ -161,8 +163,41 @@ function applyAddressSearch<T extends { or(filters: string): T }>(query: T, raw:
   )
 }
 
-export default function NewEvaluationPage() {
+// Snapshot of everything the agent may have already filled in, saved to
+// sessionStorage before navigating away to add a new contact, and restored
+// on return so the agent never loses progress on the evaluation form.
+type EvaluationDraftSnapshot = {
+  selectedProperty: Property | null
+  showAddProperty: boolean
+  newPropertyType: string
+  newPropertyAddress: string
+  showPropertyReview: boolean
+  propertyDraft: DraftProperty
+  contacts: ContactSlot[]
+  status: string
+  propertyStatus: string
+  reasonLost: string
+  reasonLostOther: string
+  agentId: string
+  tcId: string
+  leadGeneratedBy: string
+  leadSource: string
+  leadSourceOther: string
+  referralType: string
+  referralTypeOther: string
+  referredByContactId: string
+  referredByContactName: string
+  leadReferralNotes: string
+  motivation: string
+  motivationOther: string
+  timeline: string
+  schedDate: string
+  schedTime: string
+}
+
+function NewEvaluationForm() {
   const router = useRouter()
+  const searchParams = useSearchParams()
   const [userId, setUserId] = useState<string | null>(null)
   const [profiles, setProfiles] = useState<Profile[]>([])
 
@@ -223,6 +258,77 @@ export default function NewEvaluationPage() {
       setProfiles((data ?? []) as Profile[])
     })
   }, [router])
+
+  function buildDraftSnapshot(): EvaluationDraftSnapshot {
+    return {
+      selectedProperty, showAddProperty, newPropertyType, newPropertyAddress,
+      showPropertyReview, propertyDraft, contacts, status, propertyStatus,
+      reasonLost, reasonLostOther, agentId, tcId, leadGeneratedBy, leadSource,
+      leadSourceOther, referralType, referralTypeOther, referredByContactId,
+      referredByContactName, leadReferralNotes, motivation, motivationOther,
+      timeline, schedDate, schedTime,
+    }
+  }
+
+  function applyDraftSnapshot(d: EvaluationDraftSnapshot) {
+    setSelectedProperty(d.selectedProperty)
+    setShowAddProperty(d.showAddProperty)
+    setNewPropertyType(d.newPropertyType)
+    setNewPropertyAddress(d.newPropertyAddress)
+    setShowPropertyReview(d.showPropertyReview)
+    setPropertyDraft(d.propertyDraft)
+    setContacts(d.contacts)
+    setStatus(d.status)
+    setPropertyStatus(d.propertyStatus)
+    setReasonLost(d.reasonLost)
+    setReasonLostOther(d.reasonLostOther)
+    setAgentId(d.agentId)
+    setTcId(d.tcId)
+    setLeadGeneratedBy(d.leadGeneratedBy)
+    setLeadSource(d.leadSource)
+    setLeadSourceOther(d.leadSourceOther)
+    setReferralType(d.referralType)
+    setReferralTypeOther(d.referralTypeOther)
+    setReferredByContactId(d.referredByContactId)
+    setReferredByContactName(d.referredByContactName)
+    setLeadReferralNotes(d.leadReferralNotes)
+    setMotivation(d.motivation)
+    setMotivationOther(d.motivationOther)
+    setTimeline(d.timeline)
+    setSchedDate(d.schedDate)
+    setSchedTime(d.schedTime)
+  }
+
+  // ── Navigate to Add New Contact, saving current progress first so it can
+  // be restored when we come back with the newly created contact.
+  function goToAddContact(kind: 'contact' | 'referred_by') {
+    sessionStorage.setItem(DRAFT_STORAGE_KEY, JSON.stringify(buildDraftSnapshot()))
+    router.push(`/dashboard/contacts/new?returnTo=${encodeURIComponent('/dashboard/evaluations/new')}&for=${kind}`)
+  }
+
+  // ── Restore progress + apply the newly created contact after returning
+  // from the Add New Contact page.
+  useEffect(() => {
+    const newContactId = searchParams.get('newContactId')
+    const newContactName = searchParams.get('newContactName')
+    if (!newContactId || !newContactName) return
+
+    const raw = sessionStorage.getItem(DRAFT_STORAGE_KEY)
+    if (raw) {
+      try { applyDraftSnapshot(JSON.parse(raw)) } catch { /* ignore corrupt snapshot */ }
+      sessionStorage.removeItem(DRAFT_STORAGE_KEY)
+    }
+
+    if (searchParams.get('for') === 'referred_by') {
+      setReferredByContactId(newContactId)
+      setReferredByContactName(newContactName)
+    } else {
+      setContacts(prev => [...prev, { contact_id: newContactId, contact_name: newContactName, tag_option_id: '' }])
+    }
+
+    router.replace('/dashboard/evaluations/new')
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [])
 
   // ── Check for existing properties matching the typed address, so agents
   // don't accidentally create a duplicate property record.
@@ -458,7 +564,7 @@ export default function NewEvaluationPage() {
           </Section>
 
           {/* ── Deal Details ── */}
-          <Section title="Deal Details">
+          <Section title="Property Details">
             <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
               <div>
                 <span className={labelCls}>Date &amp; Time Captured</span>
@@ -567,10 +673,10 @@ export default function NewEvaluationPage() {
               excludeIds={contacts.map(c => c.contact_id)}
             />
             <p className="text-xs text-gray-400 text-center mt-3">— or —</p>
-            <a href="/dashboard/contacts/new" target="_blank" rel="noopener noreferrer"
-              className={`${btn.primary} w-full mt-3 block text-center`}>
+            <button type="button" onClick={() => goToAddContact('contact')}
+              className={`${btn.primary} w-full mt-3`}>
               + Add New Contact
-            </a>
+            </button>
           </Section>
 
           {/* ── Property ── */}
@@ -741,7 +847,7 @@ export default function NewEvaluationPage() {
           </Section>
 
           {/* ── Lead Information ── */}
-          <Section title="Lead Information">
+          <Section title="Lead Details">
             <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
               <div>
                 <label className={labelCls}>Lead Generated By</label>
@@ -801,10 +907,10 @@ export default function NewEvaluationPage() {
                         onSelect={(id, name) => { setReferredByContactId(id); setReferredByContactName(name) }}
                         excludeIds={[]}
                       />
-                      <a href="/dashboard/contacts/new" target="_blank" rel="noopener noreferrer"
-                        className={`${btn.primary} w-full block text-center`}>
+                      <button type="button" onClick={() => goToAddContact('referred_by')}
+                        className={`${btn.primary} w-full`}>
                         + Add New Contact
-                      </a>
+                      </button>
                     </div>
                   )}
                 </div>
@@ -851,6 +957,14 @@ export default function NewEvaluationPage() {
         </form>
       </main>
     </div>
+  )
+}
+
+export default function NewEvaluationPage() {
+  return (
+    <Suspense fallback={<div className="min-h-screen bg-[#f8f7f4]" />}>
+      <NewEvaluationForm />
+    </Suspense>
   )
 }
 
