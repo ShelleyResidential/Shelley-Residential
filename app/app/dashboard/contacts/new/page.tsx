@@ -3,6 +3,7 @@
 import { Suspense, useState, useEffect, useRef } from 'react'
 import { supabase } from '@/lib/supabase'
 import { btn, card, input, select, sectionTitle, label as labelCls } from '@/lib/styles'
+import { WarningIcon } from '@/lib/icons'
 import { useRouter, useSearchParams } from 'next/navigation'
 
 const TAGS = [
@@ -293,12 +294,15 @@ function AddContactForm() {
             <p className="text-xs text-gray-400 text-center">Checking for existing contacts…</p>
           )}
           {!checkingDuplicates && duplicates.length > 0 && (
-            <div className="border border-amber-200 bg-amber-50 rounded-lg p-3 space-y-2">
-              <p className="text-xs font-medium text-amber-700">
-                A contact with this name, phone number, or email may already exist:
-              </p>
+            <div className="bg-[#1a1a1a] rounded-lg p-3 space-y-2">
+              <div className="flex items-center gap-2">
+                <WarningIcon className="w-4 h-4 text-white flex-shrink-0" />
+                <p className="text-xs font-medium text-white">
+                  A contact with this name, phone number, or email may already exist:
+                </p>
+              </div>
               {duplicates.map(m => (
-                <div key={m.id} className="flex items-center justify-between gap-3 px-3 py-2 rounded-md bg-white border border-amber-200 text-sm">
+                <div key={m.id} className="flex items-center justify-between gap-3 px-3 py-2 rounded-md bg-white text-sm">
                   <div className="min-w-0">
                     <span className="font-medium text-[#1a1a1a]">{m.first_name} {m.last_name}</span>
                     {(m.phone_number || m.email_address) && (
@@ -307,12 +311,12 @@ function AddContactForm() {
                   </div>
                   {returnTo ? (
                     <button type="button" onClick={() => useExistingContact(m)}
-                      className="text-xs text-blue-600 hover:text-blue-800 font-medium flex-shrink-0">
+                      className="text-xs text-[#E8266F] hover:opacity-75 font-medium flex-shrink-0 transition-opacity">
                       Use this contact
                     </button>
                   ) : (
                     <a href={`/dashboard/contacts/${m.id}`} target="_blank" rel="noopener noreferrer"
-                      className="text-xs text-blue-600 hover:text-blue-800 font-medium flex-shrink-0">
+                      className="text-xs text-[#E8266F] hover:opacity-75 font-medium flex-shrink-0 transition-opacity">
                       View →
                     </a>
                   )}

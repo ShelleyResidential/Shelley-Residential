@@ -339,9 +339,9 @@ export default function EvaluationDetailPage() {
             </div>
           </div>
 
-          {/* Contacts */}
+          {/* Contact Details */}
           <div className={`${card} p-6`}>
-            <h3 className={sectionTitle}>Contacts</h3>
+            <h3 className={sectionTitle}>Contact Details</h3>
             {sortedContacts.length === 0 ? (
               <p className="text-sm text-gray-400">No contacts linked.</p>
             ) : (

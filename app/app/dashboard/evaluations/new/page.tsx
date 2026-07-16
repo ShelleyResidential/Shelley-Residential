@@ -3,6 +3,7 @@
 import { Suspense, useState, useEffect, useRef } from 'react'
 import { supabase } from '@/lib/supabase'
 import { btn, card, input, select, sectionTitle, label as labelCls } from '@/lib/styles'
+import { WarningIcon } from '@/lib/icons'
 import { useRouter, useSearchParams } from 'next/navigation'
 
 const DRAFT_STORAGE_KEY = 'evaluationFormDraft'
@@ -647,7 +648,7 @@ function NewEvaluationForm() {
           </Section>
 
           {/* ── Contacts ── */}
-          <Section title="Contacts">
+          <Section title="Contact Details">
             <p className="text-xs text-gray-400 -mt-1 mb-3">
               Primary contact is required. Add secondary contacts once the primary is set.
             </p>
@@ -822,13 +823,16 @@ function NewEvaluationForm() {
                   <p className="text-xs text-gray-400">Checking for existing properties…</p>
                 )}
                 {!checkingMatches && addressMatches.length > 0 && (
-                  <div className="border border-amber-200 bg-amber-50 rounded-lg p-3 space-y-2">
-                    <p className="text-xs font-medium text-amber-700">
-                      This address may already exist — select it instead of creating a duplicate:
-                    </p>
+                  <div className="bg-[#1a1a1a] rounded-lg p-3 space-y-2">
+                    <div className="flex items-center gap-2">
+                      <WarningIcon className="w-4 h-4 text-white flex-shrink-0" />
+                      <p className="text-xs font-medium text-white">
+                        This address may already exist — select it instead of creating a duplicate:
+                      </p>
+                    </div>
                     {addressMatches.map(p => (
                       <button key={p.id} type="button" onClick={() => selectExistingProperty(p)}
-                        className="w-full text-left px-3 py-2 rounded-md bg-white border border-amber-200 hover:border-amber-400 text-sm text-[#1a1a1a] transition-colors">
+                        className="w-full text-left px-3 py-2 rounded-md bg-white border border-transparent hover:border-[#E8266F] text-sm text-[#1a1a1a] transition-colors">
                         <span className="font-medium">{displayAddress(p)}</span>
                         {p.suburb && <span className="ml-2 text-xs text-gray-400">{p.suburb}</span>}
                         {p.property_type && (
