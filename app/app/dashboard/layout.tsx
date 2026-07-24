@@ -59,7 +59,7 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
   const analyseActive   = pathname === '/dashboard/analyse'
 
   return (
-    <div style={{ display: 'grid', gridTemplateColumns: '240px 1fr', minHeight: '100vh' }}>
+    <div style={{ display: 'grid', gridTemplateColumns: '240px minmax(0, 1fr)', minHeight: '100vh' }}>
 
       {/* ── Sidebar ── */}
       <aside style={{
