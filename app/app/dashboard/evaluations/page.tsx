@@ -306,7 +306,7 @@ export default function EvaluationsPage() {
       <Breadcrumbs items={[{ label: 'Analyse' }, { label: 'Evaluations' }]} />
       <div className="flex items-center justify-between mb-8">
         <h1 className="text-2xl font-bold text-[#1a1a1a]">Evaluations</h1>
-        <Link href="/dashboard/evaluations/new" className={btn.primary}>+ New Evaluation</Link>
+        <Link href="/dashboard/evaluations/new" className={`${btn.primary} fixed top-8 right-10 z-40 shadow-md`}>+ New Evaluation</Link>
       </div>
 
       {/* Status filter tabs */}
