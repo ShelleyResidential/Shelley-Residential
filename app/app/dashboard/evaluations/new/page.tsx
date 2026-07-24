@@ -4,6 +4,7 @@ import { Suspense, useState, useEffect, useRef } from 'react'
 import { supabase } from '@/lib/supabase'
 import { btn, card, input, select, sectionTitle, label as labelCls } from '@/lib/styles'
 import { WarningIcon } from '@/lib/icons'
+import { Breadcrumbs } from '@/lib/Breadcrumbs'
 import { useRouter, useSearchParams } from 'next/navigation'
 
 const DRAFT_STORAGE_KEY = 'evaluationFormDraft'
@@ -535,6 +536,7 @@ function NewEvaluationForm() {
   return (
     <div className="bg-[#f8f7f4] min-h-screen">
       <main className="max-w-2xl mx-auto px-4 py-10">
+        <Breadcrumbs items={[{ label: 'Analyse' }, { label: 'Evaluations', href: '/dashboard/evaluations' }, { label: 'New Evaluation' }]} />
         <h1 className="text-2xl font-bold text-[#1a1a1a] mb-8">New Evaluation</h1>
         <form onSubmit={handleSubmit} className="space-y-6">
 

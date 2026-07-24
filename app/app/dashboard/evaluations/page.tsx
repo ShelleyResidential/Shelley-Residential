@@ -3,8 +3,12 @@
 import { useState, useEffect, useCallback } from 'react'
 import { supabase } from '@/lib/supabase'
 import { btn, card, input } from '@/lib/styles'
+import { canDelete } from '@/lib/permissions'
+import { Breadcrumbs } from '@/lib/Breadcrumbs'
 import { useRouter } from 'next/navigation'
 import Link from 'next/link'
+
+const PAGE_SIZE = 50
 
 type Profile = { id: string; full_name: string | null; email: string | null }
 
@@ -152,12 +156,23 @@ export default function EvaluationsPage() {
   const [loading, setLoading]         = useState(true)
   const [search, setSearch]           = useState('')
   const [filterStatus, setFilterStatus] = useState('')
+  const [myOnly, setMyOnly]           = useState(false)
+  const [userId, setUserId]           = useState<string | null>(null)
+  const [userEmail, setUserEmail]     = useState<string | null>(null)
+  const [page, setPage]               = useState(1)
+  const [totalCount, setTotalCount]   = useState(0)
+  const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set())
+  const [bulkDeleting, setBulkDeleting] = useState(false)
   const [selectedProperty, setSelectedProperty] = useState<Property | null>(null)
   const [selectedContact, setSelectedContact] = useState<Contact | null>(null)
   const [selectedLead, setSelectedLead] = useState<LeadInfo | null>(null)
 
+  const totalPages = Math.max(1, Math.ceil(totalCount / PAGE_SIZE))
+
   const fetchEvaluations = useCallback(async () => {
     setLoading(true)
+    const isSearching = !!search.trim()
+
     let query = supabase
       .from('evaluations')
       .select(`
@@ -177,12 +192,24 @@ export default function EvaluationsPage() {
             branch, address, birthday, wedding_anniversary, home_anniversary, id_number, date_added),
           picklist_options:tag_option_id (label)
         )
-      `)
+      `, { count: isSearching ? undefined : 'exact' })
       .order('date_captured', { ascending: false })
 
     if (filterStatus) query = query.eq('status', filterStatus)
+    if (myOnly && userId) query = query.eq('sellers_agent_user_id', userId)
 
-    const { data } = await query
+    // Address/seller search spans a joined table PostgREST can't filter on
+    // directly, so fetch a bounded batch and filter/paginate it client-side.
+    // Otherwise, page the query itself so a database with thousands of
+    // records never loads more than one page's worth at a time.
+    if (isSearching) {
+      query = query.limit(1000)
+    } else {
+      const from = (page - 1) * PAGE_SIZE
+      query = query.range(from, from + PAGE_SIZE - 1)
+    }
+
+    const { data, count } = await query
     let results = (data ?? []) as unknown as Evaluation[]
 
     // If the scheduled time has passed and nobody filled in the inspection
@@ -197,21 +224,30 @@ export default function EvaluationsPage() {
       await supabase.from('evaluations').update({ status: 'presented' }).in('id', overdueIds).eq('status', 'scheduled')
     }
 
-    if (search) {
+    if (isSearching) {
       const q = search.toLowerCase()
       results = results.filter(e => {
         const addr = formatAddress(e.properties).toLowerCase()
         const seller = sellerName(e).toLowerCase()
         return addr.includes(q) || seller.includes(q)
       })
+      setTotalCount(results.length)
+      const from = (page - 1) * PAGE_SIZE
+      results = results.slice(from, from + PAGE_SIZE)
+    } else {
+      setTotalCount(count ?? 0)
     }
 
     setEvaluations(results)
     setLoading(false)
-  }, [search, filterStatus])
+  }, [search, filterStatus, myOnly, userId, page])
 
   useEffect(() => {
-    supabase.auth.getUser().then(({ data }) => { if (!data.user) router.push('/') })
+    supabase.auth.getUser().then(({ data }) => {
+      if (!data.user) { router.push('/'); return }
+      setUserId(data.user.id)
+      setUserEmail(data.user.email ?? null)
+    })
     supabase.from('profiles').select('id, full_name, email').then(({ data }) => {
       const map: Record<string, Profile> = {}
       for (const p of (data ?? []) as Profile[]) map[p.id] = p
@@ -219,13 +255,48 @@ export default function EvaluationsPage() {
     })
   }, [router])
 
+  // Any change to the filters should snap back to page 1.
+  useEffect(() => {
+    setPage(1)
+  }, [search, filterStatus, myOnly])
+
   useEffect(() => {
     const timer = setTimeout(fetchEvaluations, 300)
     return () => clearTimeout(timer)
   }, [fetchEvaluations])
 
+  function toggleSelected(id: string) {
+    setSelectedIds(prev => {
+      const next = new Set(prev)
+      if (next.has(id)) next.delete(id); else next.add(id)
+      return next
+    })
+  }
+
+  function toggleSelectAllOnPage() {
+    const allSelected = evaluations.length > 0 && evaluations.every(e => selectedIds.has(e.id))
+    setSelectedIds(prev => {
+      const next = new Set(prev)
+      if (allSelected) evaluations.forEach(e => next.delete(e.id))
+      else evaluations.forEach(e => next.add(e.id))
+      return next
+    })
+  }
+
+  async function deleteSelected() {
+    if (selectedIds.size === 0) return
+    if (!confirm(`Delete ${selectedIds.size} selected evaluation${selectedIds.size > 1 ? 's' : ''}? This cannot be undone.`)) return
+    setBulkDeleting(true)
+    const { error } = await supabase.from('evaluations').delete().in('id', Array.from(selectedIds))
+    setBulkDeleting(false)
+    if (error) { alert(error.message); return }
+    setSelectedIds(new Set())
+    fetchEvaluations()
+  }
+
   return (
     <div className="p-10">
+      <Breadcrumbs items={[{ label: 'Analyse' }, { label: 'Evaluations' }]} />
       <div className="flex items-center justify-between mb-8">
         <h1 className="text-2xl font-bold text-[#1a1a1a]">Evaluations</h1>
         <Link href="/dashboard/evaluations/new" className={btn.primary}>+ New Evaluation</Link>
@@ -247,10 +318,10 @@ export default function EvaluationsPage() {
       </div>
 
       {/* Search */}
-      <div className={`${card} p-4 mb-6 flex gap-3 flex-wrap items-center`}>
+      <div className={`${card} p-4 mb-3 flex gap-3 flex-wrap items-center`}>
         <input
           type="text"
-          placeholder="Search by address or seller…"
+          placeholder="Search by Address or Seller Name…"
           value={search}
           onChange={e => setSearch(e.target.value)}
           className={`${input} flex-1 min-w-[200px]`}
@@ -262,9 +333,35 @@ export default function EvaluationsPage() {
         )}
       </div>
 
+      <label className="flex items-center gap-2 text-sm text-[#1a1a1a] mb-6 cursor-pointer select-none w-fit">
+        <input
+          type="checkbox"
+          checked={myOnly}
+          onChange={e => setMyOnly(e.target.checked)}
+          className="w-4 h-4 rounded border-gray-300 accent-[#E8266F] cursor-pointer"
+        />
+        My Evaluations Only
+      </label>
+
+      {selectedIds.size > 0 && (
+        <div className="flex items-center justify-between gap-3 bg-[#1a1a1a] text-white rounded-lg px-4 py-3 mb-4">
+          <span className="text-sm">{selectedIds.size} selected</span>
+          <div className="flex items-center gap-2">
+            <button onClick={() => setSelectedIds(new Set())} className="text-xs text-gray-300 hover:text-white transition-colors">
+              Clear
+            </button>
+            {canDelete(userEmail) && (
+              <button onClick={deleteSelected} disabled={bulkDeleting} className={`${btn.danger} py-1.5`}>
+                {bulkDeleting ? 'Deleting…' : `Delete Selected (${selectedIds.size})`}
+              </button>
+            )}
+          </div>
+        </div>
+      )}
+
       {!loading && (
         <p className="text-sm text-gray-400 mb-4">
-          {evaluations.length} {evaluations.length === 1 ? 'evaluation' : 'evaluations'}
+          {totalCount} {totalCount === 1 ? 'evaluation' : 'evaluations'}
         </p>
       )}
 
@@ -280,6 +377,14 @@ export default function EvaluationsPage() {
           <table className="w-full text-sm">
             <thead>
               <tr className="border-b border-gray-100 text-left">
+                <th className="px-4 py-3 whitespace-nowrap">
+                  <input
+                    type="checkbox"
+                    checked={evaluations.length > 0 && evaluations.every(e => selectedIds.has(e.id))}
+                    onChange={toggleSelectAllOnPage}
+                    className="w-4 h-4 rounded border-gray-300 accent-[#E8266F] cursor-pointer"
+                  />
+                </th>
                 <th className="px-4 py-3 font-semibold text-[#1a1a1a] whitespace-nowrap">Status</th>
                 <th className="px-4 py-3 font-semibold text-[#1a1a1a] whitespace-nowrap">Address</th>
                 <th className="px-4 py-3 font-semibold text-[#1a1a1a] whitespace-nowrap">Date</th>
@@ -305,6 +410,14 @@ export default function EvaluationsPage() {
                     onClick={() => router.push(`/dashboard/evaluations/${ev.id}`)}
                     className={`cursor-pointer hover:bg-gray-100 transition-colors ${i % 2 === 0 ? 'bg-white' : 'bg-gray-50'}`}
                   >
+                    <td className="px-4 py-3 whitespace-nowrap" onClick={e => e.stopPropagation()}>
+                      <input
+                        type="checkbox"
+                        checked={selectedIds.has(ev.id)}
+                        onChange={() => toggleSelected(ev.id)}
+                        className="w-4 h-4 rounded border-gray-300 accent-[#E8266F] cursor-pointer"
+                      />
+                    </td>
                     <td className="px-4 py-3 whitespace-nowrap">
                       <span className={`text-xs px-2 py-0.5 rounded-full font-medium ${statusMeta.colour}`}>
                         {statusMeta.label}
@@ -348,6 +461,32 @@ export default function EvaluationsPage() {
               })}
             </tbody>
           </table>
+        </div>
+      )}
+
+      {!loading && evaluations.length > 0 && (
+        <div className="flex items-center justify-between mt-4 flex-wrap gap-3">
+          <p className="text-xs text-gray-400">
+            Page {page} of {totalPages} · {PAGE_SIZE} records per page
+          </p>
+          <div className="flex items-center gap-1">
+            <button onClick={() => setPage(1)} disabled={page <= 1}
+              className="px-2.5 py-1.5 rounded-md text-sm text-[#1a1a1a] border border-gray-200 hover:bg-gray-50 disabled:opacity-40 disabled:cursor-not-allowed transition-colors">
+              «
+            </button>
+            <button onClick={() => setPage(p => Math.max(1, p - 1))} disabled={page <= 1}
+              className="px-2.5 py-1.5 rounded-md text-sm text-[#1a1a1a] border border-gray-200 hover:bg-gray-50 disabled:opacity-40 disabled:cursor-not-allowed transition-colors">
+              ‹
+            </button>
+            <button onClick={() => setPage(p => Math.min(totalPages, p + 1))} disabled={page >= totalPages}
+              className="px-2.5 py-1.5 rounded-md text-sm text-[#1a1a1a] border border-gray-200 hover:bg-gray-50 disabled:opacity-40 disabled:cursor-not-allowed transition-colors">
+              ›
+            </button>
+            <button onClick={() => setPage(totalPages)} disabled={page >= totalPages}
+              className="px-2.5 py-1.5 rounded-md text-sm text-[#1a1a1a] border border-gray-200 hover:bg-gray-50 disabled:opacity-40 disabled:cursor-not-allowed transition-colors">
+              »
+            </button>
+          </div>
         </div>
       )}
 

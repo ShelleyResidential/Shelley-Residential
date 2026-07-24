@@ -3,6 +3,7 @@
 import { useState, useEffect, useCallback } from 'react'
 import { supabase } from '@/lib/supabase'
 import { btn, card, input, select } from '@/lib/styles'
+import { Breadcrumbs } from '@/lib/Breadcrumbs'
 import { useRouter } from 'next/navigation'
 import Link from 'next/link'
 
@@ -62,6 +63,7 @@ export default function ContactsPage() {
 
   return (
     <div className="p-10">
+      <Breadcrumbs items={[{ label: 'Analyse' }, { label: 'Contacts' }]} />
       <div className="flex items-center justify-between mb-8">
         <h1 className="text-2xl font-bold text-[#1a1a1a]">Contacts</h1>
         <Link href="/dashboard/contacts/new" className={btn.primary}>+ Add Contact</Link>

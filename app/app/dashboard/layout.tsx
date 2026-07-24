@@ -7,7 +7,7 @@ import Link from 'next/link'
 import Image from 'next/image'
 import { btn, select as selectCls, label as labelCls } from '@/lib/styles'
 
-const CHILD_ROUTES = ['/dashboard/contacts', '/dashboard/properties']
+const ANALYSE_ROUTES = ['/dashboard/contacts', '/dashboard/properties', '/dashboard/evaluations']
 
 function navItemStyle(active: boolean, indented: boolean) {
   const basePadding = indented ? 24 : 12
@@ -32,6 +32,7 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
   const [avatarUrl, setAvatarUrl] = useState<string | null>(null)
   const [userId, setUserId]       = useState<string | null>(null)
   const [needsRole, setNeedsRole] = useState(false)
+  const [analyseOpen, setAnalyseOpen] = useState(() => ANALYSE_ROUTES.some(r => pathname.startsWith(r)))
 
   useEffect(() => {
     supabase.auth.getUser().then(({ data }) => {
@@ -48,9 +49,13 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
     })
   }, [router])
 
-  const dashboardActive   = pathname === '/dashboard'
-  const evaluationsActive = pathname.startsWith('/dashboard/evaluations')
-  const childSectionOpen  = evaluationsActive || CHILD_ROUTES.some(r => pathname.startsWith(r))
+  // Re-expand Analyse whenever navigation lands on one of its child pages
+  // (e.g. a link from elsewhere in the app), without fighting a manual toggle.
+  useEffect(() => {
+    if (ANALYSE_ROUTES.some(r => pathname.startsWith(r))) setAnalyseOpen(true)
+  }, [pathname])
+
+  const dashboardActive = pathname === '/dashboard'
 
   return (
     <div style={{ display: 'grid', gridTemplateColumns: '240px 1fr', minHeight: '100vh' }}>
@@ -70,17 +75,30 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
             Dashboard
           </Link>
 
-          <Link href="/dashboard/evaluations" style={navItemStyle(evaluationsActive, false)}>
-            Evaluations
-          </Link>
+          <button
+            type="button"
+            onClick={() => setAnalyseOpen(o => !o)}
+            style={{
+              ...navItemStyle(false, false),
+              width: '100%', background: 'none', border: 'none', cursor: 'pointer',
+              display: 'flex', alignItems: 'center', justifyContent: 'space-between',
+              font: 'inherit',
+            }}
+          >
+            Analyse
+            <span style={{ fontSize: 10, opacity: 0.7 }}>{analyseOpen ? '▾' : '▸'}</span>
+          </button>
 
-          {childSectionOpen && (
+          {analyseOpen && (
             <div>
               <Link href="/dashboard/contacts" style={navItemStyle(pathname.startsWith('/dashboard/contacts'), true)}>
                 Contacts
               </Link>
               <Link href="/dashboard/properties" style={navItemStyle(pathname.startsWith('/dashboard/properties'), true)}>
                 Properties
+              </Link>
+              <Link href="/dashboard/evaluations" style={navItemStyle(pathname.startsWith('/dashboard/evaluations'), true)}>
+                Evaluations
               </Link>
             </div>
           )}

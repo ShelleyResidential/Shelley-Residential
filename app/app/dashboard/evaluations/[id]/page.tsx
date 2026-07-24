@@ -4,6 +4,7 @@ import { useState, useEffect, useCallback } from 'react'
 import { supabase } from '@/lib/supabase'
 import { btn, card, input, select, sectionTitle, label as labelCls } from '@/lib/styles'
 import { canDelete } from '@/lib/permissions'
+import { Breadcrumbs } from '@/lib/Breadcrumbs'
 import { useRouter, useParams } from 'next/navigation'
 import Link from 'next/link'
 
@@ -293,9 +294,7 @@ export default function EvaluationDetailPage() {
 
       {/* ── Header ── */}
       <div className="mb-8">
-        <Link href="/dashboard/evaluations" className="text-sm text-gray-400 hover:text-[#1a1a1a] mb-3 inline-block transition-colors">
-          ← Evaluations
-        </Link>
+        <Breadcrumbs items={[{ label: 'Analyse' }, { label: 'Evaluations', href: '/dashboard/evaluations' }, { label: address }]} />
         <div className="flex items-start justify-between gap-4 flex-wrap">
           <div>
             <h1 className="text-2xl font-bold text-[#1a1a1a]">{address}</h1>

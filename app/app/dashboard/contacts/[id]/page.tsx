@@ -4,8 +4,8 @@ import { useState, useEffect, useCallback } from 'react'
 import { supabase } from '@/lib/supabase'
 import { btn, card, input, select, sectionTitle, label as labelCls } from '@/lib/styles'
 import { canDelete } from '@/lib/permissions'
+import { Breadcrumbs } from '@/lib/Breadcrumbs'
 import { useRouter, useParams } from 'next/navigation'
-import Link from 'next/link'
 
 const TAGS = [
   'Current Buyer', 'Current Seller', 'Family', 'Friends', 'Homeowner',
@@ -168,10 +168,12 @@ export default function ContactDetailPage() {
 
   return (
     <div className="bg-[#f8f7f4] min-h-screen">
+      <div className="px-8 pt-4">
+        <Breadcrumbs items={[{ label: 'Analyse' }, { label: 'Contacts', href: '/dashboard/contacts' }, { label: fullName(contact) }]} />
+      </div>
       {/* Header */}
       <div className="bg-white border-b border-gray-100 px-8 py-4 flex items-center justify-between">
         <div className="flex items-center gap-3">
-          <Link href="/dashboard/contacts" className="text-gray-400 hover:text-[#1a1a1a] text-sm transition-colors">← Contacts</Link>
           <h1 className="text-lg font-bold text-[#1a1a1a]">{fullName(contact)}</h1>
           <span className={`text-xs px-2 py-0.5 rounded-full font-medium ${
             contact.status === 'Active' ? 'bg-green-50 text-green-700' : 'bg-gray-100 text-gray-500'
