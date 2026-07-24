@@ -77,6 +77,7 @@ type ContactSlot = {
   contact_id: string
   contact_name: string
   tag_option_id: string
+  tags: string[]
 }
 
 // ── Hardcoded options (from spec) ─────────────────────────────
@@ -91,6 +92,8 @@ const LEAD_SOURCES = [
   { value: 'website',                label: 'Website' },
   { value: 'past_client',            label: 'Past Client' },
   { value: 'referral',               label: 'Referral' },
+  { value: 'personal_network',       label: 'Personal Network' },
+  { value: 'professional_network',   label: 'Professional Network' },
   { value: 'other',                  label: 'Other (please specify)' },
 ]
 
@@ -125,6 +128,7 @@ const MOTIVATIONS = [
 ]
 
 const TIMELINES = [
+  { value: 'already_listed',    label: 'Already listed' },
   { value: 'ready_now',         label: 'Ready to list now' },
   { value: 'within_30_days',    label: 'Within the next 30 days' },
   { value: 'within_3_months',   label: 'Within the next 3 months' },
@@ -177,7 +181,6 @@ type EvaluationDraftSnapshot = {
   propertyDraft: DraftProperty
   contacts: ContactSlot[]
   status: string
-  propertyStatus: string
   reasonLost: string
   reasonLostOther: string
   agentId: string
@@ -200,6 +203,7 @@ type EvaluationDraftSnapshot = {
 function NewEvaluationForm() {
   const router = useRouter()
   const searchParams = useSearchParams()
+  const addressSuggestionsRef = useRef<HTMLDivElement>(null)
   const [userId, setUserId] = useState<string | null>(null)
   const [profiles, setProfiles] = useState<Profile[]>([])
 
@@ -210,6 +214,8 @@ function NewEvaluationForm() {
   const [newPropertyAddress, setNewPropertyAddress] = useState('')
   const [addressMatches, setAddressMatches]     = useState<Property[]>([])
   const [checkingMatches, setCheckingMatches]   = useState(false)
+  const [addressSuggestions, setAddressSuggestions] = useState<{ place_id: string; description: string }[]>([])
+  const [showAddressSuggestions, setShowAddressSuggestions] = useState(false)
   const [lookingUpAddress, setLookingUpAddress] = useState(false)
   const [showPropertyReview, setShowPropertyReview] = useState(false)
   const [propertyDraft, setPropertyDraft]       = useState<DraftProperty>(EMPTY_DRAFT)
@@ -220,7 +226,6 @@ function NewEvaluationForm() {
 
   // Deal details
   const [status, setStatus]               = useState('new')
-  const [propertyStatus, setPropertyStatus] = useState('')
   const [reasonLost, setReasonLost]         = useState('')
   const [reasonLostOther, setReasonLostOther] = useState('')
   const [agentId, setAgentId]             = useState('')
@@ -264,7 +269,7 @@ function NewEvaluationForm() {
   function buildDraftSnapshot(): EvaluationDraftSnapshot {
     return {
       selectedProperty, showAddProperty, newPropertyType, newPropertyAddress,
-      showPropertyReview, propertyDraft, contacts, status, propertyStatus,
+      showPropertyReview, propertyDraft, contacts, status,
       reasonLost, reasonLostOther, agentId, tcId, leadGeneratedBy, leadSource,
       leadSourceOther, referralType, referralTypeOther, referredByContactId,
       referredByContactName, leadReferralNotes, motivation, motivationOther,
@@ -281,7 +286,6 @@ function NewEvaluationForm() {
     setPropertyDraft(d.propertyDraft)
     setContacts(d.contacts)
     setStatus(d.status)
-    setPropertyStatus(d.propertyStatus)
     setReasonLost(d.reasonLost)
     setReasonLostOther(d.reasonLostOther)
     setAgentId(d.agentId)
@@ -325,7 +329,8 @@ function NewEvaluationForm() {
       setReferredByContactId(newContactId)
       setReferredByContactName(newContactName)
     } else {
-      setContacts(prev => [...prev, { contact_id: newContactId, contact_name: newContactName, tag_option_id: '' }])
+      const newContactTags = (searchParams.get('tags') ?? '').split(',').filter(Boolean)
+      setContacts(prev => [...prev, { contact_id: newContactId, contact_name: newContactName, tag_option_id: '', tags: newContactTags }])
     }
 
     router.replace('/dashboard/evaluations/new')
@@ -348,6 +353,38 @@ function NewEvaluationForm() {
     }, 300)
     return () => clearTimeout(timer)
   }, [newPropertyAddress])
+
+  // ── Google Maps address suggestions, so agents can search for the
+  // property instead of typing the full address from scratch.
+  useEffect(() => {
+    if (!newPropertyAddress.trim()) { setAddressSuggestions([]); setShowAddressSuggestions(false); return }
+    const timer = setTimeout(async () => {
+      const res = await fetch('/api/places-autocomplete', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ input: newPropertyAddress }),
+      })
+      const json = await res.json()
+      setAddressSuggestions(json.predictions ?? [])
+      setShowAddressSuggestions(true)
+    }, 300)
+    return () => clearTimeout(timer)
+  }, [newPropertyAddress])
+
+  useEffect(() => {
+    function handleClick(e: MouseEvent) {
+      if (addressSuggestionsRef.current && !addressSuggestionsRef.current.contains(e.target as Node)) {
+        setShowAddressSuggestions(false)
+      }
+    }
+    document.addEventListener('mousedown', handleClick)
+    return () => document.removeEventListener('mousedown', handleClick)
+  }, [])
+
+  function selectAddressSuggestion(description: string) {
+    setNewPropertyAddress(description)
+    setShowAddressSuggestions(false)
+  }
 
   function selectExistingProperty(p: Property) {
     setSelectedProperty(p)
@@ -451,8 +488,8 @@ function NewEvaluationForm() {
   }
 
   // ── Contacts ─────────────────────────────────────────────
-  function addContact(contact_id: string, contact_name: string) {
-    setContacts(prev => [...prev, { contact_id, contact_name, tag_option_id: '' }])
+  function addContact(contact_id: string, contact_name: string, tags: string[]) {
+    setContacts(prev => [...prev, { contact_id, contact_name, tag_option_id: '', tags }])
   }
 
   function removeContact(idx: number) {
@@ -498,7 +535,6 @@ function NewEvaluationForm() {
       reason_lost:                      reasonLostLabel,
       sellers_agent_user_id:            agentId || null,
       transaction_coordinator_user_id:  tcId || null,
-      property_status:                  propertyStatus || null,
       lead_generated_by:                leadGeneratedBy || null,
       lead_source_other_text:           leadSourceLabel,
       lead_referral_notes:              leadReferralNotes || null,
@@ -662,6 +698,9 @@ function NewEvaluationForm() {
                     <span className="text-xs bg-[#1a1a1a] text-white rounded-full px-2 py-0.5 flex-shrink-0">Primary</span>
                   )}
                   <span className="flex-1 min-w-0 truncate">{c.contact_name}</span>
+                  {c.tags.map(tag => (
+                    <span key={tag} className="text-xs bg-gray-100 text-gray-600 rounded-full px-2 py-0.5 flex-shrink-0">{tag}</span>
+                  ))}
                   <select value={c.tag_option_id} onChange={e => setContactTag(i, e.target.value)}
                     className="text-xs border border-gray-200 rounded-md px-2 py-1 bg-white text-gray-600 focus:outline-none cursor-pointer flex-shrink-0">
                     <option value="">No tag</option>
@@ -687,15 +726,6 @@ function NewEvaluationForm() {
 
           {/* ── Property Details ── */}
           <Section title="Property Details">
-            <div>
-              <label className={labelCls}>Property Status</label>
-              <select value={propertyStatus} onChange={e => setPropertyStatus(e.target.value)} className={select}>
-                <option value="">—</option>
-                <option value="off_market">Off Market</option>
-                <option value="on_market">On Market</option>
-              </select>
-            </div>
-
             {selectedProperty ? (
               <div className="flex items-center justify-between px-4 py-3 bg-gray-50 rounded-lg border border-gray-200">
                 <div>
@@ -810,15 +840,27 @@ function NewEvaluationForm() {
                     <option value="vacant_land">Vacant Land</option>
                   </select>
                 </div>
-                <div>
+                <div ref={addressSuggestionsRef} className="relative">
                   <label className={labelCls}>Address <span className="text-red-400">*</span></label>
                   <input
                     type="text"
                     value={newPropertyAddress}
                     onChange={e => setNewPropertyAddress(e.target.value)}
-                    placeholder="e.g. 27 Audley Road, Hillcrest, KZN"
+                    onFocus={() => { if (addressSuggestions.length > 0) setShowAddressSuggestions(true) }}
+                    placeholder="Search for the property on Google Maps…"
                     className={input}
                   />
+                  {showAddressSuggestions && addressSuggestions.length > 0 && (
+                    <div className="absolute top-full left-0 right-0 z-50 bg-white border border-gray-200 rounded-lg shadow-md mt-1 max-h-60 overflow-y-auto">
+                      {addressSuggestions.map(s => (
+                        <button key={s.place_id} type="button"
+                          onMouseDown={() => selectAddressSuggestion(s.description)}
+                          className="w-full text-left px-4 py-2.5 text-sm text-[#1a1a1a] hover:bg-[#f8f7f4] border-b border-gray-100 last:border-b-0 transition-colors">
+                          {s.description}
+                        </button>
+                      ))}
+                    </div>
+                  )}
                 </div>
 
                 {checkingMatches && (
@@ -1036,11 +1078,11 @@ function PropertySearch({ onSelect }: { onSelect: (p: Property) => void }) {
 // ── ContactSearch combobox ────────────────────────────────────
 function ContactSearch({ placeholder, onSelect, excludeIds }: {
   placeholder: string
-  onSelect: (id: string, name: string) => void
+  onSelect: (id: string, name: string, tags: string[]) => void
   excludeIds: string[]
 }) {
   const [query, setQuery]     = useState('')
-  const [results, setResults] = useState<{ id: string; first_name: string; last_name: string }[]>([])
+  const [results, setResults] = useState<{ id: string; first_name: string; last_name: string; tags: string[] | null }[]>([])
   const [open, setOpen]       = useState(false)
   const [loading, setLoading] = useState(false)
   const containerRef          = useRef<HTMLDivElement>(null)
@@ -1059,7 +1101,7 @@ function ContactSearch({ placeholder, onSelect, excludeIds }: {
       setLoading(true)
       const { data } = await supabase
         .from('contacts')
-        .select('id, first_name, last_name')
+        .select('id, first_name, last_name, tags')
         .or(`first_name.ilike.%${query}%,last_name.ilike.%${query}%`)
         .order('first_name').limit(8)
       setResults((data ?? []).filter(r => !excludeIds.includes(r.id)))
@@ -1084,7 +1126,7 @@ function ContactSearch({ placeholder, onSelect, excludeIds }: {
             const name = `${r.first_name} ${r.last_name}`.trim()
             return (
               <button key={r.id} type="button"
-                onMouseDown={() => { onSelect(r.id, name); setQuery(''); setOpen(false) }}
+                onMouseDown={() => { onSelect(r.id, name, r.tags ?? []); setQuery(''); setOpen(false) }}
                 className="w-full text-left px-4 py-2.5 text-sm text-[#1a1a1a] hover:bg-[#f8f7f4] border-b border-gray-100 last:border-b-0 transition-colors">
                 {name}
               </button>

@@ -25,18 +25,10 @@ type ContactRow = { id: string; status: string | null; tags: string[] | null; da
 
 type PropertyRow = { id: string; property_type: string | null; suburb: string | null; evaluations: { id: string }[] }
 
-const STATUS_LABELS: Record<string, { label: string; colour: string }> = {
-  new:         { label: 'New',            colour: '#3b82f6' },
-  scheduled:   { label: 'Scheduled',      colour: '#6366f1' },
-  completed:   { label: 'Completed',      colour: '#14b8a6' },
-  presented:   { label: 'Presented',      colour: '#a855f7' },
-  follow_up:   { label: 'Follow-Up',      colour: '#eab308' },
-  won:         { label: 'Won',            colour: '#10b981' },
-  lost:        { label: 'Lost',           colour: '#ef4444' },
-  cancelled:   { label: 'Cancelled',      colour: '#9ca3af' },
-  in_progress: { label: 'In Progress',    colour: '#3b82f6' },
-  open:        { label: 'Open Mandate',   colour: '#22c55e' },
-  future:      { label: 'Future Mandate', colour: '#eab308' },
+const STATUS_LABELS: Record<string, string> = {
+  new: 'New', scheduled: 'Scheduled', completed: 'Completed', presented: 'Presented',
+  follow_up: 'Follow-Up', won: 'Won', lost: 'Lost', cancelled: 'Cancelled',
+  in_progress: 'In Progress', open: 'Open Mandate', future: 'Future Mandate',
 }
 
 const TYPE_LABELS: Record<string, string> = {
@@ -188,10 +180,10 @@ export default function AnalysePage() {
             <div className="space-y-2.5">
               {statusEntries.map(([status, count]) => (
                 <BarRow key={status}
-                  label={STATUS_LABELS[status]?.label ?? status}
+                  label={STATUS_LABELS[status] ?? status}
                   count={count}
                   total={totalEvaluations}
-                  colour={STATUS_LABELS[status]?.colour ?? '#9ca3af'}
+                  colour="#E8266F"
                 />
               ))}
             </div>
@@ -242,7 +234,7 @@ export default function AnalysePage() {
           {leadSourceEntries.length === 0 ? <EmptyNote /> : (
             <div className="space-y-2.5">
               {leadSourceEntries.map(([source, count]) => (
-                <BarRow key={source} label={source} count={count} total={totalEvaluations} colour="#E8266F" />
+                <BarRow key={source} label={source} count={count} total={totalEvaluations} colour="#1a1a1a" />
               ))}
             </div>
           )}
@@ -254,7 +246,7 @@ export default function AnalysePage() {
           <p className="text-xs font-bold text-[#1a1a1a] uppercase tracking-wide mb-4">Motivation for Selling</p>
           <div className="space-y-2.5">
             {motivationEntries.map(([motivation, count]) => (
-              <BarRow key={motivation} label={motivation} count={count} total={totalEvaluations} colour="#6366f1" />
+              <BarRow key={motivation} label={motivation} count={count} total={totalEvaluations} colour="#1a1a1a" />
             ))}
           </div>
         </div>
@@ -273,7 +265,7 @@ export default function AnalysePage() {
         {tagEntries.length === 0 ? <EmptyNote /> : (
           <div className="space-y-2.5">
             {tagEntries.map(([tag, count]) => (
-              <BarRow key={tag} label={tag} count={count} total={totalContacts} colour="#14b8a6" />
+              <BarRow key={tag} label={tag} count={count} total={totalContacts} colour="#1a1a1a" />
             ))}
           </div>
         )}
@@ -293,7 +285,7 @@ export default function AnalysePage() {
           {typeEntries.length === 0 ? <EmptyNote /> : (
             <div className="space-y-2.5">
               {typeEntries.map(([type, count]) => (
-                <BarRow key={type} label={TYPE_LABELS[type] ?? type} count={count} total={totalProperties} colour="#3b82f6" />
+                <BarRow key={type} label={TYPE_LABELS[type] ?? type} count={count} total={totalProperties} colour="#1a1a1a" />
               ))}
             </div>
           )}
@@ -304,7 +296,7 @@ export default function AnalysePage() {
           {suburbEntries.length === 0 ? <EmptyNote /> : (
             <div className="space-y-2.5">
               {suburbEntries.map(([suburb, count]) => (
-                <BarRow key={suburb} label={suburb} count={count} total={totalProperties} colour="#a855f7" />
+                <BarRow key={suburb} label={suburb} count={count} total={totalProperties} colour="#1a1a1a" />
               ))}
             </div>
           )}

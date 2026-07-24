@@ -37,7 +37,7 @@ function AddContactForm() {
   const [success, setSuccess] = useState(false)
   const [userId, setUserId]   = useState<string | null>(null)
   const [form, setForm]       = useState(EMPTY_FORM)
-  const [duplicates, setDuplicates] = useState<{ id: string; first_name: string; last_name: string; phone_number: string | null; email_address: string | null }[]>([])
+  const [duplicates, setDuplicates] = useState<{ id: string; first_name: string; last_name: string; phone_number: string | null; email_address: string | null; tags: string[] | null }[]>([])
   const [checkingDuplicates, setCheckingDuplicates] = useState(false)
 
   useEffect(() => {
@@ -67,7 +67,7 @@ function AddContactForm() {
       setCheckingDuplicates(true)
       const { data } = await supabase
         .from('contacts')
-        .select('id, first_name, last_name, phone_number, email_address')
+        .select('id, first_name, last_name, phone_number, email_address, tags')
         .or(clauses.join(','))
         .limit(5)
       setDuplicates(data ?? [])
@@ -76,10 +76,11 @@ function AddContactForm() {
     return () => clearTimeout(timer)
   }, [form.first_name, form.last_name, form.phone_number, form.email_address])
 
-  function useExistingContact(match: { id: string; first_name: string; last_name: string }) {
+  function useExistingContact(match: { id: string; first_name: string; last_name: string; tags: string[] | null }) {
     if (!returnTo) return
     const name = `${match.first_name} ${match.last_name}`.trim()
-    router.push(`${returnTo}?newContactId=${match.id}&newContactName=${encodeURIComponent(name)}&for=${returnFor ?? 'contact'}`)
+    const tagsParam = encodeURIComponent((match.tags ?? []).join(','))
+    router.push(`${returnTo}?newContactId=${match.id}&newContactName=${encodeURIComponent(name)}&for=${returnFor ?? 'contact'}&tags=${tagsParam}`)
   }
 
   function toggleTag(tag: string) {
@@ -127,7 +128,8 @@ function AddContactForm() {
 
     if (returnTo && contact) {
       const name = [form.first_name.trim(), form.last_name.trim()].filter(Boolean).join(' ')
-      router.push(`${returnTo}?newContactId=${contact.id}&newContactName=${encodeURIComponent(name)}&for=${returnFor ?? 'contact'}`)
+      const tagsParam = encodeURIComponent(form.tags.join(','))
+      router.push(`${returnTo}?newContactId=${contact.id}&newContactName=${encodeURIComponent(name)}&for=${returnFor ?? 'contact'}&tags=${tagsParam}`)
       return
     }
 
