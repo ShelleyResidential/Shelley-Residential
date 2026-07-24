@@ -35,7 +35,6 @@ type Profile = { id: string; full_name: string | null; email: string | null; rol
 type Evaluation = {
   id: string; status: string; date_captured: string
   reason_lost: string | null
-  property_status: string | null
   lead_generated_by: string | null
   lead_source_other_text: string | null; lead_referral_notes: string | null
   referral_type: string | null
@@ -139,7 +138,6 @@ export default function EvaluationDetailPage() {
   // Edit form state
   const [editStatus, setEditStatus]             = useState('')
   const [editReasonLost, setEditReasonLost]     = useState('')
-  const [editPropertyStatus, setEditPropertyStatus] = useState('')
   const [editSchedDate, setEditSchedDate] = useState('')
   const [editSchedTime, setEditSchedTime] = useState('')
   const editScheduledAt = editSchedDate && editSchedTime ? `${editSchedDate}T${editSchedTime}` : ''
@@ -155,7 +153,7 @@ export default function EvaluationDetailPage() {
     const { data } = await supabase
       .from('evaluations')
       .select(`
-        id, status, date_captured, reason_lost, property_status, lead_generated_by,
+        id, status, date_captured, reason_lost, lead_generated_by,
         lead_source_other_text, lead_referral_notes, referral_type,
         motivation_for_selling_notes, selling_timeline_notes,
         scheduled_at, calendar_event_link,
@@ -191,7 +189,6 @@ export default function EvaluationDetailPage() {
       setEvaluation(ev)
       setEditStatus(ev.status)
       setEditReasonLost(ev.reason_lost ?? '')
-      setEditPropertyStatus(ev.property_status ?? '')
       const schedIso = ev.scheduled_at ? ev.scheduled_at.slice(0, 16) : ''
       setEditSchedDate(schedIso ? schedIso.slice(0, 10) : '')
       setEditSchedTime(schedIso ? schedIso.slice(11, 16) : '')
@@ -233,7 +230,6 @@ export default function EvaluationDetailPage() {
     const { error: err } = await supabase.from('evaluations').update({
       status:                   finalStatus,
       reason_lost:              finalStatus === 'lost' ? (editReasonLost || null) : null,
-      property_status:          editPropertyStatus || null,
       scheduled_at:             editScheduledAt || null,
       motivation_for_selling_notes: editMotivationNotes || null,
       selling_timeline_notes:   editTimelineNotes || null,
@@ -394,31 +390,21 @@ export default function EvaluationDetailPage() {
             <h3 className={sectionTitle}>Property Details</h3>
             {editing ? (
               <div className="space-y-4">
-                <div className="grid grid-cols-2 gap-4">
-                  <div>
-                    <label className={labelCls}>Status</label>
-                    <select value={editStatus} onChange={e => setEditStatus(e.target.value)} className={select}>
-                      <option value="new">New</option>
-                      <option value="scheduled">Scheduled</option>
-                      <option value="completed">Completed</option>
-                      <option value="presented">Presented</option>
-                      <option value="follow_up">Follow-Up</option>
-                      <option value="won">Won</option>
-                      <option value="lost">Lost</option>
-                      <option value="cancelled">Cancelled</option>
-                      <option value="in_progress">In Progress (legacy)</option>
-                      <option value="open">Open Mandate (legacy)</option>
-                      <option value="future">Future Mandate (legacy)</option>
-                    </select>
-                  </div>
-                  <div>
-                    <label className={labelCls}>Property Status</label>
-                    <select value={editPropertyStatus} onChange={e => setEditPropertyStatus(e.target.value)} className={select}>
-                      <option value="">—</option>
-                      <option value="off_market">Off Market</option>
-                      <option value="on_market">On Market</option>
-                    </select>
-                  </div>
+                <div>
+                  <label className={labelCls}>Status</label>
+                  <select value={editStatus} onChange={e => setEditStatus(e.target.value)} className={select}>
+                    <option value="new">New</option>
+                    <option value="scheduled">Scheduled</option>
+                    <option value="completed">Completed</option>
+                    <option value="presented">Presented</option>
+                    <option value="follow_up">Follow-Up</option>
+                    <option value="won">Won</option>
+                    <option value="lost">Lost</option>
+                    <option value="cancelled">Cancelled</option>
+                    <option value="in_progress">In Progress (legacy)</option>
+                    <option value="open">Open Mandate (legacy)</option>
+                    <option value="future">Future Mandate (legacy)</option>
+                  </select>
                 </div>
                 {editStatus === 'lost' && (
                   <div>
@@ -475,7 +461,6 @@ export default function EvaluationDetailPage() {
                 <div className="grid grid-cols-2 gap-x-8 gap-y-3 text-sm">
                   <InfoRow label="Status" value={STATUS_LABELS[ev.status] ?? ev.status} />
                   {ev.status === 'lost' && ev.reason_lost && <InfoRow label="Reason Lost" value={ev.reason_lost} />}
-                  <InfoRow label="Property Status" value={ev.property_status?.replace('_', ' ') ?? '—'} />
                   <InfoRow label="Scheduled"
                     value={ev.scheduled_at
                       ? new Date(ev.scheduled_at).toLocaleString('en-ZA', { dateStyle: 'medium', timeStyle: 'short' })

@@ -66,7 +66,6 @@ type Evaluation = LeadInfo & {
   status: string
   date_captured: string
   scheduled_at: string | null
-  property_status: string | null
   evaluation_price: number | null
   marketing_price: number | null
   sellers_agent_user_id: string | null
@@ -180,7 +179,7 @@ export default function EvaluationsPage() {
     let query = supabase
       .from('evaluations')
       .select(`
-        id, status, date_captured, scheduled_at, property_status,
+        id, status, date_captured, scheduled_at,
         evaluation_price, marketing_price,
         sellers_agent_user_id, transaction_coordinator_user_id,
         motivation_for_selling_notes, selling_timeline_notes,
@@ -651,7 +650,6 @@ function EvaluationSummaryModal({ evaluation, profiles, onClose, onUpdated }: {
             <p className="text-xs font-bold text-[#1a1a1a] uppercase tracking-wide mb-3">Property Details</p>
             <div className="grid grid-cols-2 gap-x-6 gap-y-3 text-sm">
               <ModalRow label="Status" value={statusMeta.label} />
-              <ModalRow label="Property Status" value={evaluation.property_status?.replace('_', ' ') ?? '—'} />
               <ModalRow label="Scheduled"
                 value={evaluation.scheduled_at
                   ? new Date(evaluation.scheduled_at).toLocaleString('en-ZA', { dateStyle: 'medium', timeStyle: 'short' })
