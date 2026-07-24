@@ -7,7 +7,7 @@ import Link from 'next/link'
 import Image from 'next/image'
 import { btn, select as selectCls, label as labelCls } from '@/lib/styles'
 
-const ANALYSE_ROUTES = ['/dashboard/contacts', '/dashboard/properties', '/dashboard/evaluations']
+const ANALYSE_ROUTES = ['/dashboard/analyse', '/dashboard/contacts', '/dashboard/properties', '/dashboard/evaluations']
 
 function navItemStyle(active: boolean, indented: boolean) {
   const basePadding = indented ? 24 : 12
@@ -56,6 +56,7 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
   }, [pathname])
 
   const dashboardActive = pathname === '/dashboard'
+  const analyseActive   = pathname === '/dashboard/analyse'
 
   return (
     <div style={{ display: 'grid', gridTemplateColumns: '240px 1fr', minHeight: '100vh' }}>
@@ -75,19 +76,22 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
             Dashboard
           </Link>
 
-          <button
-            type="button"
-            onClick={() => setAnalyseOpen(o => !o)}
-            style={{
-              ...navItemStyle(false, false),
-              width: '100%', background: 'none', border: 'none', cursor: 'pointer',
-              display: 'flex', alignItems: 'center', justifyContent: 'space-between',
-              font: 'inherit',
-            }}
-          >
-            Analyse
-            <span style={{ fontSize: 10, opacity: 0.7 }}>{analyseOpen ? '▾' : '▸'}</span>
-          </button>
+          <div style={{ display: 'flex', alignItems: 'center' }}>
+            <Link href="/dashboard/analyse" style={{ ...navItemStyle(analyseActive, false), flex: 1 }}>
+              Analyse
+            </Link>
+            <button
+              type="button"
+              onClick={() => setAnalyseOpen(o => !o)}
+              aria-label={analyseOpen ? 'Collapse Analyse section' : 'Expand Analyse section'}
+              style={{
+                background: 'none', border: 'none', cursor: 'pointer', color: '#fff',
+                opacity: 0.7, padding: '11px 12px', fontSize: 10,
+              }}
+            >
+              {analyseOpen ? '▾' : '▸'}
+            </button>
+          </div>
 
           {analyseOpen && (
             <div>

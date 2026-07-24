@@ -163,7 +163,7 @@ export default function EvaluationsPage() {
   const [totalCount, setTotalCount]   = useState(0)
   const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set())
   const [bulkDeleting, setBulkDeleting] = useState(false)
-  const [selectedProperty, setSelectedProperty] = useState<Property | null>(null)
+  const [selectedEvaluation, setSelectedEvaluation] = useState<Evaluation | null>(null)
   const [selectedContact, setSelectedContact] = useState<Contact | null>(null)
   const [selectedLead, setSelectedLead] = useState<LeadInfo | null>(null)
 
@@ -385,15 +385,15 @@ export default function EvaluationsPage() {
                     className="w-4 h-4 rounded border-gray-300 accent-[#E8266F] cursor-pointer"
                   />
                 </th>
-                <th className="px-4 py-3 font-semibold text-[#1a1a1a] whitespace-nowrap">Status</th>
-                <th className="px-4 py-3 font-semibold text-[#1a1a1a] whitespace-nowrap">Address</th>
-                <th className="px-4 py-3 font-semibold text-[#1a1a1a] whitespace-nowrap">Date</th>
-                <th className="px-4 py-3 font-semibold text-[#1a1a1a] whitespace-nowrap">Agent</th>
-                <th className="px-4 py-3 font-semibold text-[#1a1a1a] whitespace-nowrap">TC</th>
-                <th className="px-4 py-3 font-semibold text-[#1a1a1a] whitespace-nowrap">Seller</th>
-                <th className="px-4 py-3 font-semibold text-[#1a1a1a] whitespace-nowrap">Lead Source</th>
-                <th className="px-4 py-3 font-semibold text-[#1a1a1a] whitespace-nowrap">Evaluation Price</th>
-                <th className="px-4 py-3 font-semibold text-[#1a1a1a] whitespace-nowrap">Marketing Price</th>
+                <th className="px-4 py-3 font-semibold text-[#1a1a1a] whitespace-nowrap text-xs uppercase tracking-wide">Status</th>
+                <th className="px-4 py-3 font-semibold text-[#1a1a1a] whitespace-nowrap text-xs uppercase tracking-wide">Address</th>
+                <th className="px-4 py-3 font-semibold text-[#1a1a1a] whitespace-nowrap text-xs uppercase tracking-wide">Date</th>
+                <th className="px-4 py-3 font-semibold text-[#1a1a1a] whitespace-nowrap text-xs uppercase tracking-wide">Agent</th>
+                <th className="px-4 py-3 font-semibold text-[#1a1a1a] whitespace-nowrap text-xs uppercase tracking-wide">TC</th>
+                <th className="px-4 py-3 font-semibold text-[#1a1a1a] whitespace-nowrap text-xs uppercase tracking-wide">Seller</th>
+                <th className="px-4 py-3 font-semibold text-[#1a1a1a] whitespace-nowrap text-xs uppercase tracking-wide">Lead Source</th>
+                <th className="px-4 py-3 font-semibold text-[#1a1a1a] whitespace-nowrap text-xs uppercase tracking-wide">Evaluation Price</th>
+                <th className="px-4 py-3 font-semibold text-[#1a1a1a] whitespace-nowrap text-xs uppercase tracking-wide">Marketing Price</th>
               </tr>
             </thead>
             <tbody>
@@ -425,7 +425,7 @@ export default function EvaluationsPage() {
                     </td>
                     <td className="px-4 py-3 whitespace-nowrap">
                       <button
-                        onClick={e => { e.stopPropagation(); if (ev.properties) setSelectedProperty(ev.properties) }}
+                        onClick={e => { e.stopPropagation(); setSelectedEvaluation(ev) }}
                         className="font-medium text-[#1a1a1a] hover:text-blue-600 hover:underline transition-colors"
                       >
                         {formatAddress(ev.properties)}
@@ -490,10 +490,11 @@ export default function EvaluationsPage() {
         </div>
       )}
 
-      {selectedProperty && (
-        <PropertyDetailsModal
-          property={selectedProperty}
-          onClose={() => setSelectedProperty(null)}
+      {selectedEvaluation && (
+        <EvaluationSummaryModal
+          evaluation={selectedEvaluation}
+          profiles={profiles}
+          onClose={() => setSelectedEvaluation(null)}
           onUpdated={fetchEvaluations}
         />
       )}
@@ -509,33 +510,24 @@ export default function EvaluationsPage() {
   )
 }
 
-// ── Property details pop-up ──────────────────────────────────
-function PropertyDetailsModal({ property, onClose, onUpdated }: {
-  property: Property; onClose: () => void; onUpdated: () => void
+// ── Evaluation summary pop-up (shown when an address is clicked) ─
+function EvaluationSummaryModal({ evaluation, profiles, onClose, onUpdated }: {
+  evaluation: Evaluation; profiles: Record<string, Profile>; onClose: () => void; onUpdated: () => void
 }) {
-  const [current, setCurrent] = useState(property)
+  const [current, setCurrent] = useState(evaluation.properties)
   const [refreshError, setRefreshError] = useState('')
 
   const address = formatAddress(current)
-  const query   = mapQuery(current)
+  const query   = current ? mapQuery(current) : ''
   const mapSrc  = `https://www.google.com/maps?q=${encodeURIComponent(query)}&output=embed`
   const directionsUrl = `https://www.google.com/maps/dir/?api=1&destination=${encodeURIComponent(query)}`
-
-  const fields: [string, string | null][] = [
-    ['Property Type', current.property_type ? current.property_type.replace('_', ' ') : null],
-    ['Unit Number', current.unit_number],
-    ['Complex / Building', current.complex_or_building_name],
-    ['Street Number', current.street_number],
-    ['Street Name', current.street_name],
-    ['Suburb', current.suburb],
-    ['City', current.city],
-    ['Province', current.province],
-    ['Postal Code', current.postal_code],
-    ['Country', current.country],
-    ['Coordinates', current.latitude != null && current.longitude != null ? `${current.latitude}, ${current.longitude}` : null],
-  ]
+  const statusMeta = STATUS_LABELS[evaluation.status] ?? { label: evaluation.status, colour: 'bg-gray-100 text-gray-500' }
+  const agent = evaluation.sellers_agent_user_id ? profiles[evaluation.sellers_agent_user_id] : null
+  const tc = evaluation.transaction_coordinator_user_id ? profiles[evaluation.transaction_coordinator_user_id] : null
+  const sortedContacts = [...(evaluation.evaluation_contacts ?? [])].sort((a, b) => Number(b.is_primary) - Number(a.is_primary))
 
   async function refreshFromGoogle() {
+    if (!current) return
     setRefreshError('')
 
     const raw = [current.street_number, current.street_name, current.suburb, current.city].filter(Boolean).join(' ') || address
@@ -577,7 +569,7 @@ function PropertyDetailsModal({ property, onClose, onUpdated }: {
   // Auto-populate missing suburb/city/postal code on open, for properties
   // created before geocoding existed — no manual click needed.
   useEffect(() => {
-    if (!current.suburb || !current.city || !current.postal_code) {
+    if (current && (!current.suburb || !current.city || !current.postal_code)) {
       refreshFromGoogle()
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
@@ -593,20 +585,76 @@ function PropertyDetailsModal({ property, onClose, onUpdated }: {
         onClick={e => e.stopPropagation()}
       >
         <div className="flex items-start justify-between gap-4 p-6 border-b border-gray-100">
-          <h3 className="text-lg font-bold text-[#1a1a1a]">{address}</h3>
+          <div>
+            <h3 className="text-lg font-bold text-[#1a1a1a]">{address}</h3>
+            <span className={`inline-block mt-1 text-xs px-2 py-0.5 rounded-full font-medium ${statusMeta.colour}`}>
+              {statusMeta.label}
+            </span>
+          </div>
           <button onClick={onClose} className="text-gray-400 hover:text-[#1a1a1a] text-xl leading-none flex-shrink-0">×</button>
         </div>
 
-        <div className="p-6">
-          {refreshError && <p className="text-xs text-red-500 mb-4">{refreshError}</p>}
+        <div className="p-6 space-y-6">
+          {refreshError && <p className="text-xs text-red-500">{refreshError}</p>}
 
-          <div className="grid grid-cols-2 gap-x-6 gap-y-3 text-sm">
-            {fields.filter(([, value]) => value).map(([label, value]) => (
-              <div key={label}>
-                <p className="text-xs font-medium text-gray-400 uppercase tracking-wide mb-0.5">{label}</p>
-                <p className="text-[#1a1a1a] font-medium">{value}</p>
+          {/* Property */}
+          <div>
+            <p className="text-xs font-bold text-[#1a1a1a] uppercase tracking-wide mb-3">Property</p>
+            <div className="grid grid-cols-2 gap-x-6 gap-y-3 text-sm">
+              <ModalRow label="Type" value={current?.property_type?.replace('_', ' ') ?? '—'} />
+              <ModalRow label="Address" value={address} />
+              {current?.suburb && <ModalRow label="Suburb" value={current.suburb} />}
+              {current?.city && <ModalRow label="City" value={current.city} />}
+              {current?.province && <ModalRow label="Province" value={current.province} />}
+            </div>
+          </div>
+
+          {/* Contact Details */}
+          <div>
+            <p className="text-xs font-bold text-[#1a1a1a] uppercase tracking-wide mb-3">Contact Details</p>
+            {sortedContacts.length === 0 ? (
+              <p className="text-sm text-gray-400">No contacts linked.</p>
+            ) : (
+              <div className="space-y-3">
+                {sortedContacts.map((ec, i) => ec.contacts && (
+                  <div key={i}>
+                    <div className="flex items-center gap-2 flex-wrap">
+                      <span className="font-medium text-[#1a1a1a] text-sm">
+                        {[ec.contacts.first_name, ec.contacts.last_name].filter(Boolean).join(' ')}
+                      </span>
+                      {ec.is_primary && (
+                        <span className="text-xs bg-[#1a1a1a] text-white rounded-full px-2 py-0.5">Primary</span>
+                      )}
+                      {ec.picklist_options && (
+                        <span className="text-xs bg-gray-100 text-gray-600 rounded-full px-2 py-0.5">{ec.picklist_options.label}</span>
+                      )}
+                    </div>
+                    <div className="flex gap-4 mt-0.5 text-xs text-gray-500">
+                      {ec.contacts.phone_number && <span>{ec.contacts.phone_number}</span>}
+                      {ec.contacts.email_address && <span>{ec.contacts.email_address}</span>}
+                    </div>
+                  </div>
+                ))}
               </div>
-            ))}
+            )}
+          </div>
+
+          {/* Property Details */}
+          <div>
+            <p className="text-xs font-bold text-[#1a1a1a] uppercase tracking-wide mb-3">Property Details</p>
+            <div className="grid grid-cols-2 gap-x-6 gap-y-3 text-sm">
+              <ModalRow label="Status" value={statusMeta.label} />
+              <ModalRow label="Property Status" value={evaluation.property_status?.replace('_', ' ') ?? '—'} />
+              <ModalRow label="Scheduled"
+                value={evaluation.scheduled_at
+                  ? new Date(evaluation.scheduled_at).toLocaleString('en-ZA', { dateStyle: 'medium', timeStyle: 'short' })
+                  : '—'}
+              />
+              <ModalRow label="Agent" value={agent?.full_name ?? agent?.email ?? '—'} />
+              <ModalRow label="TC" value={tc?.full_name ?? tc?.email ?? '—'} />
+              <ModalRow label="Evaluation Price" value={formatCurrency(evaluation.evaluation_price)} />
+              <ModalRow label="Marketing Price" value={formatCurrency(evaluation.marketing_price)} />
+            </div>
           </div>
         </div>
 
@@ -623,10 +671,13 @@ function PropertyDetailsModal({ property, onClose, onUpdated }: {
             href={directionsUrl}
             target="_blank"
             rel="noopener noreferrer"
-            className={`${btn.primary} w-full mt-3`}
+            className={`${btn.secondary} w-full mt-3 block text-center`}
           >
             Get Directions
           </a>
+          <Link href={`/dashboard/evaluations/${evaluation.id}`} className={`${btn.primary} w-full mt-2 block text-center`}>
+            View Full Evaluation →
+          </Link>
         </div>
       </div>
     </div>
@@ -729,6 +780,16 @@ function LeadDetailsModal({ lead, onClose }: { lead: LeadInfo; onClose: () => vo
           </Link>
         </div>
       </div>
+    </div>
+  )
+}
+
+// ── Shared label/value row for modal sections ─────────────────
+function ModalRow({ label, value }: { label: string; value: string }) {
+  return (
+    <div>
+      <p className="text-xs font-medium text-gray-400 uppercase tracking-wide mb-0.5">{label}</p>
+      <p className="text-[#1a1a1a] font-medium">{value}</p>
     </div>
   )
 }
