@@ -334,8 +334,6 @@ export default function EvaluationsPage() {
         <Link href="/dashboard/evaluations/new" className={`${btn.primary} fixed top-8 right-10 z-40 shadow-md`}>+ New Evaluation</Link>
       </div>
 
-      {paginationControls && <div className="mb-6">{paginationControls}</div>}
-
       {/* Status filter tabs */}
       <div className="flex gap-1 mb-6 border-b border-gray-200 overflow-x-auto">
         {STATUS_TABS.map(tab => (
@@ -398,6 +396,8 @@ export default function EvaluationsPage() {
           {totalCount} {totalCount === 1 ? 'evaluation' : 'evaluations'}
         </p>
       )}
+
+      {paginationControls && <div className="mb-4">{paginationControls}</div>}
 
       {loading ? (
         <div className="text-center py-20 text-gray-400 text-sm">Loading evaluations…</div>
