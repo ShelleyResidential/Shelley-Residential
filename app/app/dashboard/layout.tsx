@@ -76,22 +76,13 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
             Dashboard
           </Link>
 
-          <div style={{ display: 'flex', alignItems: 'center' }}>
-            <Link href="/dashboard/analyse" style={{ ...navItemStyle(analyseActive, false), flex: 1 }}>
-              Analyse
-            </Link>
-            <button
-              type="button"
-              onClick={() => setAnalyseOpen(o => !o)}
-              aria-label={analyseOpen ? 'Collapse Analyse section' : 'Expand Analyse section'}
-              style={{
-                background: 'none', border: 'none', cursor: 'pointer', color: '#fff',
-                opacity: 0.7, padding: '11px 12px', fontSize: 10,
-              }}
-            >
-              {analyseOpen ? '▾' : '▸'}
-            </button>
-          </div>
+          <Link
+            href="/dashboard/analyse"
+            onClick={() => setAnalyseOpen(o => !o)}
+            style={navItemStyle(analyseActive, false)}
+          >
+            Analyse
+          </Link>
 
           {analyseOpen && (
             <div>
