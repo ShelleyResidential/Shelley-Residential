@@ -1,6 +1,6 @@
 'use client'
 
-import { useState, useEffect, useCallback } from 'react'
+import { useState, useEffect, useCallback, useRef } from 'react'
 import { supabase } from '@/lib/supabase'
 import { btn, card, input } from '@/lib/styles'
 import { canDelete } from '@/lib/permissions'
@@ -300,6 +300,18 @@ export default function EvaluationsPage() {
     fetchEvaluations()
   }
 
+  const singleSelectedId = selectedIds.size === 1 ? Array.from(selectedIds)[0] : null
+
+  const rowActionControls = selectedIds.size > 0 && (
+    <RowActionButtons
+      onEdit={singleSelectedId ? () => router.push(`/dashboard/evaluations/${singleSelectedId}?edit=1`) : undefined}
+      onDetails={singleSelectedId ? () => {
+        const ev = evaluations.find(e => e.id === singleSelectedId)
+        if (ev) setSelectedEvaluation(ev)
+      } : undefined}
+    />
+  )
+
   const paginationControls = !loading && evaluations.length > 0 && (
     <div className="flex items-center gap-3 flex-wrap justify-end">
       <p className="text-xs text-gray-400">
@@ -364,6 +376,8 @@ export default function EvaluationsPage() {
           </button>
         )}
       </div>
+
+      {rowActionControls && <div className="mb-4">{rowActionControls}</div>}
 
       <div className="flex items-center justify-between flex-wrap gap-3 mb-6">
         <label className="flex items-center gap-2 text-sm text-[#1a1a1a] cursor-pointer select-none w-fit">
@@ -501,6 +515,8 @@ export default function EvaluationsPage() {
 
       {paginationControls && <div className="mt-4">{paginationControls}</div>}
 
+      {rowActionControls && <div className="mt-4">{rowActionControls}</div>}
+
       {selectedEvaluation && (
         <EvaluationSummaryModal
           evaluation={selectedEvaluation}
@@ -517,6 +533,58 @@ export default function EvaluationsPage() {
       {selectedLead && (
         <LeadDetailsModal lead={selectedLead} onClose={() => setSelectedLead(null)} />
       )}
+    </div>
+  )
+}
+
+// ── Row action buttons (Edit / Details / Download), shown once a row is
+// selected. Rendered independently at both the top and bottom of the
+// results, so each instance owns its own download-menu open state.
+function RowActionButtons({ onEdit, onDetails }: { onEdit?: () => void; onDetails?: () => void }) {
+  const [downloadMenuOpen, setDownloadMenuOpen] = useState(false)
+  const downloadMenuRef = useRef<HTMLDivElement>(null)
+
+  useEffect(() => {
+    function onClickOutside(e: MouseEvent) {
+      if (downloadMenuRef.current && !downloadMenuRef.current.contains(e.target as Node)) {
+        setDownloadMenuOpen(false)
+      }
+    }
+    document.addEventListener('mousedown', onClickOutside)
+    return () => document.removeEventListener('mousedown', onClickOutside)
+  }, [])
+
+  function handleDownload(docName: string) {
+    setDownloadMenuOpen(false)
+    alert(`"${docName}" isn't set up yet — let us know what this document should contain and we'll wire it up.`)
+  }
+
+  return (
+    <div className="flex items-center gap-2 flex-wrap justify-end">
+      <button disabled={!onEdit} onClick={onEdit} className={btn.secondary}>
+        Edit
+      </button>
+      <button disabled={!onDetails} onClick={onDetails} className={btn.secondary}>
+        Details
+      </button>
+      <div className="relative" ref={downloadMenuRef}>
+        <button onClick={() => setDownloadMenuOpen(o => !o)} className={btn.secondary}>
+          Download ▾
+        </button>
+        {downloadMenuOpen && (
+          <div className="absolute right-0 top-full mt-1 w-48 bg-white border border-gray-200 rounded-lg shadow-md py-1 z-20">
+            <button onClick={() => handleDownload('Form')} className="w-full text-left px-4 py-2 text-sm text-[#1a1a1a] hover:bg-gray-50 transition-colors">
+              Form
+            </button>
+            <button onClick={() => handleDownload('Transfer Reports')} className="w-full text-left px-4 py-2 text-sm text-[#1a1a1a] hover:bg-gray-50 transition-colors">
+              Transfer Reports
+            </button>
+            <button onClick={() => handleDownload('Market Report')} className="w-full text-left px-4 py-2 text-sm text-[#1a1a1a] hover:bg-gray-50 transition-colors">
+              Market Report
+            </button>
+          </div>
+        )}
+      </div>
     </div>
   )
 }

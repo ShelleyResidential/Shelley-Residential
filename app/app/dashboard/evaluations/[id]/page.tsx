@@ -5,7 +5,7 @@ import { supabase } from '@/lib/supabase'
 import { btn, card, input, select, sectionTitle, label as labelCls } from '@/lib/styles'
 import { canDelete } from '@/lib/permissions'
 import { Breadcrumbs } from '@/lib/Breadcrumbs'
-import { useRouter, useParams } from 'next/navigation'
+import { useRouter, useParams, useSearchParams } from 'next/navigation'
 import Link from 'next/link'
 
 // ── Types ─────────────────────────────────────────────────────
@@ -120,6 +120,7 @@ const REASONS_LOST = [
 export default function EvaluationDetailPage() {
   const router = useRouter()
   const params = useParams()
+  const searchParams = useSearchParams()
   const id = params.id as string
 
   const [evaluation, setEvaluation] = useState<Evaluation | null>(null)
@@ -127,7 +128,7 @@ export default function EvaluationDetailPage() {
   const [activeTab, setActiveTab]   = useState<'details' | 'inspection' | 'pipeline'>('details')
   const [userId, setUserId]         = useState<string | null>(null)
   const [userEmail, setUserEmail]   = useState<string | null>(null)
-  const [editing, setEditing]       = useState(false)
+  const [editing, setEditing]       = useState(() => searchParams.get('edit') === '1')
   const [saving, setSaving]         = useState(false)
   const [error, setError]           = useState('')
   const [deleting, setDeleting]     = useState(false)
