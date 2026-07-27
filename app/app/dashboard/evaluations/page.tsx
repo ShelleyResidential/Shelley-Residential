@@ -365,15 +365,18 @@ export default function EvaluationsPage() {
         )}
       </div>
 
-      <label className="flex items-center gap-2 text-sm text-[#1a1a1a] mb-6 cursor-pointer select-none w-fit">
-        <input
-          type="checkbox"
-          checked={myOnly}
-          onChange={e => setMyOnly(e.target.checked)}
-          className="w-4 h-4 rounded border-gray-300 accent-[#E8266F] cursor-pointer"
-        />
-        My Evaluations Only
-      </label>
+      <div className="flex items-center justify-between flex-wrap gap-3 mb-6">
+        <label className="flex items-center gap-2 text-sm text-[#1a1a1a] cursor-pointer select-none w-fit">
+          <input
+            type="checkbox"
+            checked={myOnly}
+            onChange={e => setMyOnly(e.target.checked)}
+            className="w-4 h-4 rounded border-gray-300 accent-[#E8266F] cursor-pointer"
+          />
+          My Evaluations Only
+        </label>
+        {paginationControls}
+      </div>
 
       {selectedIds.size > 0 && (
         <div className="flex items-center justify-between gap-3 bg-[#1a1a1a] text-white rounded-lg px-4 py-3 mb-4">
@@ -396,8 +399,6 @@ export default function EvaluationsPage() {
           {totalCount} {totalCount === 1 ? 'evaluation' : 'evaluations'}
         </p>
       )}
-
-      {paginationControls && <div className="mb-4">{paginationControls}</div>}
 
       {loading ? (
         <div className="text-center py-20 text-gray-400 text-sm">Loading evaluations…</div>
