@@ -300,13 +300,41 @@ export default function EvaluationsPage() {
     fetchEvaluations()
   }
 
+  const paginationControls = !loading && evaluations.length > 0 && (
+    <div className="flex items-center gap-3 flex-wrap justify-end">
+      <p className="text-xs text-gray-400">
+        Page {page} of {totalPages} · {PAGE_SIZE} Records
+      </p>
+      <div className="flex items-center gap-1">
+        <button onClick={() => setPage(1)} disabled={page <= 1}
+          className="px-2.5 py-1.5 rounded-md text-sm text-[#1a1a1a] border border-gray-200 hover:bg-gray-50 disabled:opacity-40 disabled:cursor-not-allowed transition-colors">
+          «
+        </button>
+        <button onClick={() => setPage(p => Math.max(1, p - 1))} disabled={page <= 1}
+          className="px-2.5 py-1.5 rounded-md text-sm text-[#1a1a1a] border border-gray-200 hover:bg-gray-50 disabled:opacity-40 disabled:cursor-not-allowed transition-colors">
+          ‹
+        </button>
+        <button onClick={() => setPage(p => Math.min(totalPages, p + 1))} disabled={page >= totalPages}
+          className="px-2.5 py-1.5 rounded-md text-sm text-[#1a1a1a] border border-gray-200 hover:bg-gray-50 disabled:opacity-40 disabled:cursor-not-allowed transition-colors">
+          ›
+        </button>
+        <button onClick={() => setPage(totalPages)} disabled={page >= totalPages}
+          className="px-2.5 py-1.5 rounded-md text-sm text-[#1a1a1a] border border-gray-200 hover:bg-gray-50 disabled:opacity-40 disabled:cursor-not-allowed transition-colors">
+          »
+        </button>
+      </div>
+    </div>
+  )
+
   return (
     <div className="p-10">
       <Breadcrumbs items={[{ label: 'Analyse' }, { label: 'Evaluations' }]} />
-      <div className="flex items-center justify-between mb-8">
+      <div className="flex items-center justify-between mb-4">
         <h1 className="text-2xl font-bold text-[#1a1a1a]">Evaluations</h1>
         <Link href="/dashboard/evaluations/new" className={`${btn.primary} fixed top-8 right-10 z-40 shadow-md`}>+ New Evaluation</Link>
       </div>
+
+      {paginationControls && <div className="mb-6">{paginationControls}</div>}
 
       {/* Status filter tabs */}
       <div className="flex gap-1 mb-6 border-b border-gray-200 overflow-x-auto">
@@ -396,7 +424,7 @@ export default function EvaluationsPage() {
                 <th className="px-4 py-3 font-semibold text-[#1a1a1a] whitespace-nowrap text-xs uppercase tracking-wide">Date</th>
                 <th className="px-4 py-3 font-semibold text-[#1a1a1a] whitespace-nowrap text-xs uppercase tracking-wide">Agent</th>
                 <th className="px-4 py-3 font-semibold text-[#1a1a1a] whitespace-nowrap text-xs uppercase tracking-wide">TC</th>
-                <th className="px-4 py-3 font-semibold text-[#1a1a1a] whitespace-nowrap text-xs uppercase tracking-wide">Seller</th>
+                <th className="px-4 py-3 font-semibold text-[#1a1a1a] whitespace-nowrap text-xs uppercase tracking-wide">Contact</th>
                 <th className="px-4 py-3 font-semibold text-[#1a1a1a] whitespace-nowrap text-xs uppercase tracking-wide">Lead Source</th>
                 <th className="px-4 py-3 font-semibold text-[#1a1a1a] whitespace-nowrap text-xs uppercase tracking-wide">Evaluation Price</th>
                 <th className="px-4 py-3 font-semibold text-[#1a1a1a] whitespace-nowrap text-xs uppercase tracking-wide">Marketing Price</th>
@@ -470,31 +498,7 @@ export default function EvaluationsPage() {
         </div>
       )}
 
-      {!loading && evaluations.length > 0 && (
-        <div className="flex items-center justify-between mt-4 flex-wrap gap-3">
-          <p className="text-xs text-gray-400">
-            Page {page} of {totalPages} · {PAGE_SIZE} records per page
-          </p>
-          <div className="flex items-center gap-1">
-            <button onClick={() => setPage(1)} disabled={page <= 1}
-              className="px-2.5 py-1.5 rounded-md text-sm text-[#1a1a1a] border border-gray-200 hover:bg-gray-50 disabled:opacity-40 disabled:cursor-not-allowed transition-colors">
-              «
-            </button>
-            <button onClick={() => setPage(p => Math.max(1, p - 1))} disabled={page <= 1}
-              className="px-2.5 py-1.5 rounded-md text-sm text-[#1a1a1a] border border-gray-200 hover:bg-gray-50 disabled:opacity-40 disabled:cursor-not-allowed transition-colors">
-              ‹
-            </button>
-            <button onClick={() => setPage(p => Math.min(totalPages, p + 1))} disabled={page >= totalPages}
-              className="px-2.5 py-1.5 rounded-md text-sm text-[#1a1a1a] border border-gray-200 hover:bg-gray-50 disabled:opacity-40 disabled:cursor-not-allowed transition-colors">
-              ›
-            </button>
-            <button onClick={() => setPage(totalPages)} disabled={page >= totalPages}
-              className="px-2.5 py-1.5 rounded-md text-sm text-[#1a1a1a] border border-gray-200 hover:bg-gray-50 disabled:opacity-40 disabled:cursor-not-allowed transition-colors">
-              »
-            </button>
-          </div>
-        </div>
-      )}
+      {paginationControls && <div className="mt-4">{paginationControls}</div>}
 
       {selectedEvaluation && (
         <EvaluationSummaryModal
