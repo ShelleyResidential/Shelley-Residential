@@ -103,10 +103,6 @@ function mapsUrl(p: Evaluation['properties']): string | null {
   return q ? `https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(q)}` : null
 }
 
-function capitalizeWords(text: string): string {
-  return text.replace(/\b\w/g, c => c.toUpperCase())
-}
-
 function formatCurrency(value: number | null): string {
   if (value == null) return '—'
   return new Intl.NumberFormat('en-ZA', { style: 'currency', currency: 'ZAR', maximumFractionDigits: 0 }).format(value)
@@ -172,9 +168,8 @@ export default function EvaluationsPage() {
   const [userEmail, setUserEmail]     = useState<string | null>(null)
   const [page, setPage]               = useState(1)
   const [totalCount, setTotalCount]   = useState(0)
-  const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set())
+  const [selectedId, setSelectedId] = useState<string | null>(null)
   const [bulkDeleting, setBulkDeleting] = useState(false)
-  const [selectedEvaluation, setSelectedEvaluation] = useState<Evaluation | null>(null)
   const [selectedContact, setSelectedContact] = useState<Contact | null>(null)
 
   const totalPages = Math.max(1, Math.ceil(totalCount / PAGE_SIZE))
@@ -279,43 +274,24 @@ export default function EvaluationsPage() {
   }, [fetchEvaluations])
 
   function toggleSelected(id: string) {
-    setSelectedIds(prev => {
-      const next = new Set(prev)
-      if (next.has(id)) next.delete(id); else next.add(id)
-      return next
-    })
-  }
-
-  function toggleSelectAllOnPage() {
-    const allSelected = evaluations.length > 0 && evaluations.every(e => selectedIds.has(e.id))
-    setSelectedIds(prev => {
-      const next = new Set(prev)
-      if (allSelected) evaluations.forEach(e => next.delete(e.id))
-      else evaluations.forEach(e => next.add(e.id))
-      return next
-    })
+    setSelectedId(prev => prev === id ? null : id)
   }
 
   async function deleteSelected() {
-    if (selectedIds.size === 0) return
-    if (!confirm(`Delete ${selectedIds.size} selected evaluation${selectedIds.size > 1 ? 's' : ''}? This cannot be undone.`)) return
+    if (!selectedId) return
+    if (!confirm('Delete this evaluation? This cannot be undone.')) return
     setBulkDeleting(true)
-    const { error } = await supabase.from('evaluations').delete().in('id', Array.from(selectedIds))
+    const { error } = await supabase.from('evaluations').delete().eq('id', selectedId)
     setBulkDeleting(false)
     if (error) { alert(error.message); return }
-    setSelectedIds(new Set())
+    setSelectedId(null)
     fetchEvaluations()
   }
 
-  const singleSelectedId = selectedIds.size === 1 ? Array.from(selectedIds)[0] : null
-
-  const rowActionControls = selectedIds.size > 0 && (
+  const rowActionControls = selectedId && (
     <RowActionButtons
-      onEdit={singleSelectedId ? () => router.push(`/dashboard/evaluations/${singleSelectedId}?edit=1`) : undefined}
-      onDetails={singleSelectedId ? () => {
-        const ev = evaluations.find(e => e.id === singleSelectedId)
-        if (ev) setSelectedEvaluation(ev)
-      } : undefined}
+      onEdit={() => router.push(`/dashboard/evaluations/${selectedId}?edit=1`)}
+      onDetails={() => router.push(`/dashboard/evaluations/${selectedId}`)}
     />
   )
 
@@ -397,16 +373,16 @@ export default function EvaluationsPage() {
         {rowActionControls}
       </div>
 
-      {selectedIds.size > 0 && (
+      {selectedId && (
         <div className="flex items-center justify-between gap-3 bg-[#1a1a1a] text-white rounded-lg px-4 py-3 mb-4">
-          <span className="text-sm">{selectedIds.size} selected</span>
+          <span className="text-sm">1 selected</span>
           <div className="flex items-center gap-2">
-            <button onClick={() => setSelectedIds(new Set())} className="text-xs text-gray-300 hover:text-white transition-colors">
+            <button onClick={() => setSelectedId(null)} className="text-xs text-gray-300 hover:text-white transition-colors cursor-pointer">
               Clear
             </button>
             {canDelete(userEmail) && (
-              <button onClick={deleteSelected} disabled={bulkDeleting} className={`${btn.danger} py-1.5`}>
-                {bulkDeleting ? 'Deleting…' : `Delete Selected (${selectedIds.size})`}
+              <button onClick={deleteSelected} disabled={bulkDeleting} className={`${btn.danger} py-1.5 cursor-pointer`}>
+                {bulkDeleting ? 'Deleting…' : 'Delete Selected'}
               </button>
             )}
           </div>
@@ -432,10 +408,7 @@ export default function EvaluationsPage() {
         <div className={`${card} overflow-x-auto`}>
           <table className="w-full text-sm">
             <thead>
-              <TableHeaderRow
-                allSelected={evaluations.length > 0 && evaluations.every(e => selectedIds.has(e.id))}
-                onToggleAll={toggleSelectAllOnPage}
-              />
+              <TableHeaderRow />
             </thead>
             <tbody>
               {evaluations.map((ev, i) => {
@@ -453,10 +426,12 @@ export default function EvaluationsPage() {
                   >
                     <td className="px-4 py-3 whitespace-nowrap" onClick={e => e.stopPropagation()}>
                       <input
-                        type="checkbox"
-                        checked={selectedIds.has(ev.id)}
-                        onChange={() => toggleSelected(ev.id)}
-                        className="w-4 h-4 rounded border-gray-300 accent-[#E8266F] cursor-pointer"
+                        type="radio"
+                        name="selected-evaluation"
+                        checked={selectedId === ev.id}
+                        onClick={() => toggleSelected(ev.id)}
+                        onChange={() => setSelectedId(ev.id)}
+                        className="w-4 h-4 border-gray-300 accent-[#E8266F] cursor-pointer"
                       />
                     </td>
                     <td className="px-4 py-3 whitespace-nowrap">
@@ -504,10 +479,7 @@ export default function EvaluationsPage() {
               })}
             </tbody>
             <tfoot>
-              <TableHeaderRow
-                allSelected={evaluations.length > 0 && evaluations.every(e => selectedIds.has(e.id))}
-                onToggleAll={toggleSelectAllOnPage}
-              />
+              <TableHeaderRow />
             </tfoot>
           </table>
         </div>
@@ -516,15 +488,6 @@ export default function EvaluationsPage() {
       {paginationControls && <div className="mt-4">{paginationControls}</div>}
 
       {rowActionControls && <div className="mt-4">{rowActionControls}</div>}
-
-      {selectedEvaluation && (
-        <EvaluationSummaryModal
-          evaluation={selectedEvaluation}
-          profiles={profiles}
-          onClose={() => setSelectedEvaluation(null)}
-          onUpdated={fetchEvaluations}
-        />
-      )}
 
       {selectedContact && (
         <ContactDetailsModal contact={selectedContact} onClose={() => setSelectedContact(null)} />
@@ -535,17 +498,10 @@ export default function EvaluationsPage() {
 
 // ── Table header row, repeated at both the top (thead) and bottom (tfoot)
 // of the evaluations table so the column labels stay visible either way.
-function TableHeaderRow({ allSelected, onToggleAll }: { allSelected: boolean; onToggleAll: () => void }) {
+function TableHeaderRow() {
   return (
     <tr className="border-b border-gray-100 text-left">
-      <th className="px-4 py-3 whitespace-nowrap">
-        <input
-          type="checkbox"
-          checked={allSelected}
-          onChange={onToggleAll}
-          className="w-4 h-4 rounded border-gray-300 accent-[#E8266F] cursor-pointer"
-        />
-      </th>
+      <th className="px-4 py-3 whitespace-nowrap" />
       <th className="px-4 py-3 font-semibold text-[#1a1a1a] whitespace-nowrap text-xs uppercase tracking-wide">Status</th>
       <th className="px-4 py-3 font-semibold text-[#1a1a1a] whitespace-nowrap text-xs uppercase tracking-wide">Address</th>
       <th className="px-4 py-3 font-semibold text-[#1a1a1a] whitespace-nowrap text-xs uppercase tracking-wide">Date</th>
@@ -583,224 +539,29 @@ function RowActionButtons({ onEdit, onDetails }: { onEdit?: () => void; onDetail
 
   return (
     <div className="flex items-center gap-2 flex-wrap justify-end">
-      <button disabled={!onEdit} onClick={onEdit} className={btn.secondary}>
+      <button disabled={!onEdit} onClick={onEdit} className={`${btn.secondary} cursor-pointer disabled:cursor-not-allowed`}>
         Edit
       </button>
-      <button disabled={!onDetails} onClick={onDetails} className={btn.secondary}>
+      <button disabled={!onDetails} onClick={onDetails} className={`${btn.secondary} cursor-pointer disabled:cursor-not-allowed`}>
         Details
       </button>
       <div className="relative" ref={downloadMenuRef}>
-        <button onClick={() => setDownloadMenuOpen(o => !o)} className={btn.secondary}>
+        <button onClick={() => setDownloadMenuOpen(o => !o)} className={`${btn.secondary} cursor-pointer`}>
           Download ▾
         </button>
         {downloadMenuOpen && (
           <div className="absolute right-0 top-full mt-1 w-48 bg-white border border-gray-200 rounded-lg shadow-md py-1 z-20">
-            <button onClick={() => handleDownload('Form')} className="w-full text-left px-4 py-2 text-sm text-[#1a1a1a] hover:bg-gray-50 transition-colors">
+            <button onClick={() => handleDownload('Form')} className="w-full text-left px-4 py-2 text-sm text-[#1a1a1a] hover:bg-gray-50 transition-colors cursor-pointer">
               Form
             </button>
-            <button onClick={() => handleDownload('Transfer Reports')} className="w-full text-left px-4 py-2 text-sm text-[#1a1a1a] hover:bg-gray-50 transition-colors">
+            <button onClick={() => handleDownload('Transfer Reports')} className="w-full text-left px-4 py-2 text-sm text-[#1a1a1a] hover:bg-gray-50 transition-colors cursor-pointer">
               Transfer Reports
             </button>
-            <button onClick={() => handleDownload('Market Report')} className="w-full text-left px-4 py-2 text-sm text-[#1a1a1a] hover:bg-gray-50 transition-colors">
+            <button onClick={() => handleDownload('Market Report')} className="w-full text-left px-4 py-2 text-sm text-[#1a1a1a] hover:bg-gray-50 transition-colors cursor-pointer">
               Market Report
             </button>
           </div>
         )}
-      </div>
-    </div>
-  )
-}
-
-// ── Evaluation summary pop-up (shown when an address is clicked) ─
-function EvaluationSummaryModal({ evaluation, profiles, onClose, onUpdated }: {
-  evaluation: Evaluation; profiles: Record<string, Profile>; onClose: () => void; onUpdated: () => void
-}) {
-  const [current, setCurrent] = useState(evaluation.properties)
-  const [refreshError, setRefreshError] = useState('')
-
-  const address = formatAddress(current)
-  const query   = current ? mapQuery(current) : ''
-  const mapSrc  = `https://www.google.com/maps?q=${encodeURIComponent(query)}&output=embed`
-  const directionsUrl = `https://www.google.com/maps/dir/?api=1&destination=${encodeURIComponent(query)}`
-  const statusMeta = STATUS_LABELS[evaluation.status] ?? { label: evaluation.status, colour: 'bg-gray-100 text-gray-500' }
-  const agent = evaluation.sellers_agent_user_id ? profiles[evaluation.sellers_agent_user_id] : null
-  const tc = evaluation.transaction_coordinator_user_id ? profiles[evaluation.transaction_coordinator_user_id] : null
-  const sortedContacts = [...(evaluation.evaluation_contacts ?? [])].sort((a, b) => Number(b.is_primary) - Number(a.is_primary))
-
-  async function refreshFromGoogle() {
-    if (!current) return
-    setRefreshError('')
-
-    const raw = [current.street_number, current.street_name, current.suburb, current.city].filter(Boolean).join(' ') || address
-    const res = await fetch('/api/geocode', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ address: raw }),
-    })
-
-    if (!res.ok) {
-      setRefreshError('Could not find this address on Google. Try editing it manually.')
-      return
-    }
-
-    const geo = await res.json()
-    const updates = {
-      street_number: geo.street_number,
-      street_name:   geo.route ? capitalizeWords(geo.route) : current.street_name,
-      suburb:        geo.suburb ? capitalizeWords(geo.suburb) : null,
-      city:          geo.city ? capitalizeWords(geo.city) : null,
-      province:      geo.province,
-      postal_code:   geo.postal_code,
-      country:       geo.country ?? current.country,
-      latitude:      geo.latitude,
-      longitude:     geo.longitude,
-      google_place_id: geo.google_place_id,
-      google_maps_url: geo.formatted_address
-        ? `https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(geo.formatted_address)}`
-        : current.google_maps_url,
-    }
-
-    const { error } = await supabase.from('properties').update(updates).eq('id', current.id)
-
-    if (error) { setRefreshError(error.message); return }
-    setCurrent({ ...current, ...updates })
-    onUpdated()
-  }
-
-  // Auto-populate missing suburb/city/postal code on open, for properties
-  // created before geocoding existed — no manual click needed.
-  useEffect(() => {
-    if (current && (!current.suburb || !current.city || !current.postal_code)) {
-      refreshFromGoogle()
-    }
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [])
-
-  return (
-    <div
-      className="fixed inset-0 bg-black/40 flex items-center justify-center z-50 p-4"
-      onClick={onClose}
-    >
-      <div
-        className="bg-white rounded-2xl shadow-xl max-w-2xl w-full max-h-[90vh] overflow-y-auto"
-        onClick={e => e.stopPropagation()}
-      >
-        <div className="flex items-start justify-between gap-4 p-6 border-b border-gray-100">
-          <div>
-            <h3 className="text-lg font-bold text-[#1a1a1a]">{address}</h3>
-            <span className={`inline-block mt-1 text-xs px-2 py-0.5 rounded-full font-medium ${statusMeta.colour}`}>
-              {statusMeta.label}
-            </span>
-          </div>
-          <button onClick={onClose} className="text-gray-400 hover:text-[#1a1a1a] text-xl leading-none flex-shrink-0">×</button>
-        </div>
-
-        <div className="p-6 space-y-6">
-          {refreshError && <p className="text-xs text-red-500">{refreshError}</p>}
-
-          {/* Property */}
-          <div>
-            <p className="text-xs font-bold text-[#1a1a1a] uppercase tracking-wide mb-3">Property</p>
-            <div className="grid grid-cols-2 gap-x-6 gap-y-3 text-sm">
-              <ModalRow label="Type" value={current?.property_type?.replace('_', ' ') ?? '—'} />
-              <ModalRow label="Address" value={address} />
-              {current?.suburb && <ModalRow label="Suburb" value={current.suburb} />}
-              {current?.city && <ModalRow label="City" value={current.city} />}
-              {current?.province && <ModalRow label="Province" value={current.province} />}
-            </div>
-          </div>
-
-          {/* Contact Details */}
-          <div>
-            <p className="text-xs font-bold text-[#1a1a1a] uppercase tracking-wide mb-3">Contact Details</p>
-            {sortedContacts.length === 0 ? (
-              <p className="text-sm text-gray-400">No contacts linked.</p>
-            ) : (
-              <div className="space-y-3">
-                {sortedContacts.map((ec, i) => ec.contacts && (
-                  <div key={i}>
-                    <div className="flex items-center gap-2 flex-wrap">
-                      <span className="font-medium text-[#1a1a1a] text-sm">
-                        {[ec.contacts.first_name, ec.contacts.last_name].filter(Boolean).join(' ')}
-                      </span>
-                      {ec.is_primary && (
-                        <span className="text-xs bg-[#1a1a1a] text-white rounded-full px-2 py-0.5">Primary</span>
-                      )}
-                      {ec.picklist_options && (
-                        <span className="text-xs bg-gray-100 text-gray-600 rounded-full px-2 py-0.5">{ec.picklist_options.label}</span>
-                      )}
-                    </div>
-                    <div className="flex gap-4 mt-0.5 text-xs text-gray-500">
-                      {ec.contacts.phone_number && <span>{ec.contacts.phone_number}</span>}
-                      {ec.contacts.email_address && <span>{ec.contacts.email_address}</span>}
-                    </div>
-                  </div>
-                ))}
-              </div>
-            )}
-          </div>
-
-          {/* Property Details */}
-          <div>
-            <p className="text-xs font-bold text-[#1a1a1a] uppercase tracking-wide mb-3">Property Details</p>
-            <div className="grid grid-cols-2 gap-x-6 gap-y-3 text-sm">
-              <ModalRow label="Status" value={statusMeta.label} />
-              <ModalRow label="Scheduled"
-                value={evaluation.scheduled_at
-                  ? new Date(evaluation.scheduled_at).toLocaleString('en-ZA', { dateStyle: 'medium', timeStyle: 'short' })
-                  : '—'}
-              />
-              <ModalRow label="Agent" value={agent?.full_name ?? agent?.email ?? '—'} />
-              <ModalRow label="TC" value={tc?.full_name ?? tc?.email ?? '—'} />
-              <ModalRow label="Evaluation Price" value={formatCurrency(evaluation.evaluation_price)} />
-              <ModalRow label="Marketing Price" value={formatCurrency(evaluation.marketing_price)} />
-            </div>
-          </div>
-
-          {/* Lead Details */}
-          <div>
-            <p className="text-xs font-bold text-[#1a1a1a] uppercase tracking-wide mb-3">Lead Details</p>
-            <div className="grid grid-cols-2 gap-x-6 gap-y-3 text-sm">
-              <ModalRow label="Lead Generated By" value={evaluation.lead_generated_by?.replace('_', ' ') ?? '—'} />
-              <ModalRow label="Lead Source" value={evaluation.lead_source_picklist?.label ?? (evaluation.lead_source_other_text ?? '—')} />
-              {evaluation.referral_type && <ModalRow label="Referral Type" value={evaluation.referral_type.replace('_', ' ')} />}
-              {evaluation.lead_referral_notes && <ModalRow label="Referral Notes" value={evaluation.lead_referral_notes} fullWidth />}
-            </div>
-          </div>
-
-          {/* Motivation & Timeline */}
-          <div>
-            <p className="text-xs font-bold text-[#1a1a1a] uppercase tracking-wide mb-3">Motivation & Timeline</p>
-            <div className="grid grid-cols-2 gap-x-6 gap-y-3 text-sm">
-              <ModalRow label="Motivation" value={evaluation.motivation_picklist?.label ?? '—'} />
-              <ModalRow label="Timeline" value={evaluation.timeline_picklist?.label ?? '—'} />
-              {evaluation.motivation_for_selling_notes && <ModalRow label="Motivation Notes" value={evaluation.motivation_for_selling_notes} fullWidth />}
-              {evaluation.selling_timeline_notes && <ModalRow label="Timeline Notes" value={evaluation.selling_timeline_notes} fullWidth />}
-            </div>
-          </div>
-        </div>
-
-        <div className="px-6 pb-6">
-          <iframe
-            src={mapSrc}
-            width="100%"
-            height="260"
-            style={{ border: 0, borderRadius: 12 }}
-            loading="lazy"
-            title="Property location map"
-          />
-          <a
-            href={directionsUrl}
-            target="_blank"
-            rel="noopener noreferrer"
-            className={`${btn.secondary} w-full mt-3 block text-center`}
-          >
-            Get Directions
-          </a>
-          <Link href={`/dashboard/evaluations/${evaluation.id}`} className={`${btn.primary} w-full mt-2 block text-center`}>
-            View Full Evaluation →
-          </Link>
-        </div>
       </div>
     </div>
   )
@@ -902,12 +663,3 @@ function ContactAddressRow({ address }: { address: string | null }) {
   )
 }
 
-// ── Shared label/value row for modal sections ─────────────────
-function ModalRow({ label, value, fullWidth }: { label: string; value: string; fullWidth?: boolean }) {
-  return (
-    <div className={fullWidth ? 'col-span-2' : ''}>
-      <p className="text-xs text-gray-400 mb-0.5">{label}</p>
-      <p className="text-[#1a1a1a] capitalize">{value}</p>
-    </div>
-  )
-}
