@@ -366,7 +366,7 @@ export default function EvaluationsPage() {
             type="checkbox"
             checked={myOnly}
             onChange={e => setMyOnly(e.target.checked)}
-            className="w-4 h-4 rounded border-gray-300 accent-[#E8266F] cursor-pointer"
+            className="w-4 h-4 border-gray-300 accent-[#E8266F] cursor-pointer"
           />
           My Evaluations Only
         </label>
