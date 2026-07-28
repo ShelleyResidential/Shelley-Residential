@@ -384,8 +384,6 @@ export default function EvaluationsPage() {
         )}
       </div>
 
-      {rowActionControls && <div className="mb-4">{rowActionControls}</div>}
-
       <label className="flex items-center gap-2 text-sm text-[#1a1a1a] mb-6 cursor-pointer select-none w-fit">
         <input
           type="checkbox"
@@ -395,6 +393,8 @@ export default function EvaluationsPage() {
         />
         My Evaluations Only
       </label>
+
+      {rowActionControls && <div className="mb-4">{rowActionControls}</div>}
 
       {selectedIds.size > 0 && (
         <div className="flex items-center justify-between gap-3 bg-[#1a1a1a] text-white rounded-lg px-4 py-3 mb-4">
