@@ -34,6 +34,7 @@ type Profile = { id: string; full_name: string | null; email: string | null; rol
 
 type Evaluation = {
   id: string; status: string; date_captured: string
+  captured_by_user_id: string | null
   reason_lost: string | null
   lead_generated_by: string | null
   lead_source_other_text: string | null; lead_referral_notes: string | null
@@ -63,7 +64,8 @@ function formatAddress(p: Property | null): string {
   if (p.property_type === 'sectional_title' && p.unit_number) {
     return `Unit ${p.unit_number}${p.complex_or_building_name ? ' ' + p.complex_or_building_name : ''}${p.suburb ? ', ' + p.suburb : ''}`
   }
-  return [p.street_number, p.street_name, p.suburb].filter(Boolean).join(' ') || p.city || 'Unknown address'
+  const street = [p.street_number, p.street_name].filter(Boolean).join(' ')
+  return [street, p.suburb].filter(Boolean).join(', ') || p.city || 'Unknown address'
 }
 
 function mapsUrl(p: Property | null): string | null {
@@ -154,7 +156,7 @@ export default function EvaluationDetailPage() {
     const { data } = await supabase
       .from('evaluations')
       .select(`
-        id, status, date_captured, reason_lost, lead_generated_by,
+        id, status, date_captured, captured_by_user_id, reason_lost, lead_generated_by,
         lead_source_other_text, lead_referral_notes, referral_type,
         motivation_for_selling_notes, selling_timeline_notes,
         scheduled_at, calendar_event_link,
@@ -283,11 +285,15 @@ export default function EvaluationDetailPage() {
   const sortedSteps    = [...(ev.evaluation_pipeline_steps ?? [])].sort((a, b) => a.sort_order - b.sort_order)
   const stepsComplete  = sortedSteps.filter(s => s.is_complete).length
   const dateStr = new Date(ev.date_captured).toLocaleDateString('en-ZA', { day: 'numeric', month: 'long', year: 'numeric' })
+  const dateTimeCapturedStr = new Date(ev.date_captured).toLocaleString('en-ZA', { dateStyle: 'medium', timeStyle: 'short' })
   const agentProfile = profiles.find(p => p.id === ev.sellers_agent_user_id) ?? null
   const tcProfile     = profiles.find(p => p.id === ev.transaction_coordinator_user_id) ?? null
+  const capturedByProfile = profiles.find(p => p.id === ev.captured_by_user_id) ?? null
 
   return (
     <div className="p-10 max-w-4xl">
+
+      <Link href="/dashboard/evaluations/new" className={`${btn.primary} fixed top-8 right-10 z-40 shadow-md`}>+ New Evaluation</Link>
 
       {/* ── Header ── */}
       <div className="mb-8">
@@ -333,22 +339,51 @@ export default function EvaluationDetailPage() {
       {activeTab === 'details' && (
         <div className="space-y-6">
 
-          {/* Property */}
+          {/* Motivation & Timeline */}
           <div className={`${card} p-6`}>
-            <h3 className={sectionTitle}>Property</h3>
-            <div className="grid grid-cols-2 gap-x-8 gap-y-3 text-sm">
-              <InfoRow label="Type" value={ev.properties?.property_type?.replace('_', ' ') ?? '—'} />
-              {ev.properties?.unit_number && <InfoRow label="Unit" value={ev.properties.unit_number} />}
-              {ev.properties?.complex_or_building_name && <InfoRow label="Building" value={ev.properties.complex_or_building_name} />}
-              <InfoRow label="Address"
-                value={mapLink
-                  ? <a href={mapLink} target="_blank" rel="noopener noreferrer" className="text-blue-600 hover:underline">{address}</a>
-                  : address}
-              />
-              {ev.properties?.suburb && <InfoRow label="Suburb" value={ev.properties.suburb} />}
-              {ev.properties?.city && <InfoRow label="City" value={ev.properties.city} />}
-              {ev.properties?.province && <InfoRow label="Province" value={ev.properties.province} />}
-            </div>
+            <h3 className={sectionTitle}>Motivation & Timeline</h3>
+            {editing ? (
+              <div className="space-y-4">
+                <div>
+                  <label className={labelCls}>Motivation Notes</label>
+                  <textarea value={editMotivationNotes} onChange={e => setEditMotivationNotes(e.target.value)}
+                    rows={2} className={`${input} resize-none`} />
+                </div>
+                <div>
+                  <label className={labelCls}>Timeline Notes</label>
+                  <textarea value={editTimelineNotes} onChange={e => setEditTimelineNotes(e.target.value)}
+                    rows={2} className={`${input} resize-none`} />
+                </div>
+              </div>
+            ) : (
+              <div className="grid grid-cols-2 gap-x-8 gap-y-3 text-sm">
+                <InfoRow label="Motivation" value={ev.motivation_picklist?.label ?? '—'} />
+                <InfoRow label="Timeline" value={ev.timeline_picklist?.label ?? '—'} />
+                {ev.motivation_for_selling_notes && <InfoRow label="Motivation Notes" value={ev.motivation_for_selling_notes} fullWidth />}
+                {ev.selling_timeline_notes && <InfoRow label="Timeline Notes" value={ev.selling_timeline_notes} fullWidth />}
+              </div>
+            )}
+          </div>
+
+          {/* Lead Details */}
+          <div className={`${card} p-6`}>
+            <h3 className={sectionTitle}>Lead Details</h3>
+            {editing ? (
+              <div className="space-y-4">
+                <div>
+                  <label className={labelCls}>Referral Notes</label>
+                  <textarea value={editLeadReferralNotes} onChange={e => setEditLeadReferralNotes(e.target.value)}
+                    rows={3} className={`${input} resize-none`} />
+                </div>
+              </div>
+            ) : (
+              <div className="grid grid-cols-2 gap-x-8 gap-y-3 text-sm">
+                <InfoRow label="Lead Generated By" value={ev.lead_generated_by?.replace('_', ' ') ?? '—'} />
+                <InfoRow label="Lead Source" value={ev.lead_source_picklist?.label ?? (ev.lead_source_other_text ?? '—')} />
+                {ev.referral_type && <InfoRow label="Referral Type" value={ev.referral_type.replace('_', ' ')} />}
+                {ev.lead_referral_notes && <InfoRow label="Referral Notes" value={ev.lead_referral_notes} fullWidth />}
+              </div>
+            )}
           </div>
 
           {/* Contact Details */}
@@ -389,10 +424,32 @@ export default function EvaluationDetailPage() {
           {/* Property Details */}
           <div className={`${card} p-6`}>
             <h3 className={sectionTitle}>Property Details</h3>
+            <div className="grid grid-cols-2 gap-x-8 gap-y-3 text-sm">
+              <InfoRow label="Type" value={ev.properties?.property_type?.replace('_', ' ') ?? '—'} />
+              {ev.properties?.unit_number && <InfoRow label="Unit" value={ev.properties.unit_number} />}
+              {ev.properties?.complex_or_building_name && <InfoRow label="Building" value={ev.properties.complex_or_building_name} />}
+              <InfoRow label="Address"
+                value={mapLink
+                  ? <a href={mapLink} target="_blank" rel="noopener noreferrer" className="text-blue-600 hover:underline">{address}</a>
+                  : address}
+              />
+              {ev.properties?.suburb && <InfoRow label="Suburb" value={ev.properties.suburb} />}
+              {ev.properties?.city && <InfoRow label="City" value={ev.properties.city} />}
+              {ev.properties?.province && <InfoRow label="Province" value={ev.properties.province} />}
+            </div>
+          </div>
+
+          {/* Evaluation Details */}
+          <div className={`${card} p-6`}>
+            <h3 className={sectionTitle}>Evaluation Details</h3>
+            <div className="grid grid-cols-2 gap-x-8 gap-y-3 text-sm mb-4">
+              <InfoRow label="Date & Time Captured" value={dateTimeCapturedStr} />
+              <InfoRow label="Captured By" value={capturedByProfile?.full_name ?? capturedByProfile?.email ?? '—'} />
+            </div>
             {editing ? (
               <div className="space-y-4">
                 <div>
-                  <label className={labelCls}>Status</label>
+                  <label className={labelCls}>Evaluation Status</label>
                   <select value={editStatus} onChange={e => setEditStatus(e.target.value)} className={select}>
                     <option value="new">New</option>
                     <option value="scheduled">Scheduled</option>
@@ -418,16 +475,6 @@ export default function EvaluationDetailPage() {
                 )}
                 <div className="grid grid-cols-2 gap-4">
                   <div>
-                    <label className={labelCls}>Scheduled Date</label>
-                    <input type="date" value={editSchedDate} onChange={e => setEditSchedDate(e.target.value)} className={input} />
-                  </div>
-                  <div>
-                    <label className={labelCls}>Scheduled Time</label>
-                    <input type="time" value={editSchedTime} onChange={e => setEditSchedTime(e.target.value)} className={input} />
-                  </div>
-                </div>
-                <div className="grid grid-cols-2 gap-4">
-                  <div>
                     <label className={labelCls}>Agent</label>
                     <select value={editAgentId} onChange={e => setEditAgentId(e.target.value)} className={select}>
                       <option value="">—</option>
@@ -446,6 +493,19 @@ export default function EvaluationDetailPage() {
                     </select>
                   </div>
                 </div>
+                <div>
+                  <span className={labelCls}>Evaluation Date and Time</span>
+                  <div className="grid grid-cols-2 gap-4 mt-1">
+                    <div>
+                      <label className="text-xs text-gray-400 mb-1 block">Date</label>
+                      <input type="date" value={editSchedDate} onChange={e => setEditSchedDate(e.target.value)} className={input} />
+                    </div>
+                    <div>
+                      <label className="text-xs text-gray-400 mb-1 block">Time</label>
+                      <input type="time" value={editSchedTime} onChange={e => setEditSchedTime(e.target.value)} className={input} />
+                    </div>
+                  </div>
+                </div>
                 <div className="grid grid-cols-2 gap-4">
                   <div>
                     <label className={labelCls}>Evaluation Price</label>
@@ -460,9 +520,11 @@ export default function EvaluationDetailPage() {
             ) : (
               <>
                 <div className="grid grid-cols-2 gap-x-8 gap-y-3 text-sm">
-                  <InfoRow label="Status" value={STATUS_LABELS[ev.status] ?? ev.status} />
+                  <InfoRow label="Evaluation Status" value={STATUS_LABELS[ev.status] ?? ev.status} />
                   {ev.status === 'lost' && ev.reason_lost && <InfoRow label="Reason Lost" value={ev.reason_lost} />}
-                  <InfoRow label="Scheduled"
+                  <InfoRow label="Agent" value={agentProfile?.full_name ?? agentProfile?.email ?? '—'} />
+                  <InfoRow label="TC" value={tcProfile?.full_name ?? tcProfile?.email ?? '—'} />
+                  <InfoRow label="Evaluation Date and Time"
                     value={ev.scheduled_at
                       ? new Date(ev.scheduled_at).toLocaleString('en-ZA', { dateStyle: 'medium', timeStyle: 'short' })
                       : '—'}
@@ -470,8 +532,6 @@ export default function EvaluationDetailPage() {
                   {ev.calendar_event_link && (
                     <InfoRow label="Calendar" value={<a href={ev.calendar_event_link} target="_blank" rel="noopener noreferrer" className="text-blue-600 hover:underline">View event ↗</a>} />
                   )}
-                  <InfoRow label="Agent" value={agentProfile?.full_name ?? agentProfile?.email ?? '—'} />
-                  <InfoRow label="TC" value={tcProfile?.full_name ?? tcProfile?.email ?? '—'} />
                   <InfoRow label="Evaluation Price" value={formatCurrency(ev.evaluation_price)} />
                   <InfoRow label="Marketing Price" value={formatCurrency(ev.marketing_price)} />
                 </div>
@@ -484,53 +544,6 @@ export default function EvaluationDetailPage() {
                   </div>
                 )}
               </>
-            )}
-          </div>
-
-          {/* Lead Details */}
-          <div className={`${card} p-6`}>
-            <h3 className={sectionTitle}>Lead Details</h3>
-            {editing ? (
-              <div className="space-y-4">
-                <div>
-                  <label className={labelCls}>Referral Notes</label>
-                  <textarea value={editLeadReferralNotes} onChange={e => setEditLeadReferralNotes(e.target.value)}
-                    rows={3} className={`${input} resize-none`} />
-                </div>
-              </div>
-            ) : (
-              <div className="grid grid-cols-2 gap-x-8 gap-y-3 text-sm">
-                <InfoRow label="Lead Generated By" value={ev.lead_generated_by?.replace('_', ' ') ?? '—'} />
-                <InfoRow label="Lead Source" value={ev.lead_source_picklist?.label ?? (ev.lead_source_other_text ?? '—')} />
-                {ev.referral_type && <InfoRow label="Referral Type" value={ev.referral_type.replace('_', ' ')} />}
-                {ev.lead_referral_notes && <InfoRow label="Referral Notes" value={ev.lead_referral_notes} fullWidth />}
-              </div>
-            )}
-          </div>
-
-          {/* Motivation & Timeline */}
-          <div className={`${card} p-6`}>
-            <h3 className={sectionTitle}>Motivation & Timeline</h3>
-            {editing ? (
-              <div className="space-y-4">
-                <div>
-                  <label className={labelCls}>Motivation Notes</label>
-                  <textarea value={editMotivationNotes} onChange={e => setEditMotivationNotes(e.target.value)}
-                    rows={2} className={`${input} resize-none`} />
-                </div>
-                <div>
-                  <label className={labelCls}>Timeline Notes</label>
-                  <textarea value={editTimelineNotes} onChange={e => setEditTimelineNotes(e.target.value)}
-                    rows={2} className={`${input} resize-none`} />
-                </div>
-              </div>
-            ) : (
-              <div className="grid grid-cols-2 gap-x-8 gap-y-3 text-sm">
-                <InfoRow label="Motivation" value={ev.motivation_picklist?.label ?? '—'} />
-                <InfoRow label="Timeline" value={ev.timeline_picklist?.label ?? '—'} />
-                {ev.motivation_for_selling_notes && <InfoRow label="Motivation Notes" value={ev.motivation_for_selling_notes} fullWidth />}
-                {ev.selling_timeline_notes && <InfoRow label="Timeline Notes" value={ev.selling_timeline_notes} fullWidth />}
-              </div>
             )}
           </div>
 

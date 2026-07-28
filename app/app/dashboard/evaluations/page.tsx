@@ -87,12 +87,20 @@ function formatAddress(p: Evaluation['properties']): string {
   if (p.property_type === 'sectional_title' && p.unit_number) {
     return `Unit ${p.unit_number}${p.complex_or_building_name ? ' ' + p.complex_or_building_name : ''}${p.suburb ? ', ' + p.suburb : ''}`
   }
-  return [p.street_number, p.street_name, p.suburb].filter(Boolean).join(' ') || p.city || 'Unknown address'
+  const street = [p.street_number, p.street_name].filter(Boolean).join(' ')
+  return [street, p.suburb].filter(Boolean).join(', ') || p.city || 'Unknown address'
 }
 
 function mapQuery(p: Property): string {
   if (p.latitude != null && p.longitude != null) return `${p.latitude},${p.longitude}`
   return [p.street_number, p.street_name, p.suburb, p.city, p.province, p.postal_code, p.country].filter(Boolean).join(' ')
+}
+
+function mapsUrl(p: Evaluation['properties']): string | null {
+  if (!p) return null
+  if (p.google_maps_url) return p.google_maps_url
+  const q = mapQuery(p)
+  return q ? `https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(q)}` : null
 }
 
 function capitalizeWords(text: string): string {
@@ -168,7 +176,6 @@ export default function EvaluationsPage() {
   const [bulkDeleting, setBulkDeleting] = useState(false)
   const [selectedEvaluation, setSelectedEvaluation] = useState<Evaluation | null>(null)
   const [selectedContact, setSelectedContact] = useState<Contact | null>(null)
-  const [selectedLead, setSelectedLead] = useState<LeadInfo | null>(null)
 
   const totalPages = Math.max(1, Math.ceil(totalCount / PAGE_SIZE))
 
@@ -473,12 +480,19 @@ export default function EvaluationsPage() {
                       </span>
                     </td>
                     <td className="px-4 py-3 whitespace-nowrap">
-                      <button
-                        onClick={e => { e.stopPropagation(); setSelectedEvaluation(ev) }}
-                        className="font-medium text-[#1a1a1a] hover:text-blue-600 hover:underline transition-colors"
-                      >
-                        {formatAddress(ev.properties)}
-                      </button>
+                      {mapsUrl(ev.properties) ? (
+                        <a
+                          href={mapsUrl(ev.properties)!}
+                          target="_blank"
+                          rel="noopener noreferrer"
+                          onClick={e => e.stopPropagation()}
+                          className="font-medium text-[#1a1a1a] underline hover:font-bold transition-all"
+                        >
+                          {formatAddress(ev.properties)}
+                        </a>
+                      ) : (
+                        <span className="font-medium text-[#1a1a1a] underline">{formatAddress(ev.properties)}</span>
+                      )}
                     </td>
                     <td className="px-4 py-3 text-gray-500 whitespace-nowrap">{date}</td>
                     <td className="px-4 py-3 text-gray-500 whitespace-nowrap">{agent?.full_name ?? agent?.email ?? '—'}</td>
@@ -487,7 +501,7 @@ export default function EvaluationsPage() {
                       {getSeller(ev) ? (
                         <button
                           onClick={e => { e.stopPropagation(); setSelectedContact(getSeller(ev)) }}
-                          className="text-gray-500 hover:text-blue-600 hover:underline transition-colors"
+                          className="text-gray-500 underline hover:font-bold hover:text-[#1a1a1a] transition-all"
                         >
                           {sellerName(ev)}
                         </button>
@@ -495,13 +509,8 @@ export default function EvaluationsPage() {
                         <span className="text-gray-500">—</span>
                       )}
                     </td>
-                    <td className="px-4 py-3 whitespace-nowrap">
-                      <button
-                        onClick={e => { e.stopPropagation(); setSelectedLead(ev) }}
-                        className="text-gray-500 hover:text-blue-600 hover:underline transition-colors"
-                      >
-                        {leadSource}
-                      </button>
+                    <td className="px-4 py-3 text-gray-500 whitespace-nowrap">
+                      {leadSource}
                     </td>
                     <td className="px-4 py-3 text-gray-500 whitespace-nowrap">{formatCurrency(ev.evaluation_price)}</td>
                     <td className="px-4 py-3 text-gray-500 whitespace-nowrap">{formatCurrency(ev.marketing_price)}</td>
@@ -528,10 +537,6 @@ export default function EvaluationsPage() {
 
       {selectedContact && (
         <ContactDetailsModal contact={selectedContact} onClose={() => setSelectedContact(null)} />
-      )}
-
-      {selectedLead && (
-        <LeadDetailsModal lead={selectedLead} onClose={() => setSelectedLead(null)} />
       )}
     </div>
   )
@@ -785,29 +790,10 @@ function EvaluationSummaryModal({ evaluation, profiles, onClose, onUpdated }: {
 }
 
 // ── Contact details pop-up ───────────────────────────────────
+// Mirrors the layout of the Contacts section's own detail page (Basic
+// Information / Contact Details / Personal Details / Work Details), so a
+// contact looks the same whether viewed from here or its own page.
 function ContactDetailsModal({ contact, onClose }: { contact: Contact; onClose: () => void }) {
-  const fields: [string, string | null][] = [
-    ['Title', contact.title],
-    ['First Name', contact.first_name],
-    ['Surname', contact.last_name],
-    ['Status', contact.status],
-    ['Tags', contact.tags?.length ? contact.tags.join(', ') : null],
-    ['ID Number', contact.id_number],
-    ['Date Added', formatDate(contact.date_added)],
-    ['Phone', contact.phone_number],
-    ['Email', contact.email_address],
-    ['Preference', contact.contact_preference],
-    ['Address', contact.address],
-    ['Marital Status', contact.marital_status],
-    ['Birthday', formatDate(contact.birthday)],
-    ['Wedding Anniversary', formatDate(contact.wedding_anniversary)],
-    ['Home Anniversary', formatDate(contact.home_anniversary)],
-    ['Occupation', contact.occupation],
-    ['Company', contact.company_name],
-    ['Division', contact.division],
-    ['Branch', contact.branch],
-  ]
-
   return (
     <div className="fixed inset-0 bg-black/40 flex items-center justify-center z-50 p-4" onClick={onClose}>
       <div
@@ -819,15 +805,37 @@ function ContactDetailsModal({ contact, onClose }: { contact: Contact; onClose: 
           <button onClick={onClose} className="text-gray-400 hover:text-[#1a1a1a] text-xl leading-none flex-shrink-0">×</button>
         </div>
 
-        <div className="p-6">
-          <div className="grid grid-cols-2 gap-x-6 gap-y-3 text-sm">
-            {fields.filter(([, value]) => value).map(([label, value]) => (
-              <div key={label}>
-                <p className="text-xs font-medium text-gray-400 uppercase tracking-wide mb-0.5">{label}</p>
-                <p className="text-[#1a1a1a] font-medium">{value}</p>
-              </div>
-            ))}
-          </div>
+        <div className="p-6 space-y-4">
+          <ContactInfoSection title="Basic Information">
+            <ContactRow label="Title" value={contact.title} />
+            <ContactRow label="First Name" value={contact.first_name} />
+            <ContactRow label="Surname" value={contact.last_name} />
+            <ContactRow label="Status" value={contact.status} />
+            <ContactRow label="Tags" value={contact.tags?.length ? contact.tags.join(', ') : null} />
+            <ContactRow label="ID Number" value={contact.id_number} />
+            <ContactRow label="Date Added" value={formatDate(contact.date_added)} />
+          </ContactInfoSection>
+
+          <ContactInfoSection title="Contact Details">
+            <ContactRow label="Phone" value={contact.phone_number} />
+            <ContactRow label="Email" value={contact.email_address} />
+            <ContactRow label="Preference" value={contact.contact_preference} />
+            <ContactAddressRow address={contact.address} />
+          </ContactInfoSection>
+
+          <ContactInfoSection title="Personal Details">
+            <ContactRow label="Marital Status" value={contact.marital_status} />
+            <ContactRow label="Birthday" value={formatDate(contact.birthday)} />
+            <ContactRow label="Wedding Anniversary" value={formatDate(contact.wedding_anniversary)} />
+            <ContactRow label="Home Anniversary" value={formatDate(contact.home_anniversary)} />
+          </ContactInfoSection>
+
+          <ContactInfoSection title="Work Details">
+            <ContactRow label="Occupation" value={contact.occupation} />
+            <ContactRow label="Company" value={contact.company_name} />
+            <ContactRow label="Division" value={contact.division} />
+            <ContactRow label="Branch" value={contact.branch} />
+          </ContactInfoSection>
         </div>
 
         <div className="px-6 pb-6">
@@ -840,46 +848,39 @@ function ContactDetailsModal({ contact, onClose }: { contact: Contact; onClose: 
   )
 }
 
-// ── Lead details pop-up ───────────────────────────────────────
-function LeadDetailsModal({ lead, onClose }: { lead: LeadInfo; onClose: () => void }) {
-  const fields: [string, string | null][] = [
-    ['Lead Generated By', lead.lead_generated_by ? lead.lead_generated_by.replace('_', ' ') : null],
-    ['Lead Source', lead.lead_source_picklist?.label ?? lead.lead_source_other_text],
-    ['Referral Type', lead.referral_type ? lead.referral_type.replace('_', ' ') : null],
-    ['Referral Notes', lead.lead_referral_notes],
-  ]
-
+function ContactInfoSection({ title, children }: { title: string; children: React.ReactNode }) {
   return (
-    <div className="fixed inset-0 bg-black/40 flex items-center justify-center z-50 p-4" onClick={onClose}>
-      <div
-        className="bg-white rounded-2xl shadow-xl max-w-lg w-full max-h-[90vh] overflow-y-auto"
-        onClick={e => e.stopPropagation()}
-      >
-        <div className="flex items-start justify-between gap-4 p-6 border-b border-gray-100">
-          <h3 className="text-lg font-bold text-[#1a1a1a]">Lead Details</h3>
-          <button onClick={onClose} className="text-gray-400 hover:text-[#1a1a1a] text-xl leading-none flex-shrink-0">×</button>
-        </div>
+    <div className="border border-gray-100 rounded-xl p-4">
+      <h4 className="text-xs font-bold text-[#1a1a1a] uppercase tracking-wide mb-3">{title}</h4>
+      <div className="space-y-3">{children}</div>
+    </div>
+  )
+}
 
-        <div className="p-6">
-          <div className="grid grid-cols-2 gap-x-6 gap-y-3 text-sm">
-            {fields.filter(([, value]) => value).map(([label, value]) => (
-              <div key={label}>
-                <p className="text-xs font-medium text-gray-400 uppercase tracking-wide mb-0.5">{label}</p>
-                <p className="text-[#1a1a1a] font-medium">{value}</p>
-              </div>
-            ))}
-          </div>
-          {fields.every(([, value]) => !value) && (
-            <p className="text-sm text-gray-400">No lead details captured for this evaluation.</p>
-          )}
-        </div>
+function ContactRow({ label, value }: { label: string; value: string | null | undefined }) {
+  return (
+    <div className="flex justify-between gap-4 text-sm">
+      <span className="text-gray-500 flex-shrink-0">{label}</span>
+      <span className="text-[#1a1a1a] text-right font-medium">{value || '—'}</span>
+    </div>
+  )
+}
 
-        <div className="px-6 pb-6">
-          <Link href={`/dashboard/evaluations/${lead.id}`} className={`${btn.primary} w-full block text-center`}>
-            View Evaluation →
-          </Link>
-        </div>
-      </div>
+function ContactAddressRow({ address }: { address: string | null }) {
+  return (
+    <div className="flex justify-between gap-4 text-sm">
+      <span className="text-gray-500 flex-shrink-0">Address</span>
+      {address ? (
+        <a
+          href={`https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(address)}`}
+          target="_blank" rel="noopener noreferrer"
+          className="text-[#1a1a1a] font-medium text-right underline hover:font-bold transition-all"
+        >
+          {address}
+        </a>
+      ) : (
+        <span className="text-[#1a1a1a] font-medium">—</span>
+      )}
     </div>
   )
 }

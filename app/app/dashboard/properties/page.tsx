@@ -60,7 +60,8 @@ function formatAddress(p: Property): string {
   if (p.property_type === 'sectional_title' && p.unit_number) {
     return `Unit ${p.unit_number}${p.complex_or_building_name ? ' ' + p.complex_or_building_name : ''}${p.suburb ? ', ' + p.suburb : ''}`
   }
-  return [p.street_number, p.street_name, p.suburb].filter(Boolean).join(' ') || p.city || 'Unknown address'
+  const street = [p.street_number, p.street_name].filter(Boolean).join(' ')
+  return [street, p.suburb].filter(Boolean).join(', ') || p.city || 'Unknown address'
 }
 
 export default function PropertiesPage() {
