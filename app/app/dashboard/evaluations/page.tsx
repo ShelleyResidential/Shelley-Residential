@@ -363,9 +363,11 @@ export default function EvaluationsPage() {
       <div className="flex items-center justify-between flex-wrap gap-3 mb-6">
         <label className="flex items-center gap-2 text-sm text-[#1a1a1a] cursor-pointer select-none w-fit">
           <input
-            type="checkbox"
+            type="radio"
+            name="my-evaluations-only"
             checked={myOnly}
-            onChange={e => setMyOnly(e.target.checked)}
+            onClick={() => setMyOnly(o => !o)}
+            onChange={() => setMyOnly(true)}
             className="w-4 h-4 border-gray-300 accent-[#E8266F] cursor-pointer"
           />
           My Evaluations Only
