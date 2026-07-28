@@ -386,18 +386,15 @@ export default function EvaluationsPage() {
 
       {rowActionControls && <div className="mb-4">{rowActionControls}</div>}
 
-      <div className="flex items-center justify-between flex-wrap gap-3 mb-6">
-        <label className="flex items-center gap-2 text-sm text-[#1a1a1a] cursor-pointer select-none w-fit">
-          <input
-            type="checkbox"
-            checked={myOnly}
-            onChange={e => setMyOnly(e.target.checked)}
-            className="w-4 h-4 rounded border-gray-300 accent-[#E8266F] cursor-pointer"
-          />
-          My Evaluations Only
-        </label>
-        {paginationControls}
-      </div>
+      <label className="flex items-center gap-2 text-sm text-[#1a1a1a] mb-6 cursor-pointer select-none w-fit">
+        <input
+          type="checkbox"
+          checked={myOnly}
+          onChange={e => setMyOnly(e.target.checked)}
+          className="w-4 h-4 rounded border-gray-300 accent-[#E8266F] cursor-pointer"
+        />
+        My Evaluations Only
+      </label>
 
       {selectedIds.size > 0 && (
         <div className="flex items-center justify-between gap-3 bg-[#1a1a1a] text-white rounded-lg px-4 py-3 mb-4">
@@ -421,6 +418,8 @@ export default function EvaluationsPage() {
         </p>
       )}
 
+      {paginationControls && <div className="mb-4">{paginationControls}</div>}
+
       {loading ? (
         <div className="text-center py-20 text-gray-400 text-sm">Loading evaluations…</div>
       ) : evaluations.length === 0 ? (
@@ -432,25 +431,10 @@ export default function EvaluationsPage() {
         <div className={`${card} overflow-x-auto`}>
           <table className="w-full text-sm">
             <thead>
-              <tr className="border-b border-gray-100 text-left">
-                <th className="px-4 py-3 whitespace-nowrap">
-                  <input
-                    type="checkbox"
-                    checked={evaluations.length > 0 && evaluations.every(e => selectedIds.has(e.id))}
-                    onChange={toggleSelectAllOnPage}
-                    className="w-4 h-4 rounded border-gray-300 accent-[#E8266F] cursor-pointer"
-                  />
-                </th>
-                <th className="px-4 py-3 font-semibold text-[#1a1a1a] whitespace-nowrap text-xs uppercase tracking-wide">Status</th>
-                <th className="px-4 py-3 font-semibold text-[#1a1a1a] whitespace-nowrap text-xs uppercase tracking-wide">Address</th>
-                <th className="px-4 py-3 font-semibold text-[#1a1a1a] whitespace-nowrap text-xs uppercase tracking-wide">Date</th>
-                <th className="px-4 py-3 font-semibold text-[#1a1a1a] whitespace-nowrap text-xs uppercase tracking-wide">Agent</th>
-                <th className="px-4 py-3 font-semibold text-[#1a1a1a] whitespace-nowrap text-xs uppercase tracking-wide">TC</th>
-                <th className="px-4 py-3 font-semibold text-[#1a1a1a] whitespace-nowrap text-xs uppercase tracking-wide">Contact</th>
-                <th className="px-4 py-3 font-semibold text-[#1a1a1a] whitespace-nowrap text-xs uppercase tracking-wide">Lead Source</th>
-                <th className="px-4 py-3 font-semibold text-[#1a1a1a] whitespace-nowrap text-xs uppercase tracking-wide">Evaluation Price</th>
-                <th className="px-4 py-3 font-semibold text-[#1a1a1a] whitespace-nowrap text-xs uppercase tracking-wide">Marketing Price</th>
-              </tr>
+              <TableHeaderRow
+                allSelected={evaluations.length > 0 && evaluations.every(e => selectedIds.has(e.id))}
+                onToggleAll={toggleSelectAllOnPage}
+              />
             </thead>
             <tbody>
               {evaluations.map((ev, i) => {
@@ -518,6 +502,12 @@ export default function EvaluationsPage() {
                 )
               })}
             </tbody>
+            <tfoot>
+              <TableHeaderRow
+                allSelected={evaluations.length > 0 && evaluations.every(e => selectedIds.has(e.id))}
+                onToggleAll={toggleSelectAllOnPage}
+              />
+            </tfoot>
           </table>
         </div>
       )}
@@ -539,6 +529,32 @@ export default function EvaluationsPage() {
         <ContactDetailsModal contact={selectedContact} onClose={() => setSelectedContact(null)} />
       )}
     </div>
+  )
+}
+
+// ── Table header row, repeated at both the top (thead) and bottom (tfoot)
+// of the evaluations table so the column labels stay visible either way.
+function TableHeaderRow({ allSelected, onToggleAll }: { allSelected: boolean; onToggleAll: () => void }) {
+  return (
+    <tr className="border-b border-gray-100 text-left">
+      <th className="px-4 py-3 whitespace-nowrap">
+        <input
+          type="checkbox"
+          checked={allSelected}
+          onChange={onToggleAll}
+          className="w-4 h-4 rounded border-gray-300 accent-[#E8266F] cursor-pointer"
+        />
+      </th>
+      <th className="px-4 py-3 font-semibold text-[#1a1a1a] whitespace-nowrap text-xs uppercase tracking-wide">Status</th>
+      <th className="px-4 py-3 font-semibold text-[#1a1a1a] whitespace-nowrap text-xs uppercase tracking-wide">Address</th>
+      <th className="px-4 py-3 font-semibold text-[#1a1a1a] whitespace-nowrap text-xs uppercase tracking-wide">Date</th>
+      <th className="px-4 py-3 font-semibold text-[#1a1a1a] whitespace-nowrap text-xs uppercase tracking-wide">Agent</th>
+      <th className="px-4 py-3 font-semibold text-[#1a1a1a] whitespace-nowrap text-xs uppercase tracking-wide">TC</th>
+      <th className="px-4 py-3 font-semibold text-[#1a1a1a] whitespace-nowrap text-xs uppercase tracking-wide">Contact</th>
+      <th className="px-4 py-3 font-semibold text-[#1a1a1a] whitespace-nowrap text-xs uppercase tracking-wide">Lead Source</th>
+      <th className="px-4 py-3 font-semibold text-[#1a1a1a] whitespace-nowrap text-xs uppercase tracking-wide">Evaluation Price</th>
+      <th className="px-4 py-3 font-semibold text-[#1a1a1a] whitespace-nowrap text-xs uppercase tracking-wide">Marketing Price</th>
+    </tr>
   )
 }
 

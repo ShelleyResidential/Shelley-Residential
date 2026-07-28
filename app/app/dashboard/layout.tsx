@@ -9,19 +9,57 @@ import { btn, select as selectCls, label as labelCls } from '@/lib/styles'
 
 const ANALYSE_ROUTES = ['/dashboard/analyse', '/dashboard/contacts', '/dashboard/properties', '/dashboard/evaluations']
 
-function navItemStyle(active: boolean, indented: boolean) {
+// Nav link that bolds on hover (in addition to when active) and supports a
+// slightly larger font for the top-level Dashboard/Analyse tabs so they
+// stand out from the indented Contacts/Properties/Evaluations sub-items.
+function NavLink({ href, active, indented, large, onClick, children, trailingIcon }: {
+  href: string
+  active: boolean
+  indented: boolean
+  large?: boolean
+  onClick?: () => void
+  children: React.ReactNode
+  trailingIcon?: React.ReactNode
+}) {
+  const [hovered, setHovered] = useState(false)
   const basePadding = indented ? 24 : 12
-  return {
-    display: 'block',
-    padding: '11px 12px',
-    marginBottom: 2,
-    fontSize: 14,
-    color: '#fff',
-    fontWeight: active ? 700 : 400,
-    borderLeft: active ? '2px solid #E8266F' : '2px solid transparent',
-    paddingLeft: active ? basePadding - 2 : basePadding,
-    textDecoration: 'none',
-  } as const
+
+  return (
+    <Link
+      href={href}
+      onClick={onClick}
+      onMouseEnter={() => setHovered(true)}
+      onMouseLeave={() => setHovered(false)}
+      style={{
+        display: 'flex',
+        alignItems: 'center',
+        justifyContent: 'space-between',
+        gap: 8,
+        padding: '11px 12px',
+        marginBottom: 2,
+        fontSize: large ? 15 : 13,
+        color: '#fff',
+        fontWeight: active || hovered ? 700 : 400,
+        borderLeft: active ? '2px solid #E8266F' : '2px solid transparent',
+        paddingLeft: active ? basePadding - 2 : basePadding,
+        textDecoration: 'none',
+      }}
+    >
+      <span>{children}</span>
+      {trailingIcon}
+    </Link>
+  )
+}
+
+function ChevronIcon({ open }: { open: boolean }) {
+  return (
+    <svg
+      width="10" height="10" viewBox="0 0 10 10"
+      style={{ transform: open ? 'rotate(0deg)' : 'rotate(-90deg)', transition: 'transform 0.2s ease', opacity: 0.7, flexShrink: 0 }}
+    >
+      <path d="M2 3.5L5 6.5L8 3.5" stroke="white" strokeWidth="1.5" fill="none" strokeLinecap="round" strokeLinejoin="round" />
+    </svg>
+  )
 }
 
 export default function DashboardLayout({ children }: { children: React.ReactNode }) {
@@ -72,29 +110,32 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
         </div>
 
         <nav style={{ flex: 1 }}>
-          <Link href="/dashboard" style={navItemStyle(dashboardActive, false)}>
+          <NavLink href="/dashboard" active={dashboardActive} indented={false} large>
             Dashboard
-          </Link>
+          </NavLink>
 
-          <Link
+          <NavLink
             href="/dashboard/analyse"
+            active={analyseActive}
+            indented={false}
+            large
             onClick={() => setAnalyseOpen(o => !o)}
-            style={navItemStyle(analyseActive, false)}
+            trailingIcon={<ChevronIcon open={analyseOpen} />}
           >
             Analyse
-          </Link>
+          </NavLink>
 
           {analyseOpen && (
             <div>
-              <Link href="/dashboard/contacts" style={navItemStyle(pathname.startsWith('/dashboard/contacts'), true)}>
+              <NavLink href="/dashboard/contacts" active={pathname.startsWith('/dashboard/contacts')} indented>
                 Contacts
-              </Link>
-              <Link href="/dashboard/properties" style={navItemStyle(pathname.startsWith('/dashboard/properties'), true)}>
+              </NavLink>
+              <NavLink href="/dashboard/properties" active={pathname.startsWith('/dashboard/properties')} indented>
                 Properties
-              </Link>
-              <Link href="/dashboard/evaluations" style={navItemStyle(pathname.startsWith('/dashboard/evaluations'), true)}>
+              </NavLink>
+              <NavLink href="/dashboard/evaluations" active={pathname.startsWith('/dashboard/evaluations')} indented>
                 Evaluations
-              </Link>
+              </NavLink>
             </div>
           )}
         </nav>
