@@ -2,12 +2,18 @@
 
 import { useState, useEffect, useRef, useCallback } from 'react'
 import { supabase } from '@/lib/supabase'
-import { btn, card, input, select, sectionTitle, label as labelCls } from '@/lib/styles'
+import { btn, card, input as baseInput, select as baseSelect, sectionTitle, label as labelCls } from '@/lib/styles'
 import { WarningIcon } from '@/lib/icons'
 import { useRouter, useSearchParams } from 'next/navigation'
 import { LEAD_SOURCES, REFERRAL_TYPES, MOTIVATIONS, TIMELINES, REASONS_LOST, CONTACT_TAGS } from '@/lib/evaluationOptions'
 
 const DRAFT_STORAGE_KEY = 'evaluationFormDraft'
+
+// Read-only mode disables every field so the form doubles as the Details
+// view — but a disabled field's greyed-out text shouldn't make filled-in
+// data look empty, so force it black regardless of the disabled state.
+const input = `${baseInput} disabled:!text-[#1a1a1a]`
+const select = `${baseSelect} disabled:!text-[#1a1a1a]`
 
 // ── Types ─────────────────────────────────────────────────────
 type Property = {
@@ -831,7 +837,7 @@ export function EvaluationForm({ evaluationId, readOnly = false, onSaved, onCanc
                 <span key={tag} className="text-xs bg-gray-100 text-gray-600 rounded-full px-2 py-0.5 flex-shrink-0">{tag}</span>
               ))}
               <select value={c.tag_option_id} onChange={e => setContactTag(i, e.target.value)} disabled={readOnly}
-                className="text-xs border border-gray-200 rounded-md px-2 py-1 bg-white text-gray-600 focus:outline-none cursor-pointer flex-shrink-0 disabled:cursor-not-allowed disabled:bg-gray-50">
+                className={`text-xs border border-gray-200 rounded-md px-2 py-1 bg-white focus:outline-none cursor-pointer flex-shrink-0 disabled:cursor-not-allowed disabled:bg-gray-50 ${c.tag_option_id ? 'disabled:!text-[#1a1a1a]' : ''} text-gray-600`}>
                 <option value="">No tag</option>
                 {CONTACT_TAGS.map(t => <option key={t} value={t}>{t}</option>)}
               </select>
