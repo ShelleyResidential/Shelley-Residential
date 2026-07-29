@@ -391,13 +391,14 @@ export default function EvaluationsPage() {
         </div>
       )}
 
-      {!loading && (
-        <p className="text-sm text-gray-400 mb-4">
-          {totalCount} {totalCount === 1 ? 'evaluation' : 'evaluations'}
-        </p>
-      )}
-
-      {paginationControls && <div className="mb-4">{paginationControls}</div>}
+      <div className="flex items-center justify-between flex-wrap gap-3 mb-4">
+        {!loading && (
+          <p className="text-sm text-gray-400">
+            {totalCount} {totalCount === 1 ? 'Evaluation' : 'Evaluations'}
+          </p>
+        )}
+        {paginationControls}
+      </div>
 
       {loading ? (
         <div className="text-center py-20 text-gray-400 text-sm">Loading evaluations…</div>
