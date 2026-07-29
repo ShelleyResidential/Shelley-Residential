@@ -7,6 +7,7 @@ import { canDelete } from '@/lib/permissions'
 import { Breadcrumbs } from '@/lib/Breadcrumbs'
 import { useRouter, useParams, useSearchParams } from 'next/navigation'
 import Link from 'next/link'
+import { EvaluationForm } from '../EvaluationForm'
 
 // ── Types ─────────────────────────────────────────────────────
 type Property = {
@@ -18,47 +19,19 @@ type Property = {
   latitude: number | null; longitude: number | null
 }
 
-type EvalContact = {
-  id: string; is_primary: boolean; sort_order: number
-  tag_option_id: string | null
-  contacts: { id: string; first_name: string; last_name: string; title: string | null; phone_number: string | null; email_address: string | null } | null
-  picklist_options: { label: string } | null
-}
-
 type PipelineStep = {
   id: string; step_key: string; is_complete: boolean
   completed_at: string | null; sort_order: number
 }
 
-type Profile = { id: string; full_name: string | null; email: string | null; role: string | null }
-
 type Evaluation = {
   id: string; status: string; date_captured: string
-  captured_by_user_id: string | null
-  reason_lost: string | null
-  lead_generated_by: string | null
-  lead_source_other_text: string | null; lead_referral_notes: string | null
-  referral_type: string | null
-  motivation_for_selling_notes: string | null; selling_timeline_notes: string | null
   scheduled_at: string | null; calendar_event_link: string | null
-  sellers_agent_user_id: string | null
-  transaction_coordinator_user_id: string | null
-  evaluation_price: number | null
-  marketing_price: number | null
   properties: Property | null
-  lead_source_picklist: { label: string } | null
-  motivation_picklist: { label: string } | null
-  timeline_picklist: { label: string } | null
-  evaluation_contacts: EvalContact[]
   evaluation_pipeline_steps: PipelineStep[]
 }
 
 // ── Helpers ───────────────────────────────────────────────────
-function formatCurrency(value: number | null): string {
-  if (value == null) return '—'
-  return new Intl.NumberFormat('en-ZA', { style: 'currency', currency: 'ZAR', maximumFractionDigits: 0 }).format(value)
-}
-
 function formatAddress(p: Property | null): string {
   if (!p) return 'Unknown address'
   if (p.property_type === 'sectional_title' && p.unit_number) {
@@ -66,14 +39,6 @@ function formatAddress(p: Property | null): string {
   }
   const street = [p.street_number, p.street_name].filter(Boolean).join(' ')
   return [street, p.suburb].filter(Boolean).join(', ') || p.city || 'Unknown address'
-}
-
-function mapsUrl(p: Property | null): string | null {
-  if (!p) return null
-  if (p.google_maps_url) return p.google_maps_url
-  const addr = formatAddress(p)
-  if (addr && addr !== 'Unknown address') return `https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(addr)}`
-  return null
 }
 
 const STEP_LABELS: Record<string, string> = {
@@ -107,17 +72,6 @@ const STATUS_LABELS: Record<string, string> = {
   in_progress: 'In Progress', open: 'Open Mandate', future: 'Future Mandate',
 }
 
-const REASONS_LOST = [
-  { value: 'evaluation_price',  label: 'Evaluation Price' },
-  { value: 'commission',        label: 'Commission' },
-  { value: 'mandate_terms',     label: 'Mandate Terms' },
-  { value: 'agency_size',       label: 'Agency Size' },
-  { value: 'not_mls_member',    label: 'Not an MLS Member' },
-  { value: 'another_agency',    label: 'Another Agency' },
-  { value: 'not_selling',       label: 'Not Selling' },
-  { value: 'other',             label: 'Other (please specify)' },
-]
-
 // ── Page ──────────────────────────────────────────────────────
 export default function EvaluationDetailPage() {
   const router = useRouter()
@@ -130,49 +84,19 @@ export default function EvaluationDetailPage() {
   const [activeTab, setActiveTab]   = useState<'details' | 'inspection' | 'pipeline'>('details')
   const [userId, setUserId]         = useState<string | null>(null)
   const [userEmail, setUserEmail]   = useState<string | null>(null)
-  const [editing, setEditing]       = useState(() => searchParams.get('edit') === '1')
-  const [saving, setSaving]         = useState(false)
-  const [error, setError]           = useState('')
+  const [editing, setEditing]       = useState(() => searchParams.get('edit') === '1' || searchParams.get('newContactId') !== null)
   const [deleting, setDeleting]     = useState(false)
   const [syncing, setSyncing]       = useState(false)
   const [syncError, setSyncError]   = useState('')
-  const [profiles, setProfiles]     = useState<Profile[]>([])
-
-  // Edit form state
-  const [editStatus, setEditStatus]             = useState('')
-  const [editReasonLost, setEditReasonLost]     = useState('')
-  const [editSchedDate, setEditSchedDate] = useState('')
-  const [editSchedTime, setEditSchedTime] = useState('')
-  const editScheduledAt = editSchedDate && editSchedTime ? `${editSchedDate}T${editSchedTime}` : ''
-  const [editMotivationNotes, setEditMotivationNotes] = useState('')
-  const [editTimelineNotes, setEditTimelineNotes] = useState('')
-  const [editLeadReferralNotes, setEditLeadReferralNotes] = useState('')
-  const [editAgentId, setEditAgentId]           = useState('')
-  const [editTcId, setEditTcId]                 = useState('')
-  const [editEvaluationPrice, setEditEvaluationPrice] = useState('')
-  const [editMarketingPrice, setEditMarketingPrice]   = useState('')
 
   const fetchEvaluation = useCallback(async () => {
     const { data } = await supabase
       .from('evaluations')
       .select(`
-        id, status, date_captured, captured_by_user_id, reason_lost, lead_generated_by,
-        lead_source_other_text, lead_referral_notes, referral_type,
-        motivation_for_selling_notes, selling_timeline_notes,
-        scheduled_at, calendar_event_link,
-        sellers_agent_user_id, transaction_coordinator_user_id,
-        evaluation_price, marketing_price,
+        id, status, date_captured, scheduled_at, calendar_event_link,
         properties (id, property_type, unit_number, complex_or_building_name,
           street_number, street_name, suburb, city, province, postal_code,
           google_maps_url, latitude, longitude),
-        lead_source_picklist:lead_source_option_id (label),
-        motivation_picklist:motivation_for_selling_option_id (label),
-        timeline_picklist:selling_timeline_option_id (label),
-        evaluation_contacts (
-          id, is_primary, sort_order, tag_option_id,
-          contacts (id, first_name, last_name, title, phone_number, email_address),
-          picklist_options:tag_option_id (label)
-        ),
         evaluation_pipeline_steps (id, step_key, is_complete, completed_at, sort_order)
       `)
       .eq('id', id)
@@ -190,18 +114,6 @@ export default function EvaluationDetailPage() {
       }
 
       setEvaluation(ev)
-      setEditStatus(ev.status)
-      setEditReasonLost(ev.reason_lost ?? '')
-      const schedIso = ev.scheduled_at ? ev.scheduled_at.slice(0, 16) : ''
-      setEditSchedDate(schedIso ? schedIso.slice(0, 10) : '')
-      setEditSchedTime(schedIso ? schedIso.slice(11, 16) : '')
-      setEditMotivationNotes(ev.motivation_for_selling_notes ?? '')
-      setEditTimelineNotes(ev.selling_timeline_notes ?? '')
-      setEditLeadReferralNotes(ev.lead_referral_notes ?? '')
-      setEditAgentId(ev.sellers_agent_user_id ?? '')
-      setEditTcId(ev.transaction_coordinator_user_id ?? '')
-      setEditEvaluationPrice(ev.evaluation_price != null ? String(ev.evaluation_price) : '')
-      setEditMarketingPrice(ev.marketing_price != null ? String(ev.marketing_price) : '')
     }
     setLoading(false)
   }, [id])
@@ -210,9 +122,6 @@ export default function EvaluationDetailPage() {
     supabase.auth.getUser().then(({ data }) => {
       if (!data.user) router.push('/')
       else { setUserId(data.user.id); setUserEmail(data.user.email ?? null) }
-    })
-    supabase.from('profiles').select('id, full_name, email, role').then(({ data }) => {
-      setProfiles((data ?? []) as Profile[])
     })
     fetchEvaluation()
   }, [router, fetchEvaluation])
@@ -223,30 +132,6 @@ export default function EvaluationDetailPage() {
     const { error: err } = await supabase.from('evaluations').delete().eq('id', id)
     if (err) { alert(err.message); setDeleting(false); return }
     router.push('/dashboard/evaluations')
-  }
-
-  async function saveEdit() {
-    setSaving(true)
-    setError('')
-    // Booking a date automatically moves a fresh evaluation to Scheduled.
-    const finalStatus = (editScheduledAt && editStatus === 'new') ? 'scheduled' : editStatus
-    const { error: err } = await supabase.from('evaluations').update({
-      status:                   finalStatus,
-      reason_lost:              finalStatus === 'lost' ? (editReasonLost || null) : null,
-      scheduled_at:             editScheduledAt || null,
-      motivation_for_selling_notes: editMotivationNotes || null,
-      selling_timeline_notes:   editTimelineNotes || null,
-      lead_referral_notes:      editLeadReferralNotes || null,
-      sellers_agent_user_id:    editAgentId || null,
-      transaction_coordinator_user_id: editTcId || null,
-      evaluation_price:         editEvaluationPrice ? Number(editEvaluationPrice) : null,
-      marketing_price:          editMarketingPrice ? Number(editMarketingPrice) : null,
-    }).eq('id', id)
-
-    if (err) { setError(err.message); setSaving(false); return }
-    await fetchEvaluation()
-    setEditing(false)
-    setSaving(false)
   }
 
   async function syncToCalendar() {
@@ -280,15 +165,9 @@ export default function EvaluationDetailPage() {
 
   const ev = evaluation
   const address = formatAddress(ev.properties)
-  const mapLink = mapsUrl(ev.properties)
-  const sortedContacts = [...(ev.evaluation_contacts ?? [])].sort((a, b) => a.sort_order - b.sort_order)
   const sortedSteps    = [...(ev.evaluation_pipeline_steps ?? [])].sort((a, b) => a.sort_order - b.sort_order)
   const stepsComplete  = sortedSteps.filter(s => s.is_complete).length
   const dateStr = new Date(ev.date_captured).toLocaleDateString('en-ZA', { day: 'numeric', month: 'long', year: 'numeric' })
-  const dateTimeCapturedStr = new Date(ev.date_captured).toLocaleString('en-ZA', { dateStyle: 'medium', timeStyle: 'short' })
-  const agentProfile = profiles.find(p => p.id === ev.sellers_agent_user_id) ?? null
-  const tcProfile     = profiles.find(p => p.id === ev.transaction_coordinator_user_id) ?? null
-  const capturedByProfile = profiles.find(p => p.id === ev.captured_by_user_id) ?? null
 
   return (
     <div className="p-10 max-w-4xl">
@@ -338,225 +217,24 @@ export default function EvaluationDetailPage() {
       {/* ── Details tab ── */}
       {activeTab === 'details' && (
         <div className="space-y-6">
+          <EvaluationForm
+            evaluationId={id}
+            readOnly={!editing}
+            onSaved={() => { setEditing(false); fetchEvaluation() }}
+            onCancel={() => setEditing(false)}
+          />
 
-          {/* Motivation & Timeline */}
-          <div className={`${card} p-6`}>
-            <h3 className={sectionTitle}>Motivation & Timeline</h3>
-            {editing ? (
-              <div className="space-y-4">
-                <div>
-                  <label className={labelCls}>Motivation Notes</label>
-                  <textarea value={editMotivationNotes} onChange={e => setEditMotivationNotes(e.target.value)}
-                    rows={2} className={`${input} resize-none`} />
-                </div>
-                <div>
-                  <label className={labelCls}>Timeline Notes</label>
-                  <textarea value={editTimelineNotes} onChange={e => setEditTimelineNotes(e.target.value)}
-                    rows={2} className={`${input} resize-none`} />
-                </div>
-              </div>
-            ) : (
-              <div className="grid grid-cols-2 gap-x-8 gap-y-3 text-sm">
-                <InfoRow label="Motivation" value={ev.motivation_picklist?.label ?? '—'} />
-                <InfoRow label="Timeline" value={ev.timeline_picklist?.label ?? '—'} />
-                {ev.motivation_for_selling_notes && <InfoRow label="Motivation Notes" value={ev.motivation_for_selling_notes} fullWidth />}
-                {ev.selling_timeline_notes && <InfoRow label="Timeline Notes" value={ev.selling_timeline_notes} fullWidth />}
-              </div>
-            )}
-          </div>
-
-          {/* Lead Details */}
-          <div className={`${card} p-6`}>
-            <h3 className={sectionTitle}>Lead Details</h3>
-            {editing ? (
-              <div className="space-y-4">
-                <div>
-                  <label className={labelCls}>Referral Notes</label>
-                  <textarea value={editLeadReferralNotes} onChange={e => setEditLeadReferralNotes(e.target.value)}
-                    rows={3} className={`${input} resize-none`} />
-                </div>
-              </div>
-            ) : (
-              <div className="grid grid-cols-2 gap-x-8 gap-y-3 text-sm">
-                <InfoRow label="Lead Generated By" value={ev.lead_generated_by?.replace('_', ' ') ?? '—'} />
-                <InfoRow label="Lead Source" value={ev.lead_source_picklist?.label ?? (ev.lead_source_other_text ?? '—')} />
-                {ev.referral_type && <InfoRow label="Referral Type" value={ev.referral_type.replace('_', ' ')} />}
-                {ev.lead_referral_notes && <InfoRow label="Referral Notes" value={ev.lead_referral_notes} fullWidth />}
-              </div>
-            )}
-          </div>
-
-          {/* Contact Details */}
-          <div className={`${card} p-6`}>
-            <h3 className={sectionTitle}>Contact Details</h3>
-            {sortedContacts.length === 0 ? (
-              <p className="text-sm text-gray-400">No contacts linked.</p>
-            ) : (
-              <div className="space-y-3">
-                {sortedContacts.map(ec => (
-                  ec.contacts && (
-                    <div key={ec.id} className="flex items-start justify-between gap-4 py-3 border-b border-gray-50 last:border-0">
-                      <div>
-                        <div className="flex items-center gap-2 flex-wrap">
-                          <Link href={`/dashboard/contacts/${ec.contacts.id}`}
-                            className="font-medium text-[#1a1a1a] text-sm hover:underline">
-                            {[ec.contacts.first_name, ec.contacts.last_name].filter(Boolean).join(' ')}
-                          </Link>
-                          {ec.is_primary && (
-                            <span className="text-xs bg-[#1a1a1a] text-white rounded-full px-2 py-0.5">Primary</span>
-                          )}
-                          {ec.picklist_options && (
-                            <span className="text-xs bg-gray-100 text-gray-600 rounded-full px-2 py-0.5">{ec.picklist_options.label}</span>
-                          )}
-                        </div>
-                        <div className="flex gap-4 mt-1 text-xs text-gray-500">
-                          {ec.contacts.phone_number && <span>{ec.contacts.phone_number}</span>}
-                          {ec.contacts.email_address && <span>{ec.contacts.email_address}</span>}
-                        </div>
-                      </div>
-                    </div>
-                  )
-                ))}
-              </div>
-            )}
-          </div>
-
-          {/* Property Details */}
-          <div className={`${card} p-6`}>
-            <h3 className={sectionTitle}>Property Details</h3>
-            <div className="grid grid-cols-2 gap-x-8 gap-y-3 text-sm">
-              <InfoRow label="Type" value={ev.properties?.property_type?.replace('_', ' ') ?? '—'} />
-              {ev.properties?.unit_number && <InfoRow label="Unit" value={ev.properties.unit_number} />}
-              {ev.properties?.complex_or_building_name && <InfoRow label="Building" value={ev.properties.complex_or_building_name} />}
-              <InfoRow label="Address"
-                value={mapLink
-                  ? <a href={mapLink} target="_blank" rel="noopener noreferrer" className="text-blue-600 hover:underline">{address}</a>
-                  : address}
-              />
-              {ev.properties?.suburb && <InfoRow label="Suburb" value={ev.properties.suburb} />}
-              {ev.properties?.city && <InfoRow label="City" value={ev.properties.city} />}
-              {ev.properties?.province && <InfoRow label="Province" value={ev.properties.province} />}
-            </div>
-          </div>
-
-          {/* Evaluation Details */}
-          <div className={`${card} p-6`}>
-            <h3 className={sectionTitle}>Evaluation Details</h3>
-            <div className="grid grid-cols-2 gap-x-8 gap-y-3 text-sm mb-4">
-              <InfoRow label="Date & Time Captured" value={dateTimeCapturedStr} />
-              <InfoRow label="Captured By" value={capturedByProfile?.full_name ?? capturedByProfile?.email ?? '—'} />
-            </div>
-            {editing ? (
-              <div className="space-y-4">
-                <div>
-                  <label className={labelCls}>Evaluation Status</label>
-                  <select value={editStatus} onChange={e => setEditStatus(e.target.value)} className={select}>
-                    <option value="new">New</option>
-                    <option value="scheduled">Scheduled</option>
-                    <option value="completed">Completed</option>
-                    <option value="presented">Presented</option>
-                    <option value="follow_up">Follow-Up</option>
-                    <option value="won">Won</option>
-                    <option value="lost">Lost</option>
-                    <option value="cancelled">Cancelled</option>
-                    <option value="in_progress">In Progress (legacy)</option>
-                    <option value="open">Open Mandate (legacy)</option>
-                    <option value="future">Future Mandate (legacy)</option>
-                  </select>
-                </div>
-                {editStatus === 'lost' && (
-                  <div>
-                    <label className={labelCls}>Reason Lost</label>
-                    <select value={editReasonLost} onChange={e => setEditReasonLost(e.target.value)} className={select}>
-                      <option value="">—</option>
-                      {REASONS_LOST.map(r => <option key={r.value} value={r.label}>{r.label}</option>)}
-                    </select>
-                  </div>
-                )}
-                <div className="grid grid-cols-2 gap-4">
-                  <div>
-                    <label className={labelCls}>Agent</label>
-                    <select value={editAgentId} onChange={e => setEditAgentId(e.target.value)} className={select}>
-                      <option value="">—</option>
-                      {profiles.filter(p => p.role === 'agent').map(p => (
-                        <option key={p.id} value={p.id}>{p.full_name ?? p.email}</option>
-                      ))}
-                    </select>
-                  </div>
-                  <div>
-                    <label className={labelCls}>TC</label>
-                    <select value={editTcId} onChange={e => setEditTcId(e.target.value)} className={select}>
-                      <option value="">—</option>
-                      {profiles.filter(p => p.role === 'transaction_coordinator').map(p => (
-                        <option key={p.id} value={p.id}>{p.full_name ?? p.email}</option>
-                      ))}
-                    </select>
-                  </div>
-                </div>
-                <div>
-                  <span className={labelCls}>Evaluation Date and Time</span>
-                  <div className="grid grid-cols-2 gap-4 mt-1">
-                    <div>
-                      <label className="text-xs text-gray-400 mb-1 block">Date</label>
-                      <input type="date" value={editSchedDate} onChange={e => setEditSchedDate(e.target.value)} className={input} />
-                    </div>
-                    <div>
-                      <label className="text-xs text-gray-400 mb-1 block">Time</label>
-                      <input type="time" value={editSchedTime} onChange={e => setEditSchedTime(e.target.value)} className={input} />
-                    </div>
-                  </div>
-                </div>
-                <div className="grid grid-cols-2 gap-4">
-                  <div>
-                    <label className={labelCls}>Evaluation Price</label>
-                    <input type="number" value={editEvaluationPrice} onChange={e => setEditEvaluationPrice(e.target.value)} className={input} placeholder="0" />
-                  </div>
-                  <div>
-                    <label className={labelCls}>Marketing Price</label>
-                    <input type="number" value={editMarketingPrice} onChange={e => setEditMarketingPrice(e.target.value)} className={input} placeholder="0" />
-                  </div>
-                </div>
-              </div>
-            ) : (
-              <>
-                <div className="grid grid-cols-2 gap-x-8 gap-y-3 text-sm">
-                  <InfoRow label="Evaluation Status" value={STATUS_LABELS[ev.status] ?? ev.status} />
-                  {ev.status === 'lost' && ev.reason_lost && <InfoRow label="Reason Lost" value={ev.reason_lost} />}
-                  <InfoRow label="Agent" value={agentProfile?.full_name ?? agentProfile?.email ?? '—'} />
-                  <InfoRow label="TC" value={tcProfile?.full_name ?? tcProfile?.email ?? '—'} />
-                  <InfoRow label="Evaluation Date and Time"
-                    value={ev.scheduled_at
-                      ? new Date(ev.scheduled_at).toLocaleString('en-ZA', { dateStyle: 'medium', timeStyle: 'short' })
-                      : '—'}
-                  />
-                  {ev.calendar_event_link && (
-                    <InfoRow label="Calendar" value={<a href={ev.calendar_event_link} target="_blank" rel="noopener noreferrer" className="text-blue-600 hover:underline">View event ↗</a>} />
-                  )}
-                  <InfoRow label="Evaluation Price" value={formatCurrency(ev.evaluation_price)} />
-                  <InfoRow label="Marketing Price" value={formatCurrency(ev.marketing_price)} />
-                </div>
-                {ev.scheduled_at && (
-                  <div className="mt-4 flex items-center gap-3 flex-wrap">
-                    <button onClick={syncToCalendar} disabled={syncing} className={btn.secondary}>
-                      {syncing ? 'Syncing…' : ev.calendar_event_link ? '↻ Update Google Calendar' : '+ Add to Google Calendar'}
-                    </button>
-                    {syncError && <p className="text-xs text-red-500">{syncError}</p>}
-                  </div>
-                )}
-              </>
-            )}
-          </div>
-
-          {/* Edit controls */}
-          {editing && (
-            <div className="space-y-3">
-              {error && <p className="text-sm text-red-500 bg-red-50 px-4 py-3 rounded-lg">{error}</p>}
-              <div className="flex gap-3">
-                <button onClick={() => setEditing(false)} className={`${btn.secondary} flex-1`}>Cancel</button>
-                <button onClick={saveEdit} disabled={saving} className={`${btn.primary} flex-1`}>
-                  {saving ? 'Saving…' : 'Save Changes'}
-                </button>
-              </div>
+          {!editing && ev.scheduled_at && (
+            <div className="flex items-center gap-3 flex-wrap">
+              <button onClick={syncToCalendar} disabled={syncing} className={btn.secondary}>
+                {syncing ? 'Syncing…' : ev.calendar_event_link ? '↻ Update Google Calendar' : '+ Add to Google Calendar'}
+              </button>
+              {ev.calendar_event_link && (
+                <a href={ev.calendar_event_link} target="_blank" rel="noopener noreferrer" className="text-sm text-blue-600 hover:underline">
+                  View event ↗
+                </a>
+              )}
+              {syncError && <p className="text-xs text-red-500">{syncError}</p>}
             </div>
           )}
         </div>
@@ -616,16 +294,6 @@ export default function EvaluationDetailPage() {
           </div>
         </div>
       )}
-    </div>
-  )
-}
-
-// ── InfoRow helper ────────────────────────────────────────────
-function InfoRow({ label, value, fullWidth }: { label: string; value: React.ReactNode; fullWidth?: boolean }) {
-  return (
-    <div className={fullWidth ? 'col-span-2' : ''}>
-      <p className="text-xs text-gray-400 mb-0.5">{label}</p>
-      <p className="text-[#1a1a1a] capitalize">{value ?? '—'}</p>
     </div>
   )
 }
