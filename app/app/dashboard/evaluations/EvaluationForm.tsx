@@ -13,7 +13,7 @@ const DRAFT_STORAGE_KEY = 'evaluationFormDraft'
 // view — but a disabled field's greyed-out text shouldn't make filled-in
 // data look empty, so force it black regardless of the disabled state.
 const input = `${baseInput} disabled:!text-[#1a1a1a]`
-const select = `${baseSelect} disabled:!text-[#1a1a1a]`
+const select = `${baseSelect} disabled:!text-[#1a1a1a] disabled:appearance-none`
 
 // ── Types ─────────────────────────────────────────────────────
 type Property = {
@@ -837,7 +837,7 @@ export function EvaluationForm({ evaluationId, readOnly = false, onSaved, onCanc
                 <span key={tag} className="text-xs bg-gray-100 text-gray-600 rounded-full px-2 py-0.5 flex-shrink-0">{tag}</span>
               ))}
               <select value={c.tag_option_id} onChange={e => setContactTag(i, e.target.value)} disabled={readOnly}
-                className={`text-xs border border-gray-200 rounded-md px-2 py-1 bg-white focus:outline-none cursor-pointer flex-shrink-0 disabled:cursor-not-allowed disabled:bg-gray-50 ${c.tag_option_id ? 'disabled:!text-[#1a1a1a]' : ''} text-gray-600`}>
+                className={`text-xs border border-gray-200 rounded-md px-2 py-1 bg-white focus:outline-none cursor-pointer flex-shrink-0 disabled:cursor-not-allowed disabled:bg-gray-50 disabled:appearance-none ${c.tag_option_id ? 'disabled:!text-[#1a1a1a]' : ''} text-gray-600`}>
                 <option value="">No tag</option>
                 {CONTACT_TAGS.map(t => <option key={t} value={t}>{t}</option>)}
               </select>
