@@ -427,7 +427,7 @@ export default function EvaluationsPage() {
                     onClick={() => router.push(`/dashboard/evaluations/${ev.id}`)}
                     className={`cursor-pointer hover:bg-gray-100 transition-colors ${i % 2 === 0 ? 'bg-white' : 'bg-gray-50'}`}
                   >
-                    <td className="px-4 py-3 whitespace-nowrap" onClick={e => e.stopPropagation()}>
+                    <td className="px-3 py-3 whitespace-nowrap" onClick={e => e.stopPropagation()}>
                       <input
                         type="radio"
                         name="selected-evaluation"
@@ -437,12 +437,12 @@ export default function EvaluationsPage() {
                         className="w-4 h-4 border-gray-300 accent-[#E8266F] cursor-pointer"
                       />
                     </td>
-                    <td className="px-4 py-3 whitespace-nowrap">
+                    <td className="px-3 py-3 whitespace-nowrap">
                       <span className={`text-xs px-2 py-0.5 rounded-full font-medium ${statusMeta.colour}`}>
                         {statusMeta.label}
                       </span>
                     </td>
-                    <td className="px-4 py-3 whitespace-nowrap">
+                    <td className="px-3 py-3 max-w-[220px]">
                       {mapsUrl(ev.properties) ? (
                         <a
                           href={mapsUrl(ev.properties)!}
@@ -457,10 +457,10 @@ export default function EvaluationsPage() {
                         <span className="font-medium text-[#1a1a1a] underline">{formatAddress(ev.properties)}</span>
                       )}
                     </td>
-                    <td className="px-4 py-3 text-gray-500 whitespace-nowrap">{date}</td>
-                    <td className="px-4 py-3 text-gray-500 whitespace-nowrap">{agent?.full_name ?? agent?.email ?? '—'}</td>
-                    <td className="px-4 py-3 text-gray-500 whitespace-nowrap">{tc?.full_name ?? tc?.email ?? '—'}</td>
-                    <td className="px-4 py-3 whitespace-nowrap">
+                    <td className="px-3 py-3 text-gray-500 whitespace-nowrap">{date}</td>
+                    <td className="px-3 py-3 text-gray-500 whitespace-nowrap">{agent?.full_name ?? agent?.email ?? '—'}</td>
+                    <td className="px-3 py-3 text-gray-500 whitespace-nowrap">{tc?.full_name ?? tc?.email ?? '—'}</td>
+                    <td className="px-3 py-3 whitespace-nowrap">
                       {getSeller(ev) ? (
                         <button
                           onClick={e => { e.stopPropagation(); setSelectedContact(getSeller(ev)) }}
@@ -472,11 +472,11 @@ export default function EvaluationsPage() {
                         <span className="text-gray-500">—</span>
                       )}
                     </td>
-                    <td className="px-4 py-3 text-gray-500 whitespace-nowrap">
+                    <td className="px-3 py-3 text-gray-500 max-w-[160px]">
                       {leadSource}
                     </td>
-                    <td className="px-4 py-3 text-gray-500 whitespace-nowrap">{formatCurrency(ev.evaluation_price)}</td>
-                    <td className="px-4 py-3 text-gray-500 whitespace-nowrap">{formatCurrency(ev.marketing_price)}</td>
+                    <td className="px-3 py-3 text-gray-500 whitespace-nowrap">{formatCurrency(ev.evaluation_price)}</td>
+                    <td className="px-3 py-3 text-gray-500 whitespace-nowrap">{formatCurrency(ev.marketing_price)}</td>
                   </tr>
                 )
               })}
@@ -504,16 +504,16 @@ export default function EvaluationsPage() {
 function TableHeaderRow() {
   return (
     <tr className="border-b border-gray-100 text-left">
-      <th className="px-4 py-3 whitespace-nowrap" />
-      <th className="px-4 py-3 font-semibold text-[#1a1a1a] whitespace-nowrap text-xs uppercase tracking-wide">Status</th>
-      <th className="px-4 py-3 font-semibold text-[#1a1a1a] whitespace-nowrap text-xs uppercase tracking-wide">Address</th>
-      <th className="px-4 py-3 font-semibold text-[#1a1a1a] whitespace-nowrap text-xs uppercase tracking-wide">Date</th>
-      <th className="px-4 py-3 font-semibold text-[#1a1a1a] whitespace-nowrap text-xs uppercase tracking-wide">Agent</th>
-      <th className="px-4 py-3 font-semibold text-[#1a1a1a] whitespace-nowrap text-xs uppercase tracking-wide">TC</th>
-      <th className="px-4 py-3 font-semibold text-[#1a1a1a] whitespace-nowrap text-xs uppercase tracking-wide">Contact</th>
-      <th className="px-4 py-3 font-semibold text-[#1a1a1a] whitespace-nowrap text-xs uppercase tracking-wide">Lead Source</th>
-      <th className="px-4 py-3 font-semibold text-[#1a1a1a] whitespace-nowrap text-xs uppercase tracking-wide">Evaluation Price</th>
-      <th className="px-4 py-3 font-semibold text-[#1a1a1a] whitespace-nowrap text-xs uppercase tracking-wide">Marketing Price</th>
+      <th className="px-3 py-3 whitespace-nowrap" />
+      <th className="px-3 py-3 font-semibold text-[#1a1a1a] whitespace-nowrap text-xs uppercase tracking-wide">Status</th>
+      <th className="px-3 py-3 font-semibold text-[#1a1a1a] whitespace-nowrap text-xs uppercase tracking-wide">Address</th>
+      <th className="px-3 py-3 font-semibold text-[#1a1a1a] whitespace-nowrap text-xs uppercase tracking-wide">Date</th>
+      <th className="px-3 py-3 font-semibold text-[#1a1a1a] whitespace-nowrap text-xs uppercase tracking-wide">Agent</th>
+      <th className="px-3 py-3 font-semibold text-[#1a1a1a] whitespace-nowrap text-xs uppercase tracking-wide">TC</th>
+      <th className="px-3 py-3 font-semibold text-[#1a1a1a] whitespace-nowrap text-xs uppercase tracking-wide">Contact</th>
+      <th className="px-3 py-3 font-semibold text-[#1a1a1a] whitespace-nowrap text-xs uppercase tracking-wide">Lead Source</th>
+      <th className="px-3 py-3 font-semibold text-[#1a1a1a] whitespace-nowrap text-xs uppercase tracking-wide">Evaluation Price</th>
+      <th className="px-3 py-3 font-semibold text-[#1a1a1a] whitespace-nowrap text-xs uppercase tracking-wide">Marketing Price</th>
     </tr>
   )
 }
