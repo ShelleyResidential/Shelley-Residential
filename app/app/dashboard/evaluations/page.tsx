@@ -3,7 +3,6 @@
 import { useState, useEffect, useCallback, useRef } from 'react'
 import { supabase } from '@/lib/supabase'
 import { btn, card, input } from '@/lib/styles'
-import { canDelete } from '@/lib/permissions'
 import { Breadcrumbs } from '@/lib/Breadcrumbs'
 import { useRouter } from 'next/navigation'
 import Link from 'next/link'
@@ -165,11 +164,9 @@ export default function EvaluationsPage() {
   const [filterStatus, setFilterStatus] = useState('')
   const [myOnly, setMyOnly]           = useState(false)
   const [userId, setUserId]           = useState<string | null>(null)
-  const [userEmail, setUserEmail]     = useState<string | null>(null)
   const [page, setPage]               = useState(1)
   const [totalCount, setTotalCount]   = useState(0)
   const [selectedId, setSelectedId] = useState<string | null>(null)
-  const [bulkDeleting, setBulkDeleting] = useState(false)
   const [selectedContact, setSelectedContact] = useState<Contact | null>(null)
 
   const totalPages = Math.max(1, Math.ceil(totalCount / PAGE_SIZE))
@@ -254,7 +251,6 @@ export default function EvaluationsPage() {
     supabase.auth.getUser().then(({ data }) => {
       if (!data.user) { router.push('/'); return }
       setUserId(data.user.id)
-      setUserEmail(data.user.email ?? null)
     })
     supabase.from('profiles').select('id, full_name, email').then(({ data }) => {
       const map: Record<string, Profile> = {}
@@ -275,17 +271,6 @@ export default function EvaluationsPage() {
 
   function toggleSelected(id: string) {
     setSelectedId(prev => prev === id ? null : id)
-  }
-
-  async function deleteSelected() {
-    if (!selectedId) return
-    if (!confirm('Delete this evaluation? This cannot be undone.')) return
-    setBulkDeleting(true)
-    const { error } = await supabase.from('evaluations').delete().eq('id', selectedId)
-    setBulkDeleting(false)
-    if (error) { alert(error.message); return }
-    setSelectedId(null)
-    fetchEvaluations()
   }
 
   const rowActionControls = selectedId && (
@@ -374,22 +359,6 @@ export default function EvaluationsPage() {
         </label>
         {rowActionControls}
       </div>
-
-      {selectedId && (
-        <div className="flex items-center justify-between gap-3 bg-[#1a1a1a] text-white rounded-lg px-4 py-3 mb-4">
-          <span className="text-sm">1 selected</span>
-          <div className="flex items-center gap-2">
-            <button onClick={() => setSelectedId(null)} className="text-xs text-gray-300 hover:text-white transition-colors cursor-pointer">
-              Clear
-            </button>
-            {canDelete(userEmail) && (
-              <button onClick={deleteSelected} disabled={bulkDeleting} className={`${btn.danger} py-1.5 cursor-pointer`}>
-                {bulkDeleting ? 'Deleting…' : 'Delete Selected'}
-              </button>
-            )}
-          </div>
-        </div>
-      )}
 
       <div className="flex items-center justify-between flex-wrap gap-3 mb-4">
         {!loading && (
