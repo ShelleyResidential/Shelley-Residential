@@ -2,7 +2,7 @@
 
 import { useState, useEffect, useCallback, useRef } from 'react'
 import { supabase } from '@/lib/supabase'
-import { btn, card, input } from '@/lib/styles'
+import { btn, card, input, sectionTitle } from '@/lib/styles'
 import { Breadcrumbs } from '@/lib/Breadcrumbs'
 import { useRouter } from 'next/navigation'
 import Link from 'next/link'
@@ -107,10 +107,14 @@ function formatCurrency(value: number | null): string {
   return new Intl.NumberFormat('en-ZA', { style: 'currency', currency: 'ZAR', maximumFractionDigits: 0 }).format(value)
 }
 
-function getSeller(ev: Evaluation): Contact | null {
-  const seller = ev.evaluation_contacts?.find(c => c.picklist_options?.label === 'Seller')
+function getSellerLink(ev: Evaluation): Evaluation['evaluation_contacts'][number] | null {
+  return ev.evaluation_contacts?.find(c => c.picklist_options?.label === 'Seller')
     ?? ev.evaluation_contacts?.find(c => c.is_primary)
-  return seller?.contacts ?? null
+    ?? null
+}
+
+function getSeller(ev: Evaluation): Contact | null {
+  return getSellerLink(ev)?.contacts ?? null
 }
 
 function sellerName(ev: Evaluation): string {
@@ -167,7 +171,13 @@ export default function EvaluationsPage() {
   const [page, setPage]               = useState(1)
   const [totalCount, setTotalCount]   = useState(0)
   const [selectedId, setSelectedId] = useState<string | null>(null)
-  const [selectedContact, setSelectedContact] = useState<Contact | null>(null)
+  const [selectedContact, setSelectedContact] = useState<{ contact: Contact; evaluationTag: string | null } | null>(null)
+
+  function openContactModal(ev: Evaluation) {
+    const link = getSellerLink(ev)
+    if (!link?.contacts) return
+    setSelectedContact({ contact: link.contacts, evaluationTag: link.picklist_options?.label ?? null })
+  }
 
   const totalPages = Math.max(1, Math.ceil(totalCount / PAGE_SIZE))
 
@@ -411,29 +421,31 @@ export default function EvaluationsPage() {
                         {statusMeta.label}
                       </span>
                     </td>
-                    <td className="px-3 py-3 max-w-[220px]">
+                    <td className="px-3 py-3 max-w-[200px]">
                       {mapsUrl(ev.properties) ? (
                         <a
                           href={mapsUrl(ev.properties)!}
                           target="_blank"
                           rel="noopener noreferrer"
                           onClick={e => e.stopPropagation()}
-                          className="font-medium text-[#1a1a1a] underline hover:font-bold transition-all"
+                          title={formatAddress(ev.properties)}
+                          className="block truncate font-medium text-[#1a1a1a] underline hover:font-bold transition-all"
                         >
                           {formatAddress(ev.properties)}
                         </a>
                       ) : (
-                        <span className="font-medium text-[#1a1a1a] underline">{formatAddress(ev.properties)}</span>
+                        <span title={formatAddress(ev.properties)} className="block truncate font-medium text-[#1a1a1a] underline">{formatAddress(ev.properties)}</span>
                       )}
                     </td>
                     <td className="px-3 py-3 text-gray-500 whitespace-nowrap">{date}</td>
-                    <td className="px-3 py-3 text-gray-500 whitespace-nowrap">{agent?.full_name ?? agent?.email ?? '—'}</td>
-                    <td className="px-3 py-3 text-gray-500 whitespace-nowrap">{tc?.full_name ?? tc?.email ?? '—'}</td>
-                    <td className="px-3 py-3 whitespace-nowrap">
+                    <td className="px-3 py-3 text-gray-500 max-w-[130px] truncate" title={agent?.full_name ?? agent?.email ?? undefined}>{agent?.full_name ?? agent?.email ?? '—'}</td>
+                    <td className="px-3 py-3 text-gray-500 max-w-[130px] truncate" title={tc?.full_name ?? tc?.email ?? undefined}>{tc?.full_name ?? tc?.email ?? '—'}</td>
+                    <td className="px-3 py-3 max-w-[150px]">
                       {getSeller(ev) ? (
                         <button
-                          onClick={e => { e.stopPropagation(); setSelectedContact(getSeller(ev)) }}
-                          className="text-gray-500 underline hover:font-bold hover:text-[#1a1a1a] transition-all"
+                          onClick={e => { e.stopPropagation(); openContactModal(ev) }}
+                          title={sellerName(ev)}
+                          className="block w-full truncate text-left text-gray-500 underline hover:font-bold hover:text-[#1a1a1a] transition-all"
                         >
                           {sellerName(ev)}
                         </button>
@@ -441,7 +453,7 @@ export default function EvaluationsPage() {
                         <span className="text-gray-500">—</span>
                       )}
                     </td>
-                    <td className="px-3 py-3 text-gray-500 max-w-[160px]">
+                    <td className="px-3 py-3 text-gray-500 max-w-[140px] truncate" title={leadSource}>
                       {leadSource}
                     </td>
                     <td className="px-3 py-3 text-gray-500 whitespace-nowrap">{formatCurrency(ev.evaluation_price)}</td>
@@ -462,7 +474,11 @@ export default function EvaluationsPage() {
       {rowActionControls && <div className="mt-4">{rowActionControls}</div>}
 
       {selectedContact && (
-        <ContactDetailsModal contact={selectedContact} onClose={() => setSelectedContact(null)} />
+        <ContactDetailsModal
+          contact={selectedContact.contact}
+          evaluationTag={selectedContact.evaluationTag}
+          onClose={() => setSelectedContact(null)}
+        />
       )}
     </div>
   )
@@ -540,28 +556,35 @@ function RowActionButtons({ onEdit, onDetails }: { onEdit?: () => void; onDetail
 }
 
 // ── Contact details pop-up ───────────────────────────────────
-// Mirrors the layout of the Contacts section's own detail page (Basic
-// Information / Contact Details / Personal Details / Work Details), so a
-// contact looks the same whether viewed from here or its own page.
-function ContactDetailsModal({ contact, onClose }: { contact: Contact; onClose: () => void }) {
+// Mirrors the layout and sizing of the Contacts section's own detail page
+// (Basic Information / Contact Details / Personal Details / Work Details),
+// so a contact looks identical whether viewed from here or its own page.
+// The "Tags" row shows the role this contact plays on THIS evaluation
+// (e.g. Seller/Attorney), not the contact's own global tags.
+function ContactDetailsModal({ contact, evaluationTag, onClose }: { contact: Contact; evaluationTag: string | null; onClose: () => void }) {
   return (
     <div className="fixed inset-0 bg-black/40 flex items-center justify-center z-50 p-4" onClick={onClose}>
       <div
-        className="bg-white rounded-2xl shadow-xl max-w-lg w-full max-h-[90vh] overflow-y-auto"
+        className="bg-white rounded-2xl shadow-xl max-w-2xl w-full max-h-[90vh] overflow-y-auto"
         onClick={e => e.stopPropagation()}
       >
-        <div className="flex items-start justify-between gap-4 p-6 border-b border-gray-100">
-          <h3 className="text-lg font-bold text-[#1a1a1a]">{fullName(contact)}</h3>
+        <div className="flex items-center justify-between gap-4 px-8 py-4 border-b border-gray-100">
+          <div className="flex items-center gap-3">
+            <h3 className="text-lg font-bold text-[#1a1a1a]">{fullName(contact)}</h3>
+            <span className={`text-xs px-2 py-0.5 rounded-full font-medium ${
+              contact.status === 'Active' ? 'bg-green-50 text-green-700' : 'bg-gray-100 text-gray-500'
+            }`}>{contact.status}</span>
+          </div>
           <button onClick={onClose} className="text-gray-400 hover:text-[#1a1a1a] text-xl leading-none flex-shrink-0">×</button>
         </div>
 
-        <div className="p-6 space-y-4">
+        <div className="max-w-2xl mx-auto px-4 py-8 space-y-4">
           <ContactInfoSection title="Basic Information">
             <ContactRow label="Title" value={contact.title} />
             <ContactRow label="First Name" value={contact.first_name} />
             <ContactRow label="Surname" value={contact.last_name} />
             <ContactRow label="Status" value={contact.status} />
-            <ContactRow label="Tags" value={contact.tags?.length ? contact.tags.join(', ') : null} />
+            <ContactRow label="Tags" value={evaluationTag} />
             <ContactRow label="ID Number" value={contact.id_number} />
             <ContactRow label="Date Added" value={formatDate(contact.date_added)} />
           </ContactInfoSection>
@@ -586,9 +609,7 @@ function ContactDetailsModal({ contact, onClose }: { contact: Contact; onClose: 
             <ContactRow label="Division" value={contact.division} />
             <ContactRow label="Branch" value={contact.branch} />
           </ContactInfoSection>
-        </div>
 
-        <div className="px-6 pb-6">
           <Link href={`/dashboard/contacts/${contact.id}`} className={`${btn.primary} w-full block text-center`}>
             View Full Contact →
           </Link>
@@ -600,8 +621,8 @@ function ContactDetailsModal({ contact, onClose }: { contact: Contact; onClose: 
 
 function ContactInfoSection({ title, children }: { title: string; children: React.ReactNode }) {
   return (
-    <div className="border border-gray-100 rounded-xl p-4">
-      <h4 className="text-xs font-bold text-[#1a1a1a] uppercase tracking-wide mb-3">{title}</h4>
+    <div className={`${card} p-6`}>
+      <h3 className={sectionTitle}>{title}</h3>
       <div className="space-y-3">{children}</div>
     </div>
   )
@@ -624,7 +645,7 @@ function ContactAddressRow({ address }: { address: string | null }) {
         <a
           href={`https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(address)}`}
           target="_blank" rel="noopener noreferrer"
-          className="text-[#1a1a1a] font-medium text-right underline hover:font-bold transition-all"
+          className="text-[#1a1a1a] font-medium text-right underline underline-offset-2 hover:text-blue-600 transition-colors"
         >
           {address}
         </a>

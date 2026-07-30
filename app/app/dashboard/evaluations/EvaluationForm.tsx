@@ -335,7 +335,7 @@ export function EvaluationForm({ evaluationId, readOnly = false, onSaved, onCanc
   // Skip the DB fetch when returning from the Add New Contact page — the
   // sessionStorage draft already holds a fresher, in-progress snapshot.
   useEffect(() => {
-    if (evaluationId && !searchParams.get('newContactId')) {
+    if (evaluationId && !searchParams.get('newContactId') && searchParams.get('resume') !== '1') {
       fetchEvaluation()
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
@@ -389,12 +389,15 @@ export function EvaluationForm({ evaluationId, readOnly = false, onSaved, onCanc
     router.push(`/dashboard/contacts/new?returnTo=${encodeURIComponent(returnPath)}&for=${kind}`)
   }
 
-  // ── Restore progress + apply the newly created contact after returning
-  // from the Add New Contact page.
+  // ── Restore progress after returning from the Add New Contact page —
+  // either with a newly created contact to apply, or (via the "Back to
+  // Evaluation" breadcrumb) with nothing, if the agent bailed out without
+  // creating one.
   useEffect(() => {
     const newContactId = searchParams.get('newContactId')
     const newContactName = searchParams.get('newContactName')
-    if (!newContactId || !newContactName) return
+    const resuming = searchParams.get('resume') === '1'
+    if (!newContactId && !resuming) return
 
     const raw = sessionStorage.getItem(DRAFT_STORAGE_KEY)
     if (raw) {
@@ -403,12 +406,14 @@ export function EvaluationForm({ evaluationId, readOnly = false, onSaved, onCanc
     }
     setInitialLoading(false)
 
-    if (searchParams.get('for') === 'referred_by') {
-      setReferredByContactId(newContactId)
-      setReferredByContactName(newContactName)
-    } else {
-      const newContactTags = (searchParams.get('tags') ?? '').split(',').filter(Boolean)
-      setContacts(prev => [...prev, { contact_id: newContactId, contact_name: newContactName, tag_option_id: '', tags: newContactTags }])
+    if (newContactId && newContactName) {
+      if (searchParams.get('for') === 'referred_by') {
+        setReferredByContactId(newContactId)
+        setReferredByContactName(newContactName)
+      } else {
+        const newContactTags = (searchParams.get('tags') ?? '').split(',').filter(Boolean)
+        setContacts(prev => [...prev, { contact_id: newContactId, contact_name: newContactName, tag_option_id: '', tags: newContactTags }])
+      }
     }
 
     router.replace(returnPath)
@@ -833,9 +838,6 @@ export function EvaluationForm({ evaluationId, readOnly = false, onSaved, onCanc
                 <span className="text-xs bg-[#1a1a1a] text-white rounded-full px-2 py-0.5 flex-shrink-0">Primary</span>
               )}
               <span className="flex-1 min-w-0 truncate">{c.contact_name}</span>
-              {c.tags.map(tag => (
-                <span key={tag} className="text-xs bg-gray-100 text-gray-600 rounded-full px-2 py-0.5 flex-shrink-0">{tag}</span>
-              ))}
               <select value={c.tag_option_id} onChange={e => setContactTag(i, e.target.value)} disabled={readOnly}
                 className={`text-xs border border-gray-200 rounded-md px-2 py-1 bg-white focus:outline-none cursor-pointer flex-shrink-0 disabled:cursor-not-allowed disabled:bg-gray-50 disabled:appearance-none ${c.tag_option_id ? 'disabled:!text-[#1a1a1a]' : ''} text-gray-600`}>
                 <option value="">No tag</option>
