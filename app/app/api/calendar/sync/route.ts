@@ -70,7 +70,8 @@ export async function POST(request: NextRequest) {
   let address = 'Unknown address'
   if (prop) {
     if (prop.property_type === 'sectional_title' && prop.unit_number) {
-      address = `Unit ${prop.unit_number}${prop.complex_or_building_name ? ' ' + prop.complex_or_building_name : ''}${prop.suburb ? ', ' + prop.suburb : ''}`
+      const street = [prop.street_number, prop.street_name].filter(Boolean).join(' ')
+      address = [`Unit ${prop.unit_number}`, prop.complex_or_building_name, street, prop.suburb].filter(Boolean).join(', ')
     } else {
       address = [prop.street_number, prop.street_name, prop.suburb].filter(Boolean).join(' ') || 'Unknown address'
     }

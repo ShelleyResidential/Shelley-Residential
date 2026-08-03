@@ -83,10 +83,10 @@ type Evaluation = LeadInfo & {
 
 function formatAddress(p: Evaluation['properties']): string {
   if (!p) return 'Unknown address'
-  if (p.property_type === 'sectional_title' && p.unit_number) {
-    return `Unit ${p.unit_number}${p.complex_or_building_name ? ' ' + p.complex_or_building_name : ''}${p.suburb ? ', ' + p.suburb : ''}`
-  }
   const street = [p.street_number, p.street_name].filter(Boolean).join(' ')
+  if (p.property_type === 'sectional_title' && p.unit_number) {
+    return [`Unit ${p.unit_number}`, p.complex_or_building_name, street, p.suburb].filter(Boolean).join(', ')
+  }
   return [street, p.suburb].filter(Boolean).join(', ') || p.city || 'Unknown address'
 }
 
