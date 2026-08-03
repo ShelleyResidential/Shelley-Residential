@@ -497,8 +497,8 @@ function TableHeaderRow() {
       <th className="px-3 py-3 font-semibold text-[#1a1a1a] whitespace-nowrap text-xs uppercase tracking-wide w-[10%]">TC</th>
       <th className="px-3 py-3 font-semibold text-[#1a1a1a] whitespace-nowrap text-xs uppercase tracking-wide w-[12%]">Contact</th>
       <th className="px-3 py-3 font-semibold text-[#1a1a1a] whitespace-nowrap text-xs uppercase tracking-wide w-[11%]">Lead Source</th>
-      <th className="px-3 py-3 font-semibold text-[#1a1a1a] whitespace-nowrap text-xs uppercase tracking-wide w-[9%]">Evaluation Price</th>
-      <th className="px-3 py-3 font-semibold text-[#1a1a1a] whitespace-nowrap text-xs uppercase tracking-wide w-[9%]">Marketing Price</th>
+      <th className="px-3 py-3 font-semibold text-[#1a1a1a] truncate overflow-hidden text-xs uppercase tracking-wide w-[9%]">E Price</th>
+      <th className="px-3 py-3 font-semibold text-[#1a1a1a] truncate overflow-hidden text-xs uppercase tracking-wide w-[9%]">M Price</th>
     </tr>
   )
 }

@@ -207,7 +207,7 @@ export default function ContactDetailPage() {
         </div>
       </div>
 
-      <main className="max-w-2xl mx-auto px-4 py-8">
+      <main className="max-w-2xl px-8 py-8">
 
         {/* ── INFO VIEW ── */}
         {tab === 'info' && !editing && (
