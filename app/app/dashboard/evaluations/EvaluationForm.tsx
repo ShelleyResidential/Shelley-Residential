@@ -868,7 +868,7 @@ export function EvaluationForm({ evaluationId, readOnly = false, onSaved, onCanc
               )}
             </div>
             {(c.phone_number || c.email_address) && (
-              <p className="text-xs text-gray-400 mt-0.5">{[c.phone_number, c.email_address].filter(Boolean).join(' | ')}</p>
+              <p className="text-xs text-gray-400 mt-2">{[c.phone_number, c.email_address].filter(Boolean).join(' | ')}</p>
             )}
           </div>
         ) : (

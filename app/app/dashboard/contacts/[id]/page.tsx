@@ -5,7 +5,7 @@ import { supabase } from '@/lib/supabase'
 import { btn, card, input, select, sectionTitle, label as labelCls } from '@/lib/styles'
 import { canDelete } from '@/lib/permissions'
 import { Breadcrumbs } from '@/lib/Breadcrumbs'
-import { useRouter, useParams } from 'next/navigation'
+import { useRouter, useParams, useSearchParams } from 'next/navigation'
 
 const TAGS = [
   'Current Buyer', 'Current Seller', 'Family', 'Friends', 'Homeowner',
@@ -59,7 +59,9 @@ function timeAgo(iso: string) {
 export default function ContactDetailPage() {
   const router = useRouter()
   const params = useParams()
+  const searchParams = useSearchParams()
   const id = params.id as string
+  const fromEvaluations = searchParams.get('from') === 'evaluations'
 
   const [contact, setContact]         = useState<Contact | null>(null)
   const [userId, setUserId]           = useState<string | null>(null)
@@ -169,7 +171,10 @@ export default function ContactDetailPage() {
   return (
     <div className="bg-[#f8f7f4] min-h-screen">
       <div className="px-8 pt-4">
-        <Breadcrumbs items={[{ label: 'Analyse' }, { label: 'Contacts', href: '/dashboard/contacts' }, { label: fullName(contact) }]} />
+        <Breadcrumbs items={fromEvaluations
+          ? [{ label: 'Analyse' }, { label: 'Evaluations', href: '/dashboard/evaluations' }, { label: fullName(contact) }]
+          : [{ label: 'Analyse' }, { label: 'Contacts', href: '/dashboard/contacts' }, { label: fullName(contact) }]
+        } />
       </div>
       {/* Header */}
       <div className="bg-white border-b border-gray-100 px-8 py-4 flex items-center justify-between">

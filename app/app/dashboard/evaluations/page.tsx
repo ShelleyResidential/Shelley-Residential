@@ -2,7 +2,7 @@
 
 import { useState, useEffect, useCallback, useRef } from 'react'
 import { supabase } from '@/lib/supabase'
-import { btn, card, input, sectionTitle } from '@/lib/styles'
+import { btn, card, input } from '@/lib/styles'
 import { Breadcrumbs } from '@/lib/Breadcrumbs'
 import { useRouter } from 'next/navigation'
 import Link from 'next/link'
@@ -122,15 +122,6 @@ function sellerName(ev: Evaluation): string {
   return contact ? `${contact.first_name} ${contact.last_name}`.trim() : '—'
 }
 
-function fullName(c: Contact): string {
-  return [c.title, c.first_name, c.last_name].filter(Boolean).join(' ')
-}
-
-function formatDate(iso: string | null): string {
-  if (!iso) return '—'
-  return new Date(iso).toLocaleDateString('en-ZA', { day: 'numeric', month: 'long', year: 'numeric' })
-}
-
 const STATUS_LABELS: Record<string, { label: string; colour: string }> = {
   // Current statuses
   new:         { label: 'New',            colour: 'bg-blue-50 text-blue-700' },
@@ -171,13 +162,6 @@ export default function EvaluationsPage() {
   const [page, setPage]               = useState(1)
   const [totalCount, setTotalCount]   = useState(0)
   const [selectedId, setSelectedId] = useState<string | null>(null)
-  const [selectedContact, setSelectedContact] = useState<{ contact: Contact; evaluationTag: string | null } | null>(null)
-
-  function openContactModal(ev: Evaluation) {
-    const link = getSellerLink(ev)
-    if (!link?.contacts) return
-    setSelectedContact({ contact: link.contacts, evaluationTag: link.picklist_options?.label ?? null })
-  }
 
   const totalPages = Math.max(1, Math.ceil(totalCount / PAGE_SIZE))
 
@@ -442,13 +426,14 @@ export default function EvaluationsPage() {
                     <td className="px-3 py-3 text-gray-500 truncate" title={tc?.full_name ?? tc?.email ?? undefined}>{tc?.full_name ?? tc?.email ?? '—'}</td>
                     <td className="px-3 py-3 overflow-hidden">
                       {getSeller(ev) ? (
-                        <button
-                          onClick={e => { e.stopPropagation(); openContactModal(ev) }}
+                        <Link
+                          href={`/dashboard/contacts/${getSeller(ev)!.id}?from=evaluations`}
+                          onClick={e => e.stopPropagation()}
                           title={sellerName(ev)}
-                          className="block w-full truncate text-left text-gray-500 underline hover:font-bold hover:text-[#1a1a1a] transition-all"
+                          className="block w-full truncate text-gray-500 underline hover:font-bold hover:text-[#1a1a1a] transition-all"
                         >
                           {sellerName(ev)}
-                        </button>
+                        </Link>
                       ) : (
                         <span className="text-gray-500">—</span>
                       )}
@@ -472,14 +457,6 @@ export default function EvaluationsPage() {
       {paginationControls && <div className="mt-4">{paginationControls}</div>}
 
       {rowActionControls && <div className="mt-4">{rowActionControls}</div>}
-
-      {selectedContact && (
-        <ContactDetailsModal
-          contact={selectedContact.contact}
-          evaluationTag={selectedContact.evaluationTag}
-          onClose={() => setSelectedContact(null)}
-        />
-      )}
     </div>
   )
 }
@@ -551,107 +528,6 @@ function RowActionButtons({ onEdit, onDetails }: { onEdit?: () => void; onDetail
           </div>
         )}
       </div>
-    </div>
-  )
-}
-
-// ── Contact details pop-up ───────────────────────────────────
-// Mirrors the layout and sizing of the Contacts section's own detail page
-// (Basic Information / Contact Details / Personal Details / Work Details),
-// so a contact looks identical whether viewed from here or its own page.
-// The "Tags" row shows the role this contact plays on THIS evaluation
-// (e.g. Seller/Attorney), not the contact's own global tags.
-function ContactDetailsModal({ contact, evaluationTag, onClose }: { contact: Contact; evaluationTag: string | null; onClose: () => void }) {
-  return (
-    <div className="fixed inset-0 bg-black/40 flex items-center justify-center z-50 p-4" onClick={onClose}>
-      <div
-        className="bg-white rounded-2xl shadow-xl max-w-2xl w-full max-h-[90vh] overflow-y-auto"
-        onClick={e => e.stopPropagation()}
-      >
-        <div className="flex items-center justify-between gap-4 px-8 py-4 border-b border-gray-100">
-          <div className="flex items-center gap-3">
-            <h3 className="text-lg font-bold text-[#1a1a1a]">{fullName(contact)}</h3>
-            <span className={`text-xs px-2 py-0.5 rounded-full font-medium ${
-              contact.status === 'Active' ? 'bg-green-50 text-green-700' : 'bg-gray-100 text-gray-500'
-            }`}>{contact.status}</span>
-          </div>
-          <button onClick={onClose} className="text-gray-400 hover:text-[#1a1a1a] text-xl leading-none flex-shrink-0">×</button>
-        </div>
-
-        <div className="max-w-2xl mx-auto px-4 py-8 space-y-4">
-          <ContactInfoSection title="Basic Information">
-            <ContactRow label="Title" value={contact.title} />
-            <ContactRow label="First Name" value={contact.first_name} />
-            <ContactRow label="Surname" value={contact.last_name} />
-            <ContactRow label="Status" value={contact.status} />
-            <ContactRow label="Tags" value={evaluationTag} />
-            <ContactRow label="ID Number" value={contact.id_number} />
-            <ContactRow label="Date Added" value={formatDate(contact.date_added)} />
-          </ContactInfoSection>
-
-          <ContactInfoSection title="Contact Details">
-            <ContactRow label="Phone" value={contact.phone_number} />
-            <ContactRow label="Email" value={contact.email_address} />
-            <ContactRow label="Preference" value={contact.contact_preference} />
-            <ContactAddressRow address={contact.address} />
-          </ContactInfoSection>
-
-          <ContactInfoSection title="Personal Details">
-            <ContactRow label="Marital Status" value={contact.marital_status} />
-            <ContactRow label="Birthday" value={formatDate(contact.birthday)} />
-            <ContactRow label="Wedding Anniversary" value={formatDate(contact.wedding_anniversary)} />
-            <ContactRow label="Home Anniversary" value={formatDate(contact.home_anniversary)} />
-          </ContactInfoSection>
-
-          <ContactInfoSection title="Work Details">
-            <ContactRow label="Occupation" value={contact.occupation} />
-            <ContactRow label="Company" value={contact.company_name} />
-            <ContactRow label="Division" value={contact.division} />
-            <ContactRow label="Branch" value={contact.branch} />
-          </ContactInfoSection>
-
-          <Link href={`/dashboard/contacts/${contact.id}`} className={`${btn.primary} w-full block text-center`}>
-            View Full Contact →
-          </Link>
-        </div>
-      </div>
-    </div>
-  )
-}
-
-function ContactInfoSection({ title, children }: { title: string; children: React.ReactNode }) {
-  return (
-    <div className={`${card} p-6`}>
-      <h3 className={sectionTitle}>{title}</h3>
-      <div className="space-y-3">{children}</div>
-    </div>
-  )
-}
-
-function ContactRow({ label, value }: { label: string; value: string | null | undefined }) {
-  return (
-    <div className="flex justify-between gap-4 text-sm">
-      <span className="text-gray-500 flex-shrink-0">{label}</span>
-      <span className="text-[#1a1a1a] text-right font-medium">{value || '—'}</span>
-    </div>
-  )
-}
-
-function ContactAddressRow({ address }: { address: string | null }) {
-  return (
-    <div className="flex justify-between gap-4 text-sm">
-      <span className="text-gray-500 flex-shrink-0">Address</span>
-      {address ? (
-        <a
-          href={`https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(address)}`}
-          target="_blank" rel="noopener noreferrer"
-          className="text-[#1a1a1a] font-medium text-right underline underline-offset-2 hover:text-blue-600 transition-colors"
-        >
-          {address}
-        </a>
-      ) : (
-        <span className="text-[#1a1a1a] font-medium">—</span>
-      )}
     </div>
   )
 }
