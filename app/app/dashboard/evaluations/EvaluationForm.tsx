@@ -21,14 +21,14 @@ function formatZAR(value: string): string {
   return new Intl.NumberFormat('en-ZA', { style: 'currency', currency: 'ZAR', maximumFractionDigits: 0 }).format(n)
 }
 
-// ── Field: plain label/value text in read-only mode (matching the Contacts
-// detail page's look), the actual editable control once Edit is clicked.
+// ── Field: same label-above-content layout either way — plain text (no
+// box) in read-only mode, the actual editable control once Edit is clicked.
 function Field({ label, readOnly, value, children }: { label: string; readOnly: boolean; value?: React.ReactNode; children: React.ReactNode }) {
   if (readOnly) {
     return (
-      <div className="flex justify-between gap-4 text-sm">
-        <span className="text-gray-500 flex-shrink-0">{label}</span>
-        <span className="text-[#1a1a1a] text-right font-medium">{value ?? '—'}</span>
+      <div>
+        <span className={labelCls}>{label}</span>
+        <p className="text-sm text-[#1a1a1a] py-2.5">{value ?? '—'}</p>
       </div>
     )
   }
@@ -850,11 +850,14 @@ export function EvaluationForm({ evaluationId, readOnly = false, onSaved, onCanc
         )}
 
         {contacts.map((c, i) => readOnly ? (
-          <div key={i} className="flex justify-between gap-4 text-sm mb-2">
-            <span className="text-gray-500 flex-shrink-0">{i === 0 ? 'Primary Contact' : `Contact ${i + 1}`}</span>
-            <span className="text-[#1a1a1a] text-right font-medium">
-              {c.contact_name}{c.tag_option_id ? ` (${c.tag_option_id})` : ''}
-            </span>
+          <div key={i} className="flex items-center gap-2 flex-wrap mb-2 text-sm text-[#1a1a1a]">
+            {i === 0 && (
+              <span className="text-xs bg-[#1a1a1a] text-white rounded-full px-2 py-0.5 flex-shrink-0">Primary</span>
+            )}
+            <span>{c.contact_name}</span>
+            {c.tag_option_id && (
+              <span className="text-xs bg-gray-100 text-gray-600 rounded-full px-2 py-0.5 flex-shrink-0">{c.tag_option_id}</span>
+            )}
           </div>
         ) : (
           <div key={i} className="flex items-center gap-3 mb-2">
@@ -893,15 +896,11 @@ export function EvaluationForm({ evaluationId, readOnly = false, onSaved, onCanc
       {/* ── Property Details ── */}
       <Section title="Property Details">
         {selectedProperty && readOnly ? (
-          <div className="space-y-3">
-            <div className="flex justify-between gap-4 text-sm">
-              <span className="text-gray-500 flex-shrink-0">Address</span>
-              <span className="text-[#1a1a1a] text-right font-medium">{displayAddress(selectedProperty)}</span>
-            </div>
-            <div className="flex justify-between gap-4 text-sm">
-              <span className="text-gray-500 flex-shrink-0">Property Type</span>
-              <span className="text-[#1a1a1a] text-right font-medium capitalize">{selectedProperty.property_type?.replace('_', ' ') || '—'}</span>
-            </div>
+          <div>
+            <p className="font-medium text-[#1a1a1a] text-sm">{displayAddress(selectedProperty)}</p>
+            <p className="text-xs text-gray-400 mt-0.5 capitalize">
+              {selectedProperty.property_type?.replace('_', ' ')}
+            </p>
           </div>
         ) : selectedProperty ? (
           <div className="flex items-center justify-between px-4 py-3 bg-gray-50 rounded-lg border border-gray-200">
