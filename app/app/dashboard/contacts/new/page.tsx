@@ -76,11 +76,13 @@ function AddContactForm() {
     return () => clearTimeout(timer)
   }, [form.first_name, form.last_name, form.phone_number, form.email_address])
 
-  function useExistingContact(match: { id: string; first_name: string; last_name: string; tags: string[] | null }) {
+  function useExistingContact(match: { id: string; first_name: string; last_name: string; tags: string[] | null; phone_number: string | null; email_address: string | null }) {
     if (!returnTo) return
     const name = `${match.first_name} ${match.last_name}`.trim()
     const tagsParam = encodeURIComponent((match.tags ?? []).join(','))
-    router.push(`${returnTo}?newContactId=${match.id}&newContactName=${encodeURIComponent(name)}&for=${returnFor ?? 'contact'}&tags=${tagsParam}`)
+    const phoneParam = encodeURIComponent(match.phone_number ?? '')
+    const emailParam = encodeURIComponent(match.email_address ?? '')
+    router.push(`${returnTo}?newContactId=${match.id}&newContactName=${encodeURIComponent(name)}&for=${returnFor ?? 'contact'}&tags=${tagsParam}&phone=${phoneParam}&email=${emailParam}`)
   }
 
   function toggleTag(tag: string) {
@@ -129,7 +131,9 @@ function AddContactForm() {
     if (returnTo && contact) {
       const name = [form.first_name.trim(), form.last_name.trim()].filter(Boolean).join(' ')
       const tagsParam = encodeURIComponent(form.tags.join(','))
-      router.push(`${returnTo}?newContactId=${contact.id}&newContactName=${encodeURIComponent(name)}&for=${returnFor ?? 'contact'}&tags=${tagsParam}`)
+      const phoneParam = encodeURIComponent(form.phone_number)
+      const emailParam = encodeURIComponent(form.email_address)
+      router.push(`${returnTo}?newContactId=${contact.id}&newContactName=${encodeURIComponent(name)}&for=${returnFor ?? 'contact'}&tags=${tagsParam}&phone=${phoneParam}&email=${emailParam}`)
       return
     }
 
