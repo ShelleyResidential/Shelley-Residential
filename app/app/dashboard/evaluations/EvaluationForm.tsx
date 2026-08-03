@@ -5,6 +5,7 @@ import { supabase } from '@/lib/supabase'
 import { btn, card, input, select, sectionTitle, label as labelCls } from '@/lib/styles'
 import { WarningIcon } from '@/lib/icons'
 import { useRouter, useSearchParams } from 'next/navigation'
+import Link from 'next/link'
 import { LEAD_SOURCES, REFERRAL_TYPES, MOTIVATIONS, TIMELINES, REASONS_LOST, CONTACT_TAGS } from '@/lib/evaluationOptions'
 
 const DRAFT_STORAGE_KEY = 'evaluationFormDraft'
@@ -44,6 +45,8 @@ function Field({ label, readOnly, value, children }: { label: string; readOnly: 
 type Property = {
   id: string
   property_type: string | null
+  unit_number: string | null
+  complex_or_building_name: string | null
   street_number: string | null
   street_name: string | null
   suburb: string | null
@@ -117,7 +120,12 @@ type Profile = { id: string; full_name: string | null; email: string | null; rol
 
 // ── Address helper ────────────────────────────────────────────
 function displayAddress(p: Property): string {
-  return [p.street_number, p.street_name].filter(Boolean).join(' ') || p.suburb || p.city || ''
+  if (p.property_type === 'sectional_title' && p.unit_number) {
+    const unit = `Unit ${p.unit_number}${p.complex_or_building_name ? ' ' + p.complex_or_building_name : ''}`
+    return [unit, p.suburb].filter(Boolean).join(', ')
+  }
+  const street = [p.street_number, p.street_name].filter(Boolean).join(' ')
+  return [street, p.suburb].filter(Boolean).join(', ') || p.city || ''
 }
 
 // Search across street number/name, suburb and city, requiring every word
@@ -343,7 +351,7 @@ export function EvaluationForm({ evaluationId, readOnly = false, onSaved, onCanc
         motivation_for_selling_notes, selling_timeline_notes, scheduled_at,
         sellers_agent_user_id, transaction_coordinator_user_id, evaluation_price, marketing_price,
         date_captured, captured_by_user_id,
-        properties (id, property_type, street_number, street_name, suburb, city),
+        properties (id, property_type, unit_number, complex_or_building_name, street_number, street_name, suburb, city),
         evaluation_contacts (
           contact_id, is_primary, sort_order,
           contacts (id, first_name, last_name, tags, phone_number, email_address),
@@ -459,7 +467,7 @@ export function EvaluationForm({ evaluationId, readOnly = false, onSaved, onCanc
     const timer = setTimeout(async () => {
       setCheckingMatches(true)
       const query = applyAddressSearch(
-        supabase.from('properties').select('id, property_type, street_number, street_name, suburb, city'),
+        supabase.from('properties').select('id, property_type, unit_number, complex_or_building_name, street_number, street_name, suburb, city'),
         newPropertyAddress
       )
       const { data } = await query.limit(8)
@@ -593,7 +601,7 @@ export function EvaluationForm({ evaluationId, readOnly = false, onSaved, onCanc
         google_maps_url:          propertyDraft.google_maps_url,
         created_by_user_id:       userId,
       })
-      .select('id, property_type, street_number, street_name, suburb, city')
+      .select('id, property_type, unit_number, complex_or_building_name, street_number, street_name, suburb, city')
       .single()
 
     setSavingProperty(false)
@@ -857,19 +865,24 @@ export function EvaluationForm({ evaluationId, readOnly = false, onSaved, onCanc
         )}
 
         {contacts.map((c, i) => readOnly ? (
-          <div key={i} className={i > 0 ? 'mt-3' : ''}>
-            <div className="flex items-center gap-2 flex-wrap text-sm text-[#1a1a1a]">
-              {i === 0 && (
-                <span className="text-xs bg-[#1a1a1a] text-white rounded-full px-2 py-0.5 flex-shrink-0">Primary</span>
-              )}
-              <span className="font-medium">{c.contact_name}</span>
-              {c.tag_option_id && (
-                <span className="text-xs bg-gray-100 text-gray-600 rounded-full px-2 py-0.5 flex-shrink-0">{c.tag_option_id}</span>
+          <div key={i} className={`flex items-center justify-between gap-3 ${i > 0 ? 'mt-3' : ''}`}>
+            <div>
+              <div className="flex items-center gap-2 flex-wrap text-sm text-[#1a1a1a]">
+                {i === 0 && (
+                  <span className="text-xs bg-[#1a1a1a] text-white rounded-full px-2 py-0.5 flex-shrink-0">Primary</span>
+                )}
+                <span className="font-medium">{c.contact_name}</span>
+                {c.tag_option_id && (
+                  <span className="text-xs bg-gray-100 text-gray-600 rounded-full px-2 py-0.5 flex-shrink-0">{c.tag_option_id}</span>
+                )}
+              </div>
+              {(c.phone_number || c.email_address) && (
+                <p className="text-xs text-gray-400 mt-2">{[c.phone_number, c.email_address].filter(Boolean).join(' | ')}</p>
               )}
             </div>
-            {(c.phone_number || c.email_address) && (
-              <p className="text-xs text-gray-400 mt-2">{[c.phone_number, c.email_address].filter(Boolean).join(' | ')}</p>
-            )}
+            <Link href={`/dashboard/contacts/${c.contact_id}?from=evaluations`} className={`${btn.secondary} flex-shrink-0`}>
+              View Contact
+            </Link>
           </div>
         ) : (
           <div key={i} className="flex items-center gap-3 mb-2">
@@ -1068,7 +1081,6 @@ export function EvaluationForm({ evaluationId, readOnly = false, onSaved, onCanc
                   <button key={p.id} type="button" onClick={() => selectExistingProperty(p)}
                     className="w-full text-left px-3 py-2 rounded-md bg-white border border-transparent hover:border-[#E8266F] text-sm text-[#1a1a1a] transition-colors">
                     <span className="font-medium">{displayAddress(p)}</span>
-                    {p.suburb && <span className="ml-2 text-xs text-gray-400">{p.suburb}</span>}
                     {p.property_type && (
                       <span className="ml-2 text-xs text-gray-400 capitalize">{p.property_type.replace('_', ' ')}</span>
                     )}
@@ -1224,7 +1236,7 @@ function PropertySearch({ onSelect }: { onSelect: (p: Property) => void }) {
     const timer = setTimeout(async () => {
       setLoading(true)
       const q = applyAddressSearch(
-        supabase.from('properties').select('id, property_type, street_number, street_name, suburb, city'),
+        supabase.from('properties').select('id, property_type, unit_number, complex_or_building_name, street_number, street_name, suburb, city'),
         query
       )
       const { data } = await q.limit(8)
@@ -1250,7 +1262,6 @@ function PropertySearch({ onSelect }: { onSelect: (p: Property) => void }) {
               onMouseDown={() => { onSelect(p); setQuery(''); setOpen(false) }}
               className="w-full text-left px-4 py-2.5 text-sm text-[#1a1a1a] hover:bg-[#f8f7f4] border-b border-gray-100 last:border-b-0 transition-colors">
               <span className="font-medium">{displayAddress(p)}</span>
-              {p.suburb && <span className="ml-2 text-xs text-gray-400">{p.suburb}</span>}
               {p.property_type && (
                 <span className="ml-2 text-xs text-gray-400 capitalize">{p.property_type.replace('_', ' ')}</span>
               )}
