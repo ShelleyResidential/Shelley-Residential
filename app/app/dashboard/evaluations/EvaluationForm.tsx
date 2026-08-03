@@ -128,6 +128,13 @@ function displayAddress(p: Property): string {
   return [street, p.suburb].filter(Boolean).join(', ') || p.city || ''
 }
 
+function propertyMapQuery(p: Property): string {
+  if (p.property_type === 'sectional_title' && p.unit_number) {
+    return [p.complex_or_building_name, p.suburb, p.city].filter(Boolean).join(' ')
+  }
+  return [p.street_number, p.street_name, p.suburb, p.city].filter(Boolean).join(' ')
+}
+
 // Search across street number/name, suburb and city, requiring every word
 // in the query to match at least one of those fields (so "27 audley" finds
 // a property whose number and name are stored in separate columns).
@@ -880,7 +887,7 @@ export function EvaluationForm({ evaluationId, readOnly = false, onSaved, onCanc
                 <p className="text-xs text-gray-400 mt-2">{[c.phone_number, c.email_address].filter(Boolean).join(' | ')}</p>
               )}
             </div>
-            <Link href={`/dashboard/contacts/${c.contact_id}?from=evaluations`} className={`${btn.secondary} flex-shrink-0`}>
+            <Link href={`/dashboard/contacts/${c.contact_id}?from=evaluations`} className={`${btn.primary} flex-shrink-0`}>
               View Contact
             </Link>
           </div>
@@ -921,11 +928,20 @@ export function EvaluationForm({ evaluationId, readOnly = false, onSaved, onCanc
       {/* ── Property Details ── */}
       <Section title="Property Details">
         {selectedProperty && readOnly ? (
-          <div>
-            <p className="font-medium text-[#1a1a1a] text-sm">{displayAddress(selectedProperty)}</p>
-            <p className="text-xs text-gray-400 mt-0.5 capitalize">
-              {selectedProperty.property_type?.replace('_', ' ')}
-            </p>
+          <div className="flex items-center justify-between gap-3">
+            <div>
+              <p className="font-medium text-[#1a1a1a] text-sm">{displayAddress(selectedProperty)}</p>
+              <p className="text-xs text-gray-400 mt-0.5 capitalize">
+                {selectedProperty.property_type?.replace('_', ' ')}
+              </p>
+            </div>
+            <a
+              href={`https://www.google.com/maps/dir/?api=1&destination=${encodeURIComponent(propertyMapQuery(selectedProperty))}`}
+              target="_blank" rel="noopener noreferrer"
+              className={`${btn.primary} flex-shrink-0`}
+            >
+              Maps
+            </a>
           </div>
         ) : selectedProperty ? (
           <div className="flex items-center justify-between px-4 py-3 bg-gray-50 rounded-lg border border-gray-200">
