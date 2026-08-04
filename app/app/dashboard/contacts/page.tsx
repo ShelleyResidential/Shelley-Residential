@@ -18,10 +18,16 @@ type Contact = {
   email_address: string | null
   contact_preference: string | null
   agent_id: string | null
+  date_added: string | null
 }
 
 function fullName(c: Pick<Contact, 'first_name' | 'last_name'>) {
   return [c.first_name, c.last_name].filter(Boolean).join(' ')
+}
+
+function formatDate(iso: string | null): string {
+  if (!iso) return '—'
+  return new Date(iso).toLocaleDateString('en-ZA', { day: 'numeric', month: 'short', year: 'numeric' })
 }
 
 export default function ContactsPage() {
@@ -41,7 +47,7 @@ export default function ContactsPage() {
     setLoading(true)
     let query = supabase
       .from('contacts')
-      .select('id, title, first_name, last_name, phone_number, email_address, contact_preference, agent_id', { count: 'exact' })
+      .select('id, title, first_name, last_name, phone_number, email_address, contact_preference, agent_id, date_added', { count: 'exact' })
       .order('first_name')
 
     if (myOnly && userId) query = query.eq('agent_id', userId)
@@ -190,8 +196,24 @@ export default function ContactsPage() {
                   </td>
                   <td className="px-3 py-3 text-[#1a1a1a] font-medium truncate" title={fullName(c)}>{fullName(c)}</td>
                   <td className="px-3 py-3 text-gray-500 truncate">{c.phone_number || '—'}</td>
-                  <td className="px-3 py-3 text-gray-500 truncate" title={c.email_address ?? undefined}>{c.email_address || '—'}</td>
+                  <td className="px-3 py-3 overflow-hidden">
+                    {c.email_address ? (
+                      <a
+                        href={`https://mail.google.com/mail/?view=cm&fs=1&to=${encodeURIComponent(c.email_address)}`}
+                        target="_blank"
+                        rel="noopener noreferrer"
+                        onClick={e => e.stopPropagation()}
+                        title={c.email_address}
+                        className="block truncate text-gray-500 underline hover:font-bold hover:text-[#1a1a1a] transition-all"
+                      >
+                        {c.email_address}
+                      </a>
+                    ) : (
+                      <span className="text-gray-500">—</span>
+                    )}
+                  </td>
                   <td className="px-3 py-3 text-gray-500 truncate">{c.contact_preference || '—'}</td>
+                  <td className="px-3 py-3 text-gray-500 truncate">{formatDate(c.date_added)}</td>
                 </tr>
               ))}
             </tbody>
@@ -214,11 +236,12 @@ export default function ContactsPage() {
 function TableHeaderRow() {
   return (
     <tr className="border-b border-gray-100 text-left">
-      <th className="px-3 py-3 whitespace-nowrap w-[6%]" />
-      <th className="px-3 py-3 font-semibold text-[#1a1a1a] whitespace-nowrap text-xs uppercase tracking-wide w-[30%]">Name</th>
-      <th className="px-3 py-3 font-semibold text-[#1a1a1a] whitespace-nowrap text-xs uppercase tracking-wide w-[22%]">Phone Number</th>
-      <th className="px-3 py-3 font-semibold text-[#1a1a1a] whitespace-nowrap text-xs uppercase tracking-wide w-[28%]">Email</th>
-      <th className="px-3 py-3 font-semibold text-[#1a1a1a] whitespace-nowrap text-xs uppercase tracking-wide w-[14%]">Preference</th>
+      <th className="px-3 py-3 whitespace-nowrap w-[5%]" />
+      <th className="px-3 py-3 font-semibold text-[#1a1a1a] whitespace-nowrap text-xs uppercase tracking-wide w-[24%]">Name</th>
+      <th className="px-3 py-3 font-semibold text-[#1a1a1a] whitespace-nowrap text-xs uppercase tracking-wide w-[18%]">Phone Number</th>
+      <th className="px-3 py-3 font-semibold text-[#1a1a1a] whitespace-nowrap text-xs uppercase tracking-wide w-[24%]">Email</th>
+      <th className="px-3 py-3 font-semibold text-[#1a1a1a] whitespace-nowrap text-xs uppercase tracking-wide w-[13%]">Preference</th>
+      <th className="px-3 py-3 font-semibold text-[#1a1a1a] whitespace-nowrap text-xs uppercase tracking-wide w-[16%]">Date Added</th>
     </tr>
   )
 }

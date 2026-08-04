@@ -21,7 +21,6 @@ type Contact = {
   company_name: string | null
   division: string | null
   branch: string | null
-  address: string | null
   birthday: string | null
   wedding_anniversary: string | null
   home_anniversary: string | null
@@ -246,17 +245,6 @@ export default function ContactDetailPage() {
                   <option value="">—</option>
                   {['WhatsApp', 'Email', 'Phone'].map(p => <option key={p}>{p}</option>)}
                 </select>
-              </Field>
-              <Field label="Address" editing={editing} value={contact.address ? (
-                <a
-                  href={`https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(contact.address)}`}
-                  target="_blank" rel="noopener noreferrer"
-                  className="text-[#1a1a1a] font-medium underline underline-offset-2 hover:text-blue-600 transition-colors"
-                >
-                  {contact.address}
-                </a>
-              ) : undefined}>
-                <input value={editForm.address ?? ''} onChange={e => setField('address', e.target.value || null)} className={input} />
               </Field>
             </Section>
 
