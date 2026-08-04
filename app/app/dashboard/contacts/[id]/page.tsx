@@ -195,7 +195,7 @@ export default function ContactDetailPage() {
               className={`py-3 text-sm font-medium border-b-2 transition-colors capitalize ${
                 tab === t ? 'border-[#1a1a1a] text-[#1a1a1a]' : 'border-transparent text-gray-400 hover:text-[#1a1a1a]'
               }`}>
-              {t === 'notes' ? 'Notes' : 'Information'}
+              {t === 'notes' ? 'Notes' : 'Details'}
             </button>
           ))}
         </div>
@@ -203,141 +203,112 @@ export default function ContactDetailPage() {
 
       <main className="max-w-2xl px-8 py-8">
 
-        {/* ── INFO VIEW ── */}
-        {tab === 'info' && !editing && (
+        {/* ── DETAILS / EDIT (same layout either way) ── */}
+        {tab === 'info' && (
           <div className="space-y-4">
-            <InfoSection title="Basic Information">
-              <Row label="Title"      value={contact.title} />
-              <Row label="First Name" value={contact.first_name} />
-              <Row label="Surname"    value={contact.last_name} />
-              <Row label="Status"     value={contact.status} />
-              <Row label="ID Number"  value={contact.id_number} />
-              <Row label="Date Added" value={formatDate(contact.date_added)} />
-            </InfoSection>
-
-            <InfoSection title="Contact Details">
-              <Row label="Phone"      value={contact.phone_number} />
-              <Row label="Email"      value={contact.email_address} />
-              <Row label="Preference" value={contact.contact_preference} />
-              <AddressRow address={contact.address} />
-            </InfoSection>
-
-            <InfoSection title="Personal Details">
-              <Row label="Marital Status"      value={contact.marital_status} />
-              <Row label="Birthday"            value={formatDate(contact.birthday)} />
-              <Row label="Wedding Anniversary" value={formatDate(contact.wedding_anniversary)} />
-              <Row label="Home Anniversary"    value={formatDate(contact.home_anniversary)} />
-            </InfoSection>
-
-            <InfoSection title="Work Details">
-              <Row label="Occupation" value={contact.occupation} />
-              <Row label="Company"    value={contact.company_name} />
-              <Row label="Division"   value={contact.division} />
-              <Row label="Branch"     value={contact.branch} />
-            </InfoSection>
-          </div>
-        )}
-
-        {/* ── EDIT VIEW ── */}
-        {tab === 'info' && editing && (
-          <div className="space-y-4">
-            <EditSection title="Basic Information">
+            <Section title="Basic Information">
               <div className="grid grid-cols-3 gap-3">
-                <div>
-                  <label className={labelCls}>Title</label>
+                <Field label="Title" editing={editing} value={contact.title}>
                   <select value={editForm.title ?? ''} onChange={e => setField('title', e.target.value || null)} className={select}>
                     <option value="">—</option>
                     {['Mr', 'Mrs', 'Ms', 'Dr'].map(t => <option key={t}>{t}</option>)}
                   </select>
-                </div>
-                <div>
-                  <label className={labelCls}>First Name</label>
+                </Field>
+                <Field label="First Name" editing={editing} value={contact.first_name}>
                   <input value={editForm.first_name ?? ''} onChange={e => setField('first_name', e.target.value)} className={input} />
-                </div>
-                <div>
-                  <label className={labelCls}>Surname</label>
+                </Field>
+                <Field label="Surname" editing={editing} value={contact.last_name}>
                   <input value={editForm.last_name ?? ''} onChange={e => setField('last_name', e.target.value)} className={input} />
-                </div>
+                </Field>
               </div>
-              <div>
-                <label className={labelCls}>Status</label>
+              <Field label="Status" editing={editing} value={contact.status}>
                 <select value={editForm.status ?? 'Active'} onChange={e => setField('status', e.target.value)} className={select}>
                   <option>Active</option><option>Inactive</option>
                 </select>
-              </div>
-              <div>
-                <label className={labelCls}>ID Number</label>
+              </Field>
+              <Field label="ID Number" editing={editing} value={contact.id_number}>
                 <input value={editForm.id_number ?? ''} onChange={e => setField('id_number', e.target.value || null)} className={input} />
-              </div>
-            </EditSection>
+              </Field>
+              <Field label="Date Added" editing={false} value={formatDate(contact.date_added)} />
+            </Section>
 
-            <EditSection title="Contact Details">
+            <Section title="Contact Details">
               <div className="grid grid-cols-2 gap-3">
-                <div>
-                  <label className={labelCls}>Phone</label>
+                <Field label="Phone" editing={editing} value={contact.phone_number}>
                   <input value={editForm.phone_number ?? ''} onChange={e => setField('phone_number', e.target.value || null)} className={input} />
-                </div>
-                <div>
-                  <label className={labelCls}>Email</label>
+                </Field>
+                <Field label="Email" editing={editing} value={contact.email_address}>
                   <input type="email" value={editForm.email_address ?? ''} onChange={e => setField('email_address', e.target.value || null)} className={input} />
-                </div>
+                </Field>
               </div>
-              <div>
-                <label className={labelCls}>Contact Preference</label>
+              <Field label="Contact Preference" editing={editing} value={contact.contact_preference}>
                 <select value={editForm.contact_preference ?? ''} onChange={e => setField('contact_preference', e.target.value || null)} className={select}>
                   <option value="">—</option>
                   {['WhatsApp', 'Email', 'Phone'].map(p => <option key={p}>{p}</option>)}
                 </select>
-              </div>
-              <div>
-                <label className={labelCls}>Address</label>
+              </Field>
+              <Field label="Address" editing={editing} value={contact.address ? (
+                <a
+                  href={`https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(contact.address)}`}
+                  target="_blank" rel="noopener noreferrer"
+                  className="text-[#1a1a1a] font-medium underline underline-offset-2 hover:text-blue-600 transition-colors"
+                >
+                  {contact.address}
+                </a>
+              ) : undefined}>
                 <input value={editForm.address ?? ''} onChange={e => setField('address', e.target.value || null)} className={input} />
-              </div>
-            </EditSection>
+              </Field>
+            </Section>
 
-            <EditSection title="Personal Details">
-              <div>
-                <label className={labelCls}>Marital Status</label>
+            <Section title="Personal Details">
+              <Field label="Marital Status" editing={editing} value={contact.marital_status}>
                 <select value={editForm.marital_status ?? ''} onChange={e => setField('marital_status', e.target.value || null)} className={select}>
                   <option value="">—</option>
                   {['Single', 'Married', 'Divorced', 'Widowed', 'Separated'].map(s => <option key={s}>{s}</option>)}
                 </select>
-              </div>
+              </Field>
               <div className="grid grid-cols-3 gap-3">
-                <div>
-                  <label className={labelCls}>Birthday</label>
+                <Field label="Birthday" editing={editing} value={formatDate(contact.birthday)}>
                   <input type="date" value={editForm.birthday ?? ''} onChange={e => setField('birthday', e.target.value || null)} className={input} />
-                </div>
-                <div>
-                  <label className={labelCls}>Wedding Anniv.</label>
+                </Field>
+                <Field label="Wedding Anniv." editing={editing} value={formatDate(contact.wedding_anniversary)}>
                   <input type="date" value={editForm.wedding_anniversary ?? ''} onChange={e => setField('wedding_anniversary', e.target.value || null)} className={input} />
-                </div>
-                <div>
-                  <label className={labelCls}>Home Anniv.</label>
+                </Field>
+                <Field label="Home Anniv." editing={editing} value={formatDate(contact.home_anniversary)}>
                   <input type="date" value={editForm.home_anniversary ?? ''} onChange={e => setField('home_anniversary', e.target.value || null)} className={input} />
-                </div>
+                </Field>
               </div>
-            </EditSection>
+            </Section>
 
-            <EditSection title="Work Details">
+            <Section title="Work Details">
               <div className="grid grid-cols-2 gap-3">
-                <div><label className={labelCls}>Occupation</label><input value={editForm.occupation ?? ''} onChange={e => setField('occupation', e.target.value || null)} className={input} /></div>
-                <div><label className={labelCls}>Company</label><input value={editForm.company_name ?? ''} onChange={e => setField('company_name', e.target.value || null)} className={input} /></div>
-                <div><label className={labelCls}>Division</label><input value={editForm.division ?? ''} onChange={e => setField('division', e.target.value || null)} className={input} /></div>
-                <div><label className={labelCls}>Branch</label><input value={editForm.branch ?? ''} onChange={e => setField('branch', e.target.value || null)} className={input} /></div>
+                <Field label="Occupation" editing={editing} value={contact.occupation}>
+                  <input value={editForm.occupation ?? ''} onChange={e => setField('occupation', e.target.value || null)} className={input} />
+                </Field>
+                <Field label="Company" editing={editing} value={contact.company_name}>
+                  <input value={editForm.company_name ?? ''} onChange={e => setField('company_name', e.target.value || null)} className={input} />
+                </Field>
+                <Field label="Division" editing={editing} value={contact.division}>
+                  <input value={editForm.division ?? ''} onChange={e => setField('division', e.target.value || null)} className={input} />
+                </Field>
+                <Field label="Branch" editing={editing} value={contact.branch}>
+                  <input value={editForm.branch ?? ''} onChange={e => setField('branch', e.target.value || null)} className={input} />
+                </Field>
               </div>
-            </EditSection>
+            </Section>
 
-            {saveError && <p className="text-sm text-red-500 bg-red-50 px-4 py-3 rounded-lg">{saveError}</p>}
+            {editing && saveError && <p className="text-sm text-red-500 bg-red-50 px-4 py-3 rounded-lg">{saveError}</p>}
 
-            <div className="flex gap-3">
-              <button onClick={saveContact} disabled={saving} className={`${btn.primary} flex-1 py-3`}>
-                {saving ? 'Saving…' : 'Save Changes'}
-              </button>
-              <button onClick={() => { setEditing(false); setEditForm(contact) }} className={`${btn.secondary} flex-1 py-3`}>
-                Cancel
-              </button>
-            </div>
+            {editing && (
+              <div className="flex gap-3">
+                <button onClick={saveContact} disabled={saving} className={`${btn.primary} flex-1 py-3`}>
+                  {saving ? 'Saving…' : 'Save Changes'}
+                </button>
+                <button onClick={() => { setEditing(false); setEditForm(contact) }} className={`${btn.secondary} flex-1 py-3`}>
+                  Cancel
+                </button>
+              </div>
+            )}
           </div>
         )}
 
@@ -414,47 +385,29 @@ export default function ContactDetailPage() {
 
 // ── Reusable components ────────────────────────────────────
 
-function InfoSection({ title, children }: { title: string; children: React.ReactNode }) {
-  return (
-    <div className={`${card} p-6`}>
-      <h3 className={sectionTitle}>{title}</h3>
-      <div className="space-y-3">{children}</div>
-    </div>
-  )
-}
-
-function Row({ label, value }: { label: string; value: string | null | undefined }) {
-  return (
-    <div className="flex justify-between gap-4 text-sm">
-      <span className="text-gray-500 flex-shrink-0">{label}</span>
-      <span className="text-[#1a1a1a] text-right font-medium">{value || '—'}</span>
-    </div>
-  )
-}
-
-function AddressRow({ address }: { address: string | null }) {
-  return (
-    <div className="flex justify-between gap-4 text-sm">
-      <span className="text-gray-500 flex-shrink-0">Address</span>
-      {address ? (
-        <a
-          href={`https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(address)}`}
-          target="_blank" rel="noopener noreferrer"
-          className="text-[#1a1a1a] font-medium text-right underline underline-offset-2 hover:text-blue-600 transition-colors"
-        >
-          {address}
-        </a>
-      ) : (
-        <span className="text-[#1a1a1a] font-medium">—</span>
-      )}
-    </div>
-  )
-}
-
-function EditSection({ title, children }: { title: string; children: React.ReactNode }) {
+function Section({ title, children }: { title: string; children: React.ReactNode }) {
   return (
     <div className={`${card} p-6 space-y-4`}>
       <h3 className={sectionTitle}>{title}</h3>
+      {children}
+    </div>
+  )
+}
+
+// ── Field: same label-above-content layout either way — plain text (no
+// box) when not editing, the actual editable control once Edit is clicked.
+function Field({ label, editing, value, children }: { label: string; editing: boolean; value?: React.ReactNode; children?: React.ReactNode }) {
+  if (!editing) {
+    return (
+      <div>
+        <span className={labelCls}>{label}</span>
+        <p className="text-sm text-[#1a1a1a] py-2.5">{value ?? '—'}</p>
+      </div>
+    )
+  }
+  return (
+    <div>
+      <label className={labelCls}>{label}</label>
       {children}
     </div>
   )
