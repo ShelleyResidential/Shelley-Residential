@@ -6,6 +6,7 @@ import { btn, card, input, select, sectionTitle, label as labelCls } from '@/lib
 import { canDelete } from '@/lib/permissions'
 import { Breadcrumbs } from '@/lib/Breadcrumbs'
 import { useRouter, useParams, useSearchParams } from 'next/navigation'
+import Link from 'next/link'
 
 type Contact = {
   id: string
@@ -157,54 +158,52 @@ export default function ContactDetailPage() {
   if (!contact) return null
 
   return (
-    <div className="bg-[#f8f7f4] min-h-screen">
-      <div className="px-8 pt-4">
+    <div className="p-10 max-w-4xl">
+
+      <Link href="/dashboard/contacts/new" className={`${btn.primary} fixed top-8 right-10 z-40 shadow-md`}>+ New Contact</Link>
+
+      {/* ── Header ── */}
+      <div className="mb-8">
         <Breadcrumbs items={fromEvaluations
           ? [{ label: 'Analyse' }, { label: 'Evaluations', href: '/dashboard/evaluations' }, { label: fullName(contact) }]
           : [{ label: 'Analyse' }, { label: 'Contacts', href: '/dashboard/contacts' }, { label: fullName(contact) }]
         } />
-      </div>
-      {/* Header */}
-      <div className="bg-white border-b border-gray-100 px-8 py-4 flex items-center justify-between">
-        <div className="flex items-center gap-3">
-          <h1 className="text-lg font-bold text-[#1a1a1a]">{fullName(contact)}</h1>
-          <span className={`text-xs px-2 py-0.5 rounded-full font-medium ${
-            contact.status === 'Active' ? 'bg-green-50 text-green-700' : 'bg-gray-100 text-gray-500'
-          }`}>{contact.status}</span>
-        </div>
-        <div className="flex items-center gap-2">
-          {!editing && (
-            <button onClick={() => { setEditing(true); setEditForm(contact) }} className={btn.secondary}>
-              Edit
-            </button>
-          )}
-          {canDelete(userEmail) && (
-            <button onClick={deleteContact} disabled={deleting} className={btn.danger}>
-              {deleting ? 'Deleting…' : 'Delete'}
-            </button>
-          )}
+        <div className="flex items-start justify-between gap-4">
+          <div className="min-w-0">
+            <h1 className="text-2xl font-bold text-[#1a1a1a] truncate" title={fullName(contact)}>{fullName(contact)}</h1>
+            <p className="text-sm text-gray-400 mt-1">Added {formatDate(contact.date_added)}</p>
+          </div>
+          <div className="flex items-center gap-3 flex-shrink-0">
+            <span className={`text-sm px-3 py-1 rounded-full font-medium whitespace-nowrap ${
+              contact.status === 'Active' ? 'bg-green-50 text-green-700' : 'bg-gray-100 text-gray-500'
+            }`}>{contact.status}</span>
+            {!editing && (
+              <button onClick={() => { setEditing(true); setEditForm(contact) }} className={btn.secondary}>Edit</button>
+            )}
+            {canDelete(userEmail) && (
+              <button onClick={deleteContact} disabled={deleting} className={btn.danger}>
+                {deleting ? 'Deleting…' : 'Delete'}
+              </button>
+            )}
+          </div>
         </div>
       </div>
 
-      {/* Tabs */}
-      <div className="bg-white border-b border-gray-100 px-8">
-        <div className="flex gap-6">
-          {(['info', 'notes'] as const).map(t => (
-            <button key={t} onClick={() => setTab(t)}
-              className={`py-3 text-sm font-medium border-b-2 transition-colors capitalize ${
-                tab === t ? 'border-[#1a1a1a] text-[#1a1a1a]' : 'border-transparent text-gray-400 hover:text-[#1a1a1a]'
-              }`}>
-              {t === 'notes' ? 'Notes' : 'Details'}
-            </button>
-          ))}
-        </div>
+      {/* ── Tabs ── */}
+      <div className="flex gap-1 mb-6 border-b border-gray-200">
+        {(['info', 'notes'] as const).map(t => (
+          <button key={t} onClick={() => setTab(t)}
+            className={`px-4 py-2 text-sm font-medium border-b-2 -mb-px transition-colors ${
+              tab === t ? 'border-[#1a1a1a] text-[#1a1a1a]' : 'border-transparent text-gray-400 hover:text-[#1a1a1a]'
+            }`}>
+            {t === 'notes' ? 'Notes' : 'Details'}
+          </button>
+        ))}
       </div>
-
-      <main className="max-w-2xl px-8 py-8">
 
         {/* ── DETAILS / EDIT (same layout either way) ── */}
         {tab === 'info' && (
-          <div className="space-y-4">
+          <div className="space-y-6">
             <Section title="Basic Information">
               <div className="grid grid-cols-3 gap-3">
                 <Field label="Title" editing={editing} value={contact.title}>
@@ -366,7 +365,6 @@ export default function ContactDetailPage() {
             ))}
           </div>
         )}
-      </main>
     </div>
   )
 }
