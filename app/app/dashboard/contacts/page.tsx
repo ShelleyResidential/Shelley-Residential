@@ -14,6 +14,7 @@ type Contact = {
   title: string | null
   first_name: string
   last_name: string
+  status: string | null
   phone_number: string | null
   email_address: string | null
   contact_preference: string | null
@@ -47,7 +48,7 @@ export default function ContactsPage() {
     setLoading(true)
     let query = supabase
       .from('contacts')
-      .select('id, title, first_name, last_name, phone_number, email_address, contact_preference, agent_id, date_added', { count: 'exact' })
+      .select('id, title, first_name, last_name, status, phone_number, email_address, contact_preference, agent_id, date_added', { count: 'exact' })
       .order('first_name')
 
     if (myOnly && userId) query = query.eq('agent_id', userId)
@@ -213,6 +214,13 @@ export default function ContactsPage() {
                     )}
                   </td>
                   <td className="px-3 py-3 text-gray-500 truncate">{c.contact_preference || '—'}</td>
+                  <td className="px-3 py-3 overflow-hidden">
+                    <span className={`text-xs px-2 py-0.5 rounded-full font-medium truncate inline-block max-w-full align-bottom ${
+                      c.status === 'Active' ? 'bg-green-50 text-green-700' : 'bg-gray-100 text-gray-500'
+                    }`}>
+                      {c.status || '—'}
+                    </span>
+                  </td>
                   <td className="px-3 py-3 text-gray-500 truncate">{formatDate(c.date_added)}</td>
                 </tr>
               ))}
@@ -237,11 +245,12 @@ function TableHeaderRow() {
   return (
     <tr className="border-b border-gray-100 text-left">
       <th className="px-3 py-3 whitespace-nowrap w-[5%]" />
-      <th className="px-3 py-3 font-semibold text-[#1a1a1a] whitespace-nowrap text-xs uppercase tracking-wide w-[24%]">Name</th>
-      <th className="px-3 py-3 font-semibold text-[#1a1a1a] whitespace-nowrap text-xs uppercase tracking-wide w-[18%]">Phone Number</th>
-      <th className="px-3 py-3 font-semibold text-[#1a1a1a] whitespace-nowrap text-xs uppercase tracking-wide w-[24%]">Email</th>
-      <th className="px-3 py-3 font-semibold text-[#1a1a1a] whitespace-nowrap text-xs uppercase tracking-wide w-[13%]">Preference</th>
-      <th className="px-3 py-3 font-semibold text-[#1a1a1a] whitespace-nowrap text-xs uppercase tracking-wide w-[16%]">Date Added</th>
+      <th className="px-3 py-3 font-semibold text-[#1a1a1a] whitespace-nowrap text-xs uppercase tracking-wide w-[22%]">Name</th>
+      <th className="px-3 py-3 font-semibold text-[#1a1a1a] whitespace-nowrap text-xs uppercase tracking-wide w-[16%]">Phone Number</th>
+      <th className="px-3 py-3 font-semibold text-[#1a1a1a] whitespace-nowrap text-xs uppercase tracking-wide w-[22%]">Email</th>
+      <th className="px-3 py-3 font-semibold text-[#1a1a1a] whitespace-nowrap text-xs uppercase tracking-wide w-[11%]">Preference</th>
+      <th className="px-3 py-3 font-semibold text-[#1a1a1a] whitespace-nowrap text-xs uppercase tracking-wide w-[10%]">Status</th>
+      <th className="px-3 py-3 font-semibold text-[#1a1a1a] whitespace-nowrap text-xs uppercase tracking-wide w-[14%]">Date Added</th>
     </tr>
   )
 }
