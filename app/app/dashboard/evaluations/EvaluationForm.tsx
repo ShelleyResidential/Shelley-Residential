@@ -121,15 +121,15 @@ type Profile = { id: string; full_name: string | null; email: string | null; rol
 function displayAddress(p: Property): string {
   const street = [p.street_number, p.street_name].filter(Boolean).join(' ')
   if (p.property_type === 'sectional_title' && p.unit_number) {
-    return [`Unit ${p.unit_number}`, p.complex_or_building_name, street, p.suburb].filter(Boolean).join(', ')
+    const unit = [`Unit ${p.unit_number}`, p.complex_or_building_name ? capitalizeWords(p.complex_or_building_name) : null].filter(Boolean).join(' ')
+    return [unit, street, p.suburb].filter(Boolean).join(', ')
   }
   return [street, p.suburb].filter(Boolean).join(', ') || p.city || ''
 }
 
+// View Maps should always navigate to the actual street address, never the
+// unit/complex name — a complex name alone doesn't reliably geocode.
 function propertyMapQuery(p: Property): string {
-  if (p.property_type === 'sectional_title' && p.unit_number) {
-    return [p.complex_or_building_name, p.street_number, p.street_name, p.suburb, p.city].filter(Boolean).join(' ')
-  }
   return [p.street_number, p.street_name, p.suburb, p.city].filter(Boolean).join(' ')
 }
 

@@ -56,12 +56,25 @@ const STATUS_LABELS: Record<string, string> = {
   in_progress: 'In Progress', open: 'Open Mandate', future: 'Future Mandate',
 }
 
+function capitalizeWords(text: string): string {
+  return text.replace(/\b\w/g, c => c.toUpperCase())
+}
+
+// Heading format: unit + complex + suburb only — the full street address
+// is still used for search matching and the Maps link (see mapQuery below).
 function formatAddress(p: Property): string {
   const street = [p.street_number, p.street_name].filter(Boolean).join(' ')
   if (p.property_type === 'sectional_title' && p.unit_number) {
-    return [`Unit ${p.unit_number}`, p.complex_or_building_name, street, p.suburb].filter(Boolean).join(', ')
+    const unit = [`Unit ${p.unit_number}`, p.complex_or_building_name ? capitalizeWords(p.complex_or_building_name) : null].filter(Boolean).join(' ')
+    return [unit, p.suburb].filter(Boolean).join(', ')
   }
   return [street, p.suburb].filter(Boolean).join(', ') || p.city || 'Unknown address'
+}
+
+// The actual navigable street address — used for the Maps link and search
+// matching, since a unit/complex name alone doesn't reliably geocode.
+function mapQuery(p: Property): string {
+  return [p.street_number, p.street_name, p.suburb, p.city].filter(Boolean).join(' ')
 }
 
 export default function PropertiesPage() {
@@ -96,7 +109,7 @@ export default function PropertiesPage() {
 
     if (search) {
       const q = search.toLowerCase()
-      results = results.filter(p => formatAddress(p).toLowerCase().includes(q))
+      results = results.filter(p => `${formatAddress(p)} ${mapQuery(p)}`.toLowerCase().includes(q))
     }
 
     setProperties(results)
@@ -185,7 +198,8 @@ export default function PropertiesPage() {
         <div className="space-y-2">
           {properties.map(p => {
             const address  = formatAddress(p)
-            const mapLink  = p.google_maps_url ?? (address !== 'Unknown address' ? `https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(address)}` : null)
+            const query    = mapQuery(p)
+            const mapLink  = p.google_maps_url ?? (query ? `https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(query)}` : null)
             const evals    = p.evaluations ?? []
             const latestEv = evals[0] ?? null
 

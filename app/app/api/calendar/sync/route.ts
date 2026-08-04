@@ -56,7 +56,9 @@ export async function POST(request: NextRequest) {
     return NextResponse.json({ error: 'Evaluation has no scheduled date set.' }, { status: 400 })
   }
 
-  // Build human-readable address + Google Maps link (same logic used on the evaluation detail page)
+  // Build a short heading (unit + complex + suburb) for the event title, and
+  // a separate street-based address for the Maps link -- a unit/complex name
+  // alone doesn't reliably geocode.
   type PropertyInfo = {
     property_type: string | null
     unit_number: string | null
@@ -66,18 +68,24 @@ export async function POST(request: NextRequest) {
     suburb: string | null
     google_maps_url: string | null
   }
+  function capitalizeWords(text: string): string {
+    return text.replace(/\b\w/g, c => c.toUpperCase())
+  }
   const prop = ev.properties as unknown as PropertyInfo | null
-  let address = 'Unknown address'
+  let title = 'Unknown address'
+  let mapAddress = ''
   if (prop) {
+    const street = [prop.street_number, prop.street_name].filter(Boolean).join(' ')
+    mapAddress = [street, prop.suburb].filter(Boolean).join(', ')
     if (prop.property_type === 'sectional_title' && prop.unit_number) {
-      const street = [prop.street_number, prop.street_name].filter(Boolean).join(' ')
-      address = [`Unit ${prop.unit_number}`, prop.complex_or_building_name, street, prop.suburb].filter(Boolean).join(', ')
+      const unit = [`Unit ${prop.unit_number}`, prop.complex_or_building_name ? capitalizeWords(prop.complex_or_building_name) : null].filter(Boolean).join(' ')
+      title = [unit, prop.suburb].filter(Boolean).join(', ')
     } else {
-      address = [prop.street_number, prop.street_name, prop.suburb].filter(Boolean).join(' ') || 'Unknown address'
+      title = mapAddress || 'Unknown address'
     }
   }
   const mapsLink = prop?.google_maps_url
-    || (address !== 'Unknown address' ? `https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(address)}` : null)
+    || (mapAddress ? `https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(mapAddress)}` : null)
 
   type ContactRow = { is_primary: boolean; contacts: { first_name: string; last_name: string } | null }
   const contacts    = (ev.evaluation_contacts as unknown as ContactRow[]) ?? []
@@ -91,9 +99,9 @@ export async function POST(request: NextRequest) {
   const calEvent = await upsertCalendarEvent(
     accessToken,
     {
-      summary:     `Evaluation | ${address}`,
+      summary:     `Evaluation | ${title}`,
       description: [contactName && `Contact: ${contactName}`, leadSource && `Source: ${leadSource}`].filter(Boolean).join('\n'),
-      location:    mapsLink ?? address,
+      location:    mapsLink ?? (mapAddress || title),
       start,
       end,
     },

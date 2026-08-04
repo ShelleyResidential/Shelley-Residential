@@ -32,11 +32,18 @@ type Evaluation = {
 }
 
 // ── Helpers ───────────────────────────────────────────────────
+function capitalizeWords(text: string): string {
+  return text.replace(/\b\w/g, c => c.toUpperCase())
+}
+
+// Heading format: unit + complex + suburb only — the full street address
+// (kept separately in Property Details) would make the page title unwieldy.
 function formatAddress(p: Property | null): string {
   if (!p) return 'Unknown address'
   const street = [p.street_number, p.street_name].filter(Boolean).join(' ')
   if (p.property_type === 'sectional_title' && p.unit_number) {
-    return [`Unit ${p.unit_number}`, p.complex_or_building_name, street, p.suburb].filter(Boolean).join(', ')
+    const unit = [`Unit ${p.unit_number}`, p.complex_or_building_name ? capitalizeWords(p.complex_or_building_name) : null].filter(Boolean).join(' ')
+    return [unit, p.suburb].filter(Boolean).join(', ')
   }
   return [street, p.suburb].filter(Boolean).join(', ') || p.city || 'Unknown address'
 }
