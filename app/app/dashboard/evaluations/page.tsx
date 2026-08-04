@@ -37,7 +37,6 @@ type Contact = {
   phone_number: string | null
   email_address: string | null
   contact_preference: string | null
-  tags: string[] | null
   marital_status: string | null
   occupation: string | null
   company_name: string | null
@@ -187,7 +186,7 @@ export default function EvaluationsPage() {
         evaluation_contacts (
           is_primary,
           contacts (id, title, first_name, last_name, status, phone_number, email_address,
-            contact_preference, tags, marital_status, occupation, company_name, division,
+            contact_preference, marital_status, occupation, company_name, division,
             branch, address, birthday, wedding_anniversary, home_anniversary, id_number, date_added),
           picklist_options:tag_option_id (label)
         )

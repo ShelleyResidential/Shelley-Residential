@@ -21,7 +21,7 @@ type EvalRow = {
   motivation_picklist: { label: string } | null
 }
 
-type ContactRow = { id: string; status: string | null; tags: string[] | null; date_added: string | null }
+type ContactRow = { id: string; status: string | null; date_added: string | null }
 
 type PropertyRow = { id: string; property_type: string | null; suburb: string | null; evaluations: { id: string }[] }
 
@@ -78,7 +78,7 @@ export default function AnalysePage() {
           lead_source_other_text, lead_source_picklist:lead_source_option_id (label),
           motivation_for_selling_notes, motivation_picklist:motivation_for_selling_option_id (label)
         `),
-        supabase.from('contacts').select('id, status, tags, date_added'),
+        supabase.from('contacts').select('id, status, date_added'),
         supabase.from('properties').select('id, property_type, suburb, evaluations (id)'),
         supabase.from('profiles').select('id, full_name, email'),
       ])
@@ -148,8 +148,6 @@ export default function AnalysePage() {
   const activeContacts = contacts.filter(c => c.status === 'Active').length
   const startOfMonth = new Date(now.getFullYear(), now.getMonth(), 1)
   const newThisMonth = contacts.filter(c => c.date_added && new Date(c.date_added) >= startOfMonth).length
-  const tagCounts = countBy(contacts.flatMap(c => c.tags ?? []).map(t => ({ t })), r => r.t)
-  const tagEntries = topEntries(tagCounts, 8)
 
   // ── Properties analytics ───────────────────────────────────
   const totalProperties = properties.length
@@ -258,17 +256,6 @@ export default function AnalysePage() {
         <StatCard label="Total Contacts" value={totalContacts} />
         <StatCard label="Active" value={activeContacts} sub={totalContacts ? `${((activeContacts / totalContacts) * 100).toFixed(0)}% of total` : undefined} />
         <StatCard label="Added This Month" value={newThisMonth} />
-      </div>
-
-      <div className={`${card} p-6 mb-10`}>
-        <p className="text-xs font-bold text-[#1a1a1a] uppercase tracking-wide mb-4">By Tag</p>
-        {tagEntries.length === 0 ? <EmptyNote /> : (
-          <div className="space-y-2.5">
-            {tagEntries.map(([tag, count]) => (
-              <BarRow key={tag} label={tag} count={count} total={totalContacts} colour="#1a1a1a" />
-            ))}
-          </div>
-        )}
       </div>
 
       {/* ══ PROPERTIES ══ */}

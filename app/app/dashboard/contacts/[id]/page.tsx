@@ -7,11 +7,6 @@ import { canDelete } from '@/lib/permissions'
 import { Breadcrumbs } from '@/lib/Breadcrumbs'
 import { useRouter, useParams, useSearchParams } from 'next/navigation'
 
-const TAGS = [
-  'Current Buyer', 'Current Seller', 'Family', 'Friends', 'Homeowner',
-  'Investor', 'Referral Agent', 'Service Provider', 'Shelly Team Member', 'Strategic Partner',
-]
-
 type Contact = {
   id: string
   title: string | null
@@ -21,7 +16,6 @@ type Contact = {
   phone_number: string | null
   email_address: string | null
   contact_preference: string | null
-  tags: string[]
   marital_status: string | null
   occupation: string | null
   company_name: string | null
@@ -69,7 +63,7 @@ export default function ContactDetailPage() {
   const [deleting, setDeleting]       = useState(false)
   const [loading, setLoading]         = useState(true)
   const [tab, setTab]                 = useState<'info' | 'notes'>('info')
-  const [editing, setEditing]         = useState(false)
+  const [editing, setEditing]         = useState(() => searchParams.get('edit') === '1')
   const [editForm, setEditForm]       = useState<Partial<Contact>>({})
   const [saving, setSaving]           = useState(false)
   const [saveError, setSaveError]     = useState('')
@@ -105,11 +99,6 @@ export default function ContactDetailPage() {
 
   function setField(field: string, value: unknown) {
     setEditForm(f => ({ ...f, [field]: value }))
-  }
-
-  function toggleTag(tag: string) {
-    const current = (editForm.tags ?? []) as string[]
-    setField('tags', current.includes(tag) ? current.filter(t => t !== tag) : [...current, tag])
   }
 
   async function deleteContact() {
@@ -222,7 +211,6 @@ export default function ContactDetailPage() {
               <Row label="First Name" value={contact.first_name} />
               <Row label="Surname"    value={contact.last_name} />
               <Row label="Status"     value={contact.status} />
-              <Row label="Tags"       value={contact.tags?.length ? contact.tags.join(', ') : null} />
               <Row label="ID Number"  value={contact.id_number} />
               <Row label="Date Added" value={formatDate(contact.date_added)} />
             </InfoSection>
@@ -276,21 +264,6 @@ export default function ContactDetailPage() {
                 <select value={editForm.status ?? 'Active'} onChange={e => setField('status', e.target.value)} className={select}>
                   <option>Active</option><option>Inactive</option>
                 </select>
-              </div>
-              <div>
-                <label className={labelCls}>Tags</label>
-                <div className="flex flex-wrap gap-2 mt-1">
-                  {TAGS.map(tag => (
-                    <button key={tag} type="button" onClick={() => toggleTag(tag)}
-                      className={`px-3 py-1.5 rounded-full text-xs font-medium border transition-colors ${
-                        (editForm.tags ?? []).includes(tag)
-                          ? 'bg-[#1a1a1a] text-white border-[#1a1a1a]'
-                          : 'bg-white text-[#1a1a1a] border-gray-200 hover:border-gray-400'
-                      }`}>
-                      {tag}
-                    </button>
-                  ))}
-                </div>
               </div>
               <div>
                 <label className={labelCls}>ID Number</label>

@@ -7,11 +7,6 @@ import { WarningIcon } from '@/lib/icons'
 import { Breadcrumbs } from '@/lib/Breadcrumbs'
 import { useRouter, useSearchParams } from 'next/navigation'
 
-const TAGS = [
-  'Current Buyer', 'Current Seller', 'Family', 'Friends', 'Homeowner',
-  'Investor', 'Referral Agent', 'Service Provider', 'Shelly Team Member', 'Strategic Partner',
-]
-
 const RELATIONSHIP_TYPES = [
   'Aunt', 'Brother', 'Business Partner', 'Contractor', 'Daughter',
   'Employee', 'Father', 'Grandfather', 'Grandmother', 'Landlord',
@@ -21,7 +16,7 @@ const RELATIONSHIP_TYPES = [
 
 const EMPTY_FORM = {
   title: '', first_name: '', last_name: '', phone_number: '', email_address: '',
-  contact_preference: '', tags: [] as string[], marital_status: '',
+  contact_preference: '', marital_status: '',
   occupation: '', company_name: '', division: '', branch: '',
   birthday: '', wedding_anniversary: '', home_anniversary: '',
   id_number: '', linked_contact_id: '', linked_contact_name: '', relationship_type: '',
@@ -37,7 +32,7 @@ function AddContactForm() {
   const [success, setSuccess] = useState(false)
   const [userId, setUserId]   = useState<string | null>(null)
   const [form, setForm]       = useState(EMPTY_FORM)
-  const [duplicates, setDuplicates] = useState<{ id: string; first_name: string; last_name: string; phone_number: string | null; email_address: string | null; tags: string[] | null }[]>([])
+  const [duplicates, setDuplicates] = useState<{ id: string; first_name: string; last_name: string; phone_number: string | null; email_address: string | null }[]>([])
   const [checkingDuplicates, setCheckingDuplicates] = useState(false)
 
   useEffect(() => {
@@ -67,7 +62,7 @@ function AddContactForm() {
       setCheckingDuplicates(true)
       const { data } = await supabase
         .from('contacts')
-        .select('id, first_name, last_name, phone_number, email_address, tags')
+        .select('id, first_name, last_name, phone_number, email_address')
         .or(clauses.join(','))
         .limit(5)
       setDuplicates(data ?? [])
@@ -76,17 +71,12 @@ function AddContactForm() {
     return () => clearTimeout(timer)
   }, [form.first_name, form.last_name, form.phone_number, form.email_address])
 
-  function useExistingContact(match: { id: string; first_name: string; last_name: string; tags: string[] | null; phone_number: string | null; email_address: string | null }) {
+  function useExistingContact(match: { id: string; first_name: string; last_name: string; phone_number: string | null; email_address: string | null }) {
     if (!returnTo) return
     const name = `${match.first_name} ${match.last_name}`.trim()
-    const tagsParam = encodeURIComponent((match.tags ?? []).join(','))
     const phoneParam = encodeURIComponent(match.phone_number ?? '')
     const emailParam = encodeURIComponent(match.email_address ?? '')
-    router.push(`${returnTo}?newContactId=${match.id}&newContactName=${encodeURIComponent(name)}&for=${returnFor ?? 'contact'}&tags=${tagsParam}&phone=${phoneParam}&email=${emailParam}`)
-  }
-
-  function toggleTag(tag: string) {
-    setForm(f => ({ ...f, tags: f.tags.includes(tag) ? f.tags.filter(t => t !== tag) : [...f.tags, tag] }))
+    router.push(`${returnTo}?newContactId=${match.id}&newContactName=${encodeURIComponent(name)}&for=${returnFor ?? 'contact'}&phone=${phoneParam}&email=${emailParam}`)
   }
 
   function set(field: string, value: string) {
@@ -106,7 +96,7 @@ function AddContactForm() {
       name: [form.first_name.trim(), form.last_name.trim()].filter(Boolean).join(' '),
       status: 'Active',
       phone_number: form.phone_number || null, email_address: form.email_address || null,
-      contact_preference: form.contact_preference || null, tags: form.tags,
+      contact_preference: form.contact_preference || null,
       marital_status: form.marital_status || null, occupation: form.occupation || null,
       company_name: form.company_name || null, division: form.division || null,
       branch: form.branch || null,
@@ -130,10 +120,9 @@ function AddContactForm() {
 
     if (returnTo && contact) {
       const name = [form.first_name.trim(), form.last_name.trim()].filter(Boolean).join(' ')
-      const tagsParam = encodeURIComponent(form.tags.join(','))
       const phoneParam = encodeURIComponent(form.phone_number)
       const emailParam = encodeURIComponent(form.email_address)
-      router.push(`${returnTo}?newContactId=${contact.id}&newContactName=${encodeURIComponent(name)}&for=${returnFor ?? 'contact'}&tags=${tagsParam}&phone=${phoneParam}&email=${emailParam}`)
+      router.push(`${returnTo}?newContactId=${contact.id}&newContactName=${encodeURIComponent(name)}&for=${returnFor ?? 'contact'}&phone=${phoneParam}&email=${emailParam}`)
       return
     }
 
@@ -189,22 +178,6 @@ function AddContactForm() {
               <div>
                 <label className={labelCls}>Surname</label>
                 <input value={form.last_name} onChange={e => set('last_name', e.target.value)} placeholder="Smith" className={input} />
-              </div>
-            </div>
-            <div>
-              <label className={labelCls}>Tags</label>
-              <p className="text-xs text-gray-400 mb-2">Select all that apply</p>
-              <div className="flex flex-wrap gap-2">
-                {TAGS.map(tag => (
-                  <button key={tag} type="button" onClick={() => toggleTag(tag)}
-                    className={`px-3 py-1.5 rounded-full text-xs font-medium border transition-colors ${
-                      form.tags.includes(tag)
-                        ? 'bg-[#1a1a1a] text-white border-[#1a1a1a]'
-                        : 'bg-white text-[#1a1a1a] border-gray-200 hover:border-gray-400'
-                    }`}>
-                    {tag}
-                  </button>
-                ))}
               </div>
             </div>
           </Section>

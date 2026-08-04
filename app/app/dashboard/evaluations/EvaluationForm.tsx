@@ -111,7 +111,6 @@ type ContactSlot = {
   contact_id: string
   contact_name: string
   tag_option_id: string
-  tags: string[]
   phone_number: string | null
   email_address: string | null
 }
@@ -213,7 +212,7 @@ type RawEvaluationRow = {
     contact_id: string
     is_primary: boolean
     sort_order: number
-    contacts: { id: string; first_name: string; last_name: string; tags: string[] | null; phone_number: string | null; email_address: string | null } | null
+    contacts: { id: string; first_name: string; last_name: string; phone_number: string | null; email_address: string | null } | null
     picklist_options: { label: string } | null
   }[]
 }
@@ -341,7 +340,6 @@ export function EvaluationForm({ evaluationId, readOnly = false, onSaved, onCanc
       contact_id: ec.contact_id,
       contact_name: [ec.contacts!.first_name, ec.contacts!.last_name].filter(Boolean).join(' '),
       tag_option_id: ec.picklist_options?.label ?? '',
-      tags: ec.contacts!.tags ?? [],
       phone_number: ec.contacts!.phone_number ?? null,
       email_address: ec.contacts!.email_address ?? null,
     })))
@@ -360,7 +358,7 @@ export function EvaluationForm({ evaluationId, readOnly = false, onSaved, onCanc
         properties (id, property_type, unit_number, complex_or_building_name, street_number, street_name, suburb, city),
         evaluation_contacts (
           contact_id, is_primary, sort_order,
-          contacts (id, first_name, last_name, tags, phone_number, email_address),
+          contacts (id, first_name, last_name, phone_number, email_address),
           picklist_options:tag_option_id (label)
         )
       `)
@@ -454,9 +452,8 @@ export function EvaluationForm({ evaluationId, readOnly = false, onSaved, onCanc
         setReferredByContactId(newContactId)
         setReferredByContactName(newContactName)
       } else {
-        const newContactTags = (searchParams.get('tags') ?? '').split(',').filter(Boolean)
         setContacts(prev => [...prev, {
-          contact_id: newContactId, contact_name: newContactName, tag_option_id: '', tags: newContactTags,
+          contact_id: newContactId, contact_name: newContactName, tag_option_id: '',
           phone_number: searchParams.get('phone') || null, email_address: searchParams.get('email') || null,
         }])
       }
@@ -617,8 +614,8 @@ export function EvaluationForm({ evaluationId, readOnly = false, onSaved, onCanc
   }
 
   // ── Contacts ─────────────────────────────────────────────
-  function addContact(contact_id: string, contact_name: string, tags: string[], phone_number: string | null, email_address: string | null) {
-    setContacts(prev => [...prev, { contact_id, contact_name, tag_option_id: '', tags, phone_number, email_address }])
+  function addContact(contact_id: string, contact_name: string, phone_number: string | null, email_address: string | null) {
+    setContacts(prev => [...prev, { contact_id, contact_name, tag_option_id: '', phone_number, email_address }])
   }
 
   function removeContact(idx: number) {
@@ -939,7 +936,7 @@ export function EvaluationForm({ evaluationId, readOnly = false, onSaved, onCanc
               target="_blank" rel="noopener noreferrer"
               className={`${btn.primary} flex-shrink-0`}
             >
-              Maps
+              View Maps
             </a>
           </div>
         ) : selectedProperty ? (
@@ -1291,11 +1288,11 @@ function PropertySearch({ onSelect }: { onSelect: (p: Property) => void }) {
 // ── ContactSearch combobox ────────────────────────────────────
 function ContactSearch({ placeholder, onSelect, excludeIds }: {
   placeholder: string
-  onSelect: (id: string, name: string, tags: string[], phone_number: string | null, email_address: string | null) => void
+  onSelect: (id: string, name: string, phone_number: string | null, email_address: string | null) => void
   excludeIds: string[]
 }) {
   const [query, setQuery]     = useState('')
-  const [results, setResults] = useState<{ id: string; first_name: string; last_name: string; tags: string[] | null; phone_number: string | null; email_address: string | null }[]>([])
+  const [results, setResults] = useState<{ id: string; first_name: string; last_name: string; phone_number: string | null; email_address: string | null }[]>([])
   const [open, setOpen]       = useState(false)
   const [loading, setLoading] = useState(false)
   const containerRef          = useRef<HTMLDivElement>(null)
@@ -1314,7 +1311,7 @@ function ContactSearch({ placeholder, onSelect, excludeIds }: {
       setLoading(true)
       const { data } = await supabase
         .from('contacts')
-        .select('id, first_name, last_name, tags, phone_number, email_address')
+        .select('id, first_name, last_name, phone_number, email_address')
         .or(`first_name.ilike.%${query}%,last_name.ilike.%${query}%`)
         .order('first_name').limit(8)
       setResults((data ?? []).filter(r => !excludeIds.includes(r.id)))
@@ -1339,7 +1336,7 @@ function ContactSearch({ placeholder, onSelect, excludeIds }: {
             const name = `${r.first_name} ${r.last_name}`.trim()
             return (
               <button key={r.id} type="button"
-                onMouseDown={() => { onSelect(r.id, name, r.tags ?? [], r.phone_number, r.email_address); setQuery(''); setOpen(false) }}
+                onMouseDown={() => { onSelect(r.id, name, r.phone_number, r.email_address); setQuery(''); setOpen(false) }}
                 className="w-full text-left px-4 py-2.5 text-sm text-[#1a1a1a] hover:bg-[#f8f7f4] border-b border-gray-100 last:border-b-0 transition-colors">
                 {name}
               </button>
