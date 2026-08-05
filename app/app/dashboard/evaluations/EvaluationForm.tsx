@@ -883,7 +883,7 @@ export function EvaluationForm({ evaluationId, readOnly = false, onSaved, onCanc
                 <p className="text-xs text-gray-400 mt-2">{[c.phone_number, c.email_address].filter(Boolean).join(' | ')}</p>
               )}
             </div>
-            <Link href={`/dashboard/contacts/${c.contact_id}?from=evaluations`} className={`${btn.primary} flex-shrink-0`}>
+            <Link href={`/dashboard/contacts/${c.contact_id}`} className={`${btn.primary} flex-shrink-0`}>
               View Contact
             </Link>
           </div>

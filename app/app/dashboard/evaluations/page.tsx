@@ -433,7 +433,7 @@ export default function EvaluationsPage() {
                     <td className="px-3 py-3 overflow-hidden">
                       {getSeller(ev) ? (
                         <Link
-                          href={`/dashboard/contacts/${getSeller(ev)!.id}?from=evaluations`}
+                          href={`/dashboard/contacts/${getSeller(ev)!.id}`}
                           onClick={e => e.stopPropagation()}
                           title={sellerName(ev)}
                           className="block w-full truncate text-gray-500 underline hover:font-bold hover:text-[#1a1a1a] transition-all"

@@ -195,6 +195,13 @@ export default function ContactsPage() {
                       className="w-4 h-4 border-gray-300 accent-[#E8266F] cursor-pointer"
                     />
                   </td>
+                  <td className="px-3 py-3 overflow-hidden">
+                    <span className={`text-xs px-2 py-0.5 rounded-full font-medium truncate inline-block max-w-full align-bottom ${
+                      c.status === 'Active' ? 'bg-green-50 text-green-700' : 'bg-gray-100 text-gray-500'
+                    }`}>
+                      {c.status || '—'}
+                    </span>
+                  </td>
                   <td className="px-3 py-3 text-[#1a1a1a] font-medium truncate" title={fullName(c)}>{fullName(c)}</td>
                   <td className="px-3 py-3 text-gray-500 truncate">{c.phone_number || '—'}</td>
                   <td className="px-3 py-3 overflow-hidden">
@@ -214,13 +221,6 @@ export default function ContactsPage() {
                     )}
                   </td>
                   <td className="px-3 py-3 text-gray-500 truncate">{c.contact_preference || '—'}</td>
-                  <td className="px-3 py-3 overflow-hidden">
-                    <span className={`text-xs px-2 py-0.5 rounded-full font-medium truncate inline-block max-w-full align-bottom ${
-                      c.status === 'Active' ? 'bg-green-50 text-green-700' : 'bg-gray-100 text-gray-500'
-                    }`}>
-                      {c.status || '—'}
-                    </span>
-                  </td>
                   <td className="px-3 py-3 text-gray-500 truncate">{formatDate(c.date_added)}</td>
                 </tr>
               ))}
@@ -245,11 +245,11 @@ function TableHeaderRow() {
   return (
     <tr className="border-b border-gray-100 text-left">
       <th className="px-3 py-3 whitespace-nowrap w-[4%]" />
+      <th className="px-3 py-3 font-semibold text-[#1a1a1a] whitespace-nowrap text-xs uppercase tracking-wide w-[16%]">Status</th>
       <th className="px-3 py-3 font-semibold text-[#1a1a1a] whitespace-nowrap text-xs uppercase tracking-wide w-[16%]">Name</th>
       <th className="px-3 py-3 font-semibold text-[#1a1a1a] whitespace-nowrap text-xs uppercase tracking-wide w-[16%]">Phone Number</th>
       <th className="px-3 py-3 font-semibold text-[#1a1a1a] whitespace-nowrap text-xs uppercase tracking-wide w-[16%]">Email</th>
       <th className="px-3 py-3 font-semibold text-[#1a1a1a] whitespace-nowrap text-xs uppercase tracking-wide w-[16%]">Preference</th>
-      <th className="px-3 py-3 font-semibold text-[#1a1a1a] whitespace-nowrap text-xs uppercase tracking-wide w-[16%]">Status</th>
       <th className="px-3 py-3 font-semibold text-[#1a1a1a] whitespace-nowrap text-xs uppercase tracking-wide w-[16%]">Date Added</th>
     </tr>
   )

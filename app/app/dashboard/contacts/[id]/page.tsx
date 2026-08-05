@@ -55,7 +55,6 @@ export default function ContactDetailPage() {
   const params = useParams()
   const searchParams = useSearchParams()
   const id = params.id as string
-  const fromEvaluations = searchParams.get('from') === 'evaluations'
 
   const [contact, setContact]         = useState<Contact | null>(null)
   const [userId, setUserId]           = useState<string | null>(null)
@@ -164,10 +163,7 @@ export default function ContactDetailPage() {
 
       {/* ── Header ── */}
       <div className="mb-8">
-        <Breadcrumbs items={fromEvaluations
-          ? [{ label: 'Analyse' }, { label: 'Evaluations', href: '/dashboard/evaluations' }, { label: fullName(contact) }]
-          : [{ label: 'Analyse' }, { label: 'Contacts', href: '/dashboard/contacts' }, { label: fullName(contact) }]
-        } />
+        <Breadcrumbs items={[{ label: 'Analyse' }, { label: 'Contacts', href: '/dashboard/contacts' }, { label: fullName(contact) }]} />
         <div className="flex items-start justify-between gap-4">
           <div className="min-w-0">
             <h1 className="text-2xl font-bold text-[#1a1a1a] truncate" title={fullName(contact)}>{fullName(contact)}</h1>
