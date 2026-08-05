@@ -143,9 +143,15 @@ export async function POST(request: NextRequest) {
     section('Agent',                  [agentName]),
   ].join('\n\n')
 
-  const start = new Date(ev.scheduled_at).toISOString()
+  // scheduled_at's digits are captured and displayed everywhere else in the
+  // app (see EvaluationForm's schedDate/schedTime fields) as literal
+  // Johannesburg wall-clock time, with no timezone conversion. Google
+  // Calendar's `dateTime` must therefore be sent WITHOUT a UTC "Z" suffix --
+  // otherwise Google treats it as a true UTC instant and, paired with
+  // timeZone: 'Africa/Johannesburg', shifts the displayed time by +2 hours.
   // Duration is always fixed at 45 minutes, regardless of any other setting.
-  const end   = new Date(new Date(ev.scheduled_at).getTime() + 45 * 60 * 1000).toISOString()
+  const start = new Date(ev.scheduled_at).toISOString().slice(0, 19)
+  const end   = new Date(new Date(ev.scheduled_at).getTime() + 45 * 60 * 1000).toISOString().slice(0, 19)
 
   const calEvent = await upsertCalendarEvent(
     accessToken,
