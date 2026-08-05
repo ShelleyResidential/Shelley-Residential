@@ -217,9 +217,10 @@ type RawEvaluationRow = {
   }[]
 }
 
-export function EvaluationForm({ evaluationId, readOnly = false, onSaved, onCancel }: {
+export function EvaluationForm({ evaluationId, readOnly = false, calendarEventLink, onSaved, onCancel }: {
   evaluationId?: string
   readOnly?: boolean
+  calendarEventLink?: string | null
   onSaved?: () => void
   onCancel?: () => void
 }) {
@@ -1204,7 +1205,16 @@ export function EvaluationForm({ evaluationId, readOnly = false, onSaved, onCanc
         </div>
 
         <Field label="Evaluation Date and Time" readOnly={readOnly}
-          value={schedDate ? `${new Date(schedDate).toLocaleDateString('en-ZA', { day: 'numeric', month: 'long', year: 'numeric' })}${schedTime ? ' at ' + schedTime : ''}` : undefined}>
+          value={schedDate ? (
+            <span className="flex items-center gap-2 flex-wrap">
+              {`${new Date(schedDate).toLocaleDateString('en-ZA', { day: 'numeric', month: 'long', year: 'numeric' })}${schedTime ? ' at ' + schedTime : ''}`}
+              {calendarEventLink && (
+                <a href={calendarEventLink} target="_blank" rel="noopener noreferrer" className="text-sm text-blue-600 hover:underline">
+                  View Event ↗
+                </a>
+              )}
+            </span>
+          ) : undefined}>
           <div className="grid grid-cols-2 gap-4 mt-1">
             <div>
               <label className="text-xs text-gray-400 mb-1 block">Date</label>

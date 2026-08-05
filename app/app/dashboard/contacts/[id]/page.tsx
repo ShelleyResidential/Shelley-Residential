@@ -27,7 +27,10 @@ type Contact = {
   home_anniversary: string | null
   id_number: string | null
   date_added: string
+  created_by: string | null
 }
+
+type Profile = { id: string; full_name: string | null; email: string | null }
 
 type Note = { id: string; note_text: string; created_at: string; last_edited_at: string }
 type NoteHistory = { id: string; note_text: string; edited_at: string }
@@ -57,6 +60,7 @@ export default function ContactDetailPage() {
   const id = params.id as string
 
   const [contact, setContact]         = useState<Contact | null>(null)
+  const [profiles, setProfiles]       = useState<Profile[]>([])
   const [userId, setUserId]           = useState<string | null>(null)
   const [userEmail, setUserEmail]     = useState<string | null>(null)
   const [deleting, setDeleting]       = useState(false)
@@ -93,6 +97,7 @@ export default function ContactDetailPage() {
       setEditForm(data)
       setLoading(false)
     })
+    supabase.from('profiles').select('id, full_name, email').then(({ data }) => setProfiles(data ?? []))
     fetchNotes()
   }, [id, router, fetchNotes])
 
@@ -223,7 +228,11 @@ export default function ContactDetailPage() {
               <Field label="ID Number" editing={editing} value={contact.id_number}>
                 <input value={editForm.id_number ?? ''} onChange={e => setField('id_number', e.target.value || null)} className={input} />
               </Field>
-              <Field label="Date Added" editing={false} value={formatDate(contact.date_added)} />
+              <div className="grid grid-cols-2 gap-3">
+                <Field label="Date Added" editing={false} value={formatDate(contact.date_added)} />
+                <Field label="Captured By" editing={false}
+                  value={profiles.find(p => p.id === contact.created_by)?.full_name ?? profiles.find(p => p.id === contact.created_by)?.email} />
+              </div>
             </Section>
 
             <Section title="Contact Details">

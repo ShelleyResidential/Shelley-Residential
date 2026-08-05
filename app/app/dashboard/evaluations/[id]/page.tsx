@@ -93,8 +93,6 @@ export default function EvaluationDetailPage() {
   const [userEmail, setUserEmail]   = useState<string | null>(null)
   const [editing, setEditing]       = useState(() => searchParams.get('edit') === '1' || searchParams.get('newContactId') !== null)
   const [deleting, setDeleting]     = useState(false)
-  const [syncing, setSyncing]       = useState(false)
-  const [syncError, setSyncError]   = useState('')
 
   const fetchEvaluation = useCallback(async () => {
     const { data } = await supabase
@@ -139,24 +137,6 @@ export default function EvaluationDetailPage() {
     const { error: err } = await supabase.from('evaluations').delete().eq('id', id)
     if (err) { alert(err.message); setDeleting(false); return }
     router.push('/dashboard/evaluations')
-  }
-
-  async function syncToCalendar() {
-    if (!userId) return
-    setSyncing(true)
-    setSyncError('')
-    const res = await fetch('/api/calendar/sync', {
-      method:  'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body:    JSON.stringify({ evaluationId: id, userId }),
-    })
-    const json = await res.json()
-    if (!res.ok) {
-      setSyncError(json.error ?? 'Failed to sync to Google Calendar.')
-    } else {
-      await fetchEvaluation()
-    }
-    setSyncing(false)
   }
 
   async function togglePipelineStep(stepId: string, currentValue: boolean) {
@@ -227,23 +207,10 @@ export default function EvaluationDetailPage() {
           <EvaluationForm
             evaluationId={id}
             readOnly={!editing}
+            calendarEventLink={ev.calendar_event_link}
             onSaved={() => { setEditing(false); fetchEvaluation() }}
             onCancel={() => setEditing(false)}
           />
-
-          {!editing && ev.scheduled_at && (
-            <div className="flex items-center gap-3 flex-wrap">
-              <button onClick={syncToCalendar} disabled={syncing} className={btn.secondary}>
-                {syncing ? 'Syncing…' : ev.calendar_event_link ? '↻ Update Google Calendar' : '+ Add to Google Calendar'}
-              </button>
-              {ev.calendar_event_link && (
-                <a href={ev.calendar_event_link} target="_blank" rel="noopener noreferrer" className="text-sm text-blue-600 hover:underline">
-                  View event ↗
-                </a>
-              )}
-              {syncError && <p className="text-xs text-red-500">{syncError}</p>}
-            </div>
-          )}
         </div>
       )}
 
