@@ -3,10 +3,11 @@
 import { useState, useEffect, useCallback } from 'react'
 import { supabase } from '@/lib/supabase'
 import { btn, card, input, select } from '@/lib/styles'
-import { canDelete } from '@/lib/permissions'
 import { Breadcrumbs } from '@/lib/Breadcrumbs'
 import { useRouter } from 'next/navigation'
 import Link from 'next/link'
+
+const PAGE_SIZE = 50
 
 type Property = {
   id: string
@@ -25,12 +26,6 @@ type Property = {
     status: string
     date_captured: string
   }[]
-}
-
-const TYPE_LABELS: Record<string, string> = {
-  freehold:        'Freehold',
-  sectional_title: 'Sectional Title',
-  vacant_land:     'Vacant Land',
 }
 
 const STATUS_COLOURS: Record<string, string> = {
@@ -61,7 +56,7 @@ function capitalizeWords(text: string): string {
 }
 
 // Heading format: unit + complex + suburb only — the full street address
-// is still used for search matching and the Maps link (see mapQuery below).
+// is still used for the Maps link (see mapQuery below).
 function formatAddress(p: Property): string {
   const street = [p.street_number, p.street_name].filter(Boolean).join(' ')
   if (p.property_type === 'sectional_title' && p.unit_number) {
@@ -71,10 +66,24 @@ function formatAddress(p: Property): string {
   return [street, p.suburb].filter(Boolean).join(', ') || p.city || 'Unknown address'
 }
 
-// The actual navigable street address — used for the Maps link and search
-// matching, since a unit/complex name alone doesn't reliably geocode.
+// The actual navigable street address — used for the Maps link, since a
+// unit/complex name alone doesn't reliably geocode.
 function mapQuery(p: Property): string {
   return [p.street_number, p.street_name, p.suburb, p.city].filter(Boolean).join(' ')
+}
+
+function mapsUrl(p: Property): string | null {
+  if (p.google_maps_url) return p.google_maps_url
+  const q = mapQuery(p)
+  return q ? `https://www.google.com/maps/dir/?api=1&destination=${encodeURIComponent(q)}` : null
+}
+
+// A property can carry multiple evaluations over time — the most recent
+// one (by date captured) is what the list surfaces.
+function latestEvaluation(p: Property): Property['evaluations'][number] | null {
+  const evals = p.evaluations ?? []
+  if (evals.length === 0) return null
+  return [...evals].sort((a, b) => new Date(b.date_captured).getTime() - new Date(a.date_captured).getTime())[0]
 }
 
 export default function PropertiesPage() {
@@ -85,8 +94,11 @@ export default function PropertiesPage() {
   const [filterType, setFilterType] = useState('')
   const [filterSuburb, setFilterSuburb] = useState('')
   const [suburbs, setSuburbs]       = useState<string[]>([])
-  const [userEmail, setUserEmail]   = useState<string | null>(null)
-  const [deletingId, setDeletingId] = useState<string | null>(null)
+  const [page, setPage]             = useState(1)
+  const [totalCount, setTotalCount] = useState(0)
+  const [selectedId, setSelectedId] = useState<string | null>(null)
+
+  const totalPages = Math.max(1, Math.ceil(totalCount / PAGE_SIZE))
 
   const fetchProperties = useCallback(async () => {
     setLoading(true)
@@ -98,28 +110,28 @@ export default function PropertiesPage() {
         street_number, street_name, suburb, city, province,
         google_maps_url, created_at,
         evaluations (id, status, date_captured)
-      `)
+      `, { count: 'exact' })
       .order('created_at', { ascending: false })
 
     if (filterType)   query = query.eq('property_type', filterType)
     if (filterSuburb) query = query.eq('suburb', filterSuburb)
-
-    const { data } = await query
-    let results = (data ?? []) as unknown as Property[]
-
     if (search) {
-      const q = search.toLowerCase()
-      results = results.filter(p => `${formatAddress(p)} ${mapQuery(p)}`.toLowerCase().includes(q))
+      const q = search.trim()
+      query = query.or(`street_name.ilike.%${q}%,suburb.ilike.%${q}%,city.ilike.%${q}%,complex_or_building_name.ilike.%${q}%`)
     }
 
-    setProperties(results)
+    const from = (page - 1) * PAGE_SIZE
+    query = query.range(from, from + PAGE_SIZE - 1)
+
+    const { data, count } = await query
+    setProperties((data ?? []) as unknown as Property[])
+    setTotalCount(count ?? 0)
     setLoading(false)
-  }, [search, filterType, filterSuburb])
+  }, [search, filterType, filterSuburb, page])
 
   useEffect(() => {
     supabase.auth.getUser().then(({ data }) => {
-      if (!data.user) { router.push('/'); return }
-      setUserEmail(data.user.email ?? null)
+      if (!data.user) router.push('/')
     })
 
     // Load distinct suburbs for the filter dropdown
@@ -129,35 +141,62 @@ export default function PropertiesPage() {
     })
   }, [router])
 
-  async function deleteProperty(p: Property) {
-    if (!confirm(`Delete ${formatAddress(p)}? This cannot be undone.`)) return
-    setDeletingId(p.id)
-    const { error } = await supabase.from('properties').delete().eq('id', p.id)
-    if (error) {
-      alert(error.code === '23503'
-        ? "This property has evaluations linked to it and can't be deleted. Delete those evaluations first."
-        : error.message)
-      setDeletingId(null)
-      return
-    }
-    setDeletingId(null)
-    fetchProperties()
-  }
+  // Any change to the filters should snap back to page 1.
+  useEffect(() => {
+    setPage(1)
+  }, [search, filterType, filterSuburb])
 
   useEffect(() => {
     const timer = setTimeout(fetchProperties, 300)
     return () => clearTimeout(timer)
   }, [fetchProperties])
 
+  function toggleSelected(id: string) {
+    setSelectedId(prev => prev === id ? null : id)
+  }
+
+  const rowActionControls = selectedId && (
+    <RowActionButtons
+      onEdit={() => router.push(`/dashboard/properties/${selectedId}?edit=1`)}
+      onDetails={() => router.push(`/dashboard/properties/${selectedId}`)}
+    />
+  )
+
+  const paginationControls = !loading && properties.length > 0 && (
+    <div className="flex items-center gap-3 flex-wrap justify-end">
+      <p className="text-xs text-gray-400">
+        Page {page} of {totalPages} · {PAGE_SIZE} Records
+      </p>
+      <div className="flex items-center gap-1">
+        <button onClick={() => setPage(1)} disabled={page <= 1}
+          className="px-2.5 py-1.5 rounded-md text-sm text-[#1a1a1a] border border-gray-200 hover:bg-gray-50 disabled:opacity-40 disabled:cursor-not-allowed transition-colors">
+          «
+        </button>
+        <button onClick={() => setPage(p => Math.max(1, p - 1))} disabled={page <= 1}
+          className="px-2.5 py-1.5 rounded-md text-sm text-[#1a1a1a] border border-gray-200 hover:bg-gray-50 disabled:opacity-40 disabled:cursor-not-allowed transition-colors">
+          ‹
+        </button>
+        <button onClick={() => setPage(p => Math.min(totalPages, p + 1))} disabled={page >= totalPages}
+          className="px-2.5 py-1.5 rounded-md text-sm text-[#1a1a1a] border border-gray-200 hover:bg-gray-50 disabled:opacity-40 disabled:cursor-not-allowed transition-colors">
+          ›
+        </button>
+        <button onClick={() => setPage(totalPages)} disabled={page >= totalPages}
+          className="px-2.5 py-1.5 rounded-md text-sm text-[#1a1a1a] border border-gray-200 hover:bg-gray-50 disabled:opacity-40 disabled:cursor-not-allowed transition-colors">
+          »
+        </button>
+      </div>
+    </div>
+  )
+
   return (
     <div className="p-10">
       <Breadcrumbs items={[{ label: 'Analyse' }, { label: 'Properties' }]} />
-      <div className="flex items-center justify-between mb-8">
+      <div className="flex items-center justify-between mb-4">
         <h1 className="text-2xl font-bold text-[#1a1a1a]">Properties</h1>
       </div>
 
       {/* Filters */}
-      <div className={`${card} p-4 mb-6 flex gap-3 flex-wrap items-center`}>
+      <div className={`${card} p-4 mb-3 flex gap-3 flex-wrap items-center`}>
         <input
           type="text"
           placeholder="Search by address…"
@@ -182,11 +221,18 @@ export default function PropertiesPage() {
         )}
       </div>
 
-      {!loading && (
-        <p className="text-sm text-gray-400 mb-4">
-          {properties.length} {properties.length === 1 ? 'property' : 'properties'}
-        </p>
-      )}
+      <div className="flex items-center justify-end flex-wrap gap-3 mb-6">
+        {rowActionControls}
+      </div>
+
+      <div className="flex items-center justify-between flex-wrap gap-3 mb-4">
+        {!loading && (
+          <p className="text-sm text-gray-400">
+            {totalCount} {totalCount === 1 ? 'Property' : 'Properties'}
+          </p>
+        )}
+        {paginationControls}
+      </div>
 
       {loading ? (
         <div className="text-center py-20 text-gray-400 text-sm">Loading properties…</div>
@@ -195,74 +241,106 @@ export default function PropertiesPage() {
           <p className="text-gray-400 text-sm">No properties found.</p>
         </div>
       ) : (
-        <div className="space-y-2">
-          {properties.map(p => {
-            const address  = formatAddress(p)
-            const query    = mapQuery(p)
-            const mapLink  = p.google_maps_url ?? (query ? `https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(query)}` : null)
-            const evals    = p.evaluations ?? []
-            const latestEv = evals[0] ?? null
+        <div className={`${card} overflow-x-auto`}>
+          <table className="w-full text-sm table-fixed">
+            <thead>
+              <TableHeaderRow />
+            </thead>
+            <tbody>
+              {properties.map((p, i) => {
+                const address = formatAddress(p)
+                const link    = mapsUrl(p)
+                const latest  = latestEvaluation(p)
+                const area    = [p.suburb, p.city].filter(Boolean).join(', ')
 
-            return (
-              <div key={p.id} className={`${card} flex items-center justify-between px-5 py-4 gap-4`}>
-                <div className="min-w-0 flex-1">
-                  <div className="flex items-center gap-2 flex-wrap">
-                    <span className="font-semibold text-[#1a1a1a]">{address}</span>
-                    {p.property_type && (
-                      <span className="text-xs px-2 py-0.5 rounded-full bg-gray-100 text-gray-600 font-medium">
-                        {TYPE_LABELS[p.property_type] ?? p.property_type}
-                      </span>
-                    )}
-                  </div>
-                  <div className="flex gap-4 mt-1 text-sm text-gray-400 flex-wrap">
-                    {p.suburb && <span>{p.suburb}</span>}
-                    {p.city && p.city !== p.suburb && <span>{p.city}</span>}
-                    {evals.length > 0 && (
-                      <span>{evals.length} evaluation{evals.length !== 1 ? 's' : ''}</span>
-                    )}
-                  </div>
-                </div>
-
-                <div className="flex items-center gap-3 flex-shrink-0 flex-wrap justify-end">
-                  {latestEv && (
-                    <span className={`text-xs px-2 py-0.5 rounded-full font-medium ${STATUS_COLOURS[latestEv.status] ?? 'bg-gray-100 text-gray-500'}`}>
-                      {STATUS_LABELS[latestEv.status] ?? latestEv.status}
-                    </span>
-                  )}
-                  {mapLink && (
-                    <a
-                      href={mapLink}
-                      target="_blank"
-                      rel="noopener noreferrer"
-                      className="text-xs text-gray-400 hover:text-[#1a1a1a] transition-colors"
-                      onClick={e => e.stopPropagation()}
-                    >
-                      Maps ↗
-                    </a>
-                  )}
-                  {latestEv && (
-                    <Link
-                      href={`/dashboard/evaluations/${latestEv.id}`}
-                      className="text-xs font-medium text-[#1a1a1a] hover:underline"
-                    >
-                      View evaluation →
-                    </Link>
-                  )}
-                  {canDelete(userEmail) && (
-                    <button
-                      onClick={() => deleteProperty(p)}
-                      disabled={deletingId === p.id}
-                      className="text-xs font-medium text-red-500 hover:text-red-700 transition-colors disabled:opacity-50"
-                    >
-                      {deletingId === p.id ? 'Deleting…' : 'Delete'}
-                    </button>
-                  )}
-                </div>
-              </div>
-            )
-          })}
+                return (
+                  <tr
+                    key={p.id}
+                    onClick={() => router.push(`/dashboard/properties/${p.id}`)}
+                    className={`cursor-pointer hover:bg-gray-100 transition-colors ${i % 2 === 0 ? 'bg-white' : 'bg-gray-50'}`}
+                  >
+                    <td className="px-3 py-3 whitespace-nowrap" onClick={e => e.stopPropagation()}>
+                      <input
+                        type="radio"
+                        name="selected-property"
+                        checked={selectedId === p.id}
+                        onClick={() => toggleSelected(p.id)}
+                        onChange={() => setSelectedId(p.id)}
+                        className="w-4 h-4 border-gray-300 accent-[#E8266F] cursor-pointer"
+                      />
+                    </td>
+                    <td className="px-3 py-3 text-[#1a1a1a] font-medium truncate" title={address}>{address}</td>
+                    <td className="px-3 py-3 text-gray-500 truncate" title={area || undefined}>{area || '—'}</td>
+                    <td className="px-3 py-3 overflow-hidden">
+                      {latest ? (
+                        <span className={`text-xs px-2 py-0.5 rounded-full font-medium truncate inline-block max-w-full align-bottom ${STATUS_COLOURS[latest.status] ?? 'bg-gray-100 text-gray-500'}`}>
+                          {STATUS_LABELS[latest.status] ?? latest.status}
+                        </span>
+                      ) : (
+                        <span className="text-gray-500">—</span>
+                      )}
+                    </td>
+                    <td className="px-3 py-3 overflow-hidden" onClick={e => e.stopPropagation()}>
+                      {link ? (
+                        <a href={link} target="_blank" rel="noopener noreferrer" className="text-gray-500 hover:text-[#1a1a1a] transition-colors">
+                          Maps ↗
+                        </a>
+                      ) : (
+                        <span className="text-gray-500">—</span>
+                      )}
+                    </td>
+                    <td className="px-3 py-3 overflow-hidden" onClick={e => e.stopPropagation()}>
+                      {latest ? (
+                        <Link href={`/dashboard/evaluations/${latest.id}`} className="font-medium text-[#1a1a1a] hover:underline">
+                          View evaluation →
+                        </Link>
+                      ) : (
+                        <span className="text-gray-500">—</span>
+                      )}
+                    </td>
+                  </tr>
+                )
+              })}
+            </tbody>
+            <tfoot>
+              <TableHeaderRow />
+            </tfoot>
+          </table>
         </div>
       )}
+
+      {paginationControls && <div className="mt-4">{paginationControls}</div>}
+
+      {rowActionControls && <div className="mt-4">{rowActionControls}</div>}
+    </div>
+  )
+}
+
+// ── Table header row, repeated at both the top (thead) and bottom (tfoot)
+// of the properties table so the column labels stay visible either way.
+function TableHeaderRow() {
+  return (
+    <tr className="border-b border-gray-100 text-left">
+      <th className="px-3 py-3 whitespace-nowrap w-[4%]" />
+      <th className="px-3 py-3 font-semibold text-[#1a1a1a] whitespace-nowrap text-xs uppercase tracking-wide w-[24%]">Address</th>
+      <th className="px-3 py-3 font-semibold text-[#1a1a1a] whitespace-nowrap text-xs uppercase tracking-wide w-[20%]">Suburb Area</th>
+      <th className="px-3 py-3 font-semibold text-[#1a1a1a] whitespace-nowrap text-xs uppercase tracking-wide w-[16%]">Evaluation Status</th>
+      <th className="px-3 py-3 font-semibold text-[#1a1a1a] whitespace-nowrap text-xs uppercase tracking-wide w-[16%]">Maps</th>
+      <th className="px-3 py-3 font-semibold text-[#1a1a1a] whitespace-nowrap text-xs uppercase tracking-wide w-[20%]">View Evaluation</th>
+    </tr>
+  )
+}
+
+// ── Row action buttons (Edit / Details), shown once a row is selected.
+function RowActionButtons({ onEdit, onDetails }: { onEdit?: () => void; onDetails?: () => void }) {
+  return (
+    <div className="flex items-center gap-2 flex-wrap justify-end">
+      <button disabled={!onEdit} onClick={onEdit} className={`${btn.secondary} cursor-pointer disabled:cursor-not-allowed`}>
+        Edit
+      </button>
+      <button disabled={!onDetails} onClick={onDetails} className={`${btn.secondary} cursor-pointer disabled:cursor-not-allowed`}>
+        Details
+      </button>
     </div>
   )
 }

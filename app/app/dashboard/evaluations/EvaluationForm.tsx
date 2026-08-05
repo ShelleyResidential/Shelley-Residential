@@ -293,7 +293,9 @@ export function EvaluationForm({ evaluationId, readOnly = false, calendarEventLi
       setUserId(data.user?.id ?? null)
     })
     supabase.from('profiles').select('id, full_name, email, role').then(({ data }) => {
-      setProfiles((data ?? []) as Profile[])
+      const rows = (data ?? []) as Profile[]
+      rows.sort((a, b) => (a.full_name ?? a.email ?? '').localeCompare(b.full_name ?? b.email ?? ''))
+      setProfiles(rows)
     })
   }, [])
 
