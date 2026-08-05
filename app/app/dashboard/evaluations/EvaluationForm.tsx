@@ -1214,11 +1214,11 @@ export function EvaluationForm({ evaluationId, readOnly = false, onSaved, onCanc
 
       {!readOnly && (
         <div className="flex gap-3">
-          <button type="button" onClick={handleCancel} className={`${btn.secondary} flex-1`}>
-            Cancel
-          </button>
           <button type="submit" disabled={saving} className={`${btn.primary} flex-1 py-4`}>
             {saving ? 'Saving…' : evaluationId ? 'Save Changes' : 'Save Evaluation'}
+          </button>
+          <button type="button" onClick={handleCancel} className={`${btn.secondary} flex-1`}>
+            Cancel
           </button>
         </div>
       )}

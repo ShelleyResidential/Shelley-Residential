@@ -83,6 +83,14 @@ function AddContactForm() {
     setForm(f => ({ ...f, [field]: value }))
   }
 
+  function handleCancel() {
+    if (returnTo) {
+      router.push(`${returnTo}?resume=1`)
+    } else {
+      router.push('/dashboard/contacts')
+    }
+  }
+
   async function handleSubmit(e: React.FormEvent) {
     e.preventDefault()
     if (!form.first_name.trim()) { setError('First name is required.'); return }
@@ -312,9 +320,14 @@ function AddContactForm() {
 
           {error && <p className="text-sm text-red-500 bg-red-50 px-4 py-3 rounded-lg">{error}</p>}
 
-          <button type="submit" disabled={saving} className={`${btn.primary} w-full py-4`}>
-            {saving ? 'Saving contact…' : 'Save Contact'}
-          </button>
+          <div className="flex gap-3">
+            <button type="submit" disabled={saving} className={`${btn.primary} flex-1 py-4`}>
+              {saving ? 'Saving contact…' : 'Save Contact'}
+            </button>
+            <button type="button" onClick={handleCancel} className={`${btn.secondary} flex-1`}>
+              Cancel
+            </button>
+          </div>
 
         </form>
       </main>
