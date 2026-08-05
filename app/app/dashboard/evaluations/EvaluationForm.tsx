@@ -1165,9 +1165,6 @@ export function EvaluationForm({ evaluationId, readOnly = false, calendarEventLi
             <option value="won">Won</option>
             <option value="lost">Lost</option>
             <option value="cancelled">Cancelled</option>
-            <option value="in_progress">In Progress (legacy)</option>
-            <option value="open">Open Mandate (legacy)</option>
-            <option value="future">Future Mandate (legacy)</option>
           </select>
         </Field>
 
@@ -1189,7 +1186,7 @@ export function EvaluationForm({ evaluationId, readOnly = false, calendarEventLi
           <Field label="Agent" readOnly={readOnly} value={profiles.find(p => p.id === agentId)?.full_name ?? profiles.find(p => p.id === agentId)?.email}>
             <select value={agentId} onChange={e => setAgentId(e.target.value)} className={select}>
               <option value="">—</option>
-              {profiles.filter(p => p.role === 'agent').map(p => (
+              {profiles.map(p => (
                 <option key={p.id} value={p.id}>{p.full_name ?? p.email}</option>
               ))}
             </select>
@@ -1197,7 +1194,7 @@ export function EvaluationForm({ evaluationId, readOnly = false, calendarEventLi
           <Field label="Transaction Coordinator" readOnly={readOnly} value={profiles.find(p => p.id === tcId)?.full_name ?? profiles.find(p => p.id === tcId)?.email}>
             <select value={tcId} onChange={e => setTcId(e.target.value)} className={select}>
               <option value="">—</option>
-              {profiles.filter(p => p.role === 'transaction_coordinator').map(p => (
+              {profiles.map(p => (
                 <option key={p.id} value={p.id}>{p.full_name ?? p.email}</option>
               ))}
             </select>

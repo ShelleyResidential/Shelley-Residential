@@ -20,7 +20,10 @@ type Contact = {
   contact_preference: string | null
   agent_id: string | null
   date_added: string | null
+  created_by: string | null
 }
+
+type Profile = { id: string; full_name: string | null; email: string | null }
 
 function fullName(c: Pick<Contact, 'first_name' | 'last_name'>) {
   return [c.first_name, c.last_name].filter(Boolean).join(' ')
@@ -34,6 +37,7 @@ function formatDate(iso: string | null): string {
 export default function ContactsPage() {
   const router = useRouter()
   const [contacts, setContacts]       = useState<Contact[]>([])
+  const [profiles, setProfiles]       = useState<Profile[]>([])
   const [loading, setLoading]         = useState(true)
   const [search, setSearch]           = useState('')
   const [myOnly, setMyOnly]           = useState(false)
@@ -48,7 +52,7 @@ export default function ContactsPage() {
     setLoading(true)
     let query = supabase
       .from('contacts')
-      .select('id, title, first_name, last_name, status, phone_number, email_address, contact_preference, agent_id, date_added', { count: 'exact' })
+      .select('id, title, first_name, last_name, status, phone_number, email_address, contact_preference, agent_id, date_added, created_by', { count: 'exact' })
       .order('first_name')
 
     if (myOnly && userId) query = query.eq('agent_id', userId)
@@ -68,6 +72,7 @@ export default function ContactsPage() {
       if (!data.user) { router.push('/'); return }
       setUserId(data.user.id)
     })
+    supabase.from('profiles').select('id, full_name, email').then(({ data }) => setProfiles(data ?? []))
   }, [router])
 
   // Any change to the filters should snap back to page 1.
@@ -222,6 +227,9 @@ export default function ContactsPage() {
                   </td>
                   <td className="px-3 py-3 text-gray-500 truncate">{c.contact_preference || '—'}</td>
                   <td className="px-3 py-3 text-gray-500 truncate">{formatDate(c.date_added)}</td>
+                  <td className="px-3 py-3 text-gray-500 truncate">
+                    {profiles.find(p => p.id === c.created_by)?.full_name ?? profiles.find(p => p.id === c.created_by)?.email ?? '—'}
+                  </td>
                 </tr>
               ))}
             </tbody>
@@ -245,12 +253,13 @@ function TableHeaderRow() {
   return (
     <tr className="border-b border-gray-100 text-left">
       <th className="px-3 py-3 whitespace-nowrap w-[4%]" />
-      <th className="px-3 py-3 font-semibold text-[#1a1a1a] whitespace-nowrap text-xs uppercase tracking-wide w-[16%]">Status</th>
-      <th className="px-3 py-3 font-semibold text-[#1a1a1a] whitespace-nowrap text-xs uppercase tracking-wide w-[16%]">Name</th>
-      <th className="px-3 py-3 font-semibold text-[#1a1a1a] whitespace-nowrap text-xs uppercase tracking-wide w-[16%]">Phone Number</th>
-      <th className="px-3 py-3 font-semibold text-[#1a1a1a] whitespace-nowrap text-xs uppercase tracking-wide w-[16%]">Email</th>
-      <th className="px-3 py-3 font-semibold text-[#1a1a1a] whitespace-nowrap text-xs uppercase tracking-wide w-[16%]">Preference</th>
-      <th className="px-3 py-3 font-semibold text-[#1a1a1a] whitespace-nowrap text-xs uppercase tracking-wide w-[16%]">Date Added</th>
+      <th className="px-3 py-3 font-semibold text-[#1a1a1a] whitespace-nowrap text-xs uppercase tracking-wide w-[13.7%]">Status</th>
+      <th className="px-3 py-3 font-semibold text-[#1a1a1a] whitespace-nowrap text-xs uppercase tracking-wide w-[13.7%]">Name</th>
+      <th className="px-3 py-3 font-semibold text-[#1a1a1a] whitespace-nowrap text-xs uppercase tracking-wide w-[13.7%]">Phone Number</th>
+      <th className="px-3 py-3 font-semibold text-[#1a1a1a] whitespace-nowrap text-xs uppercase tracking-wide w-[13.7%]">Email</th>
+      <th className="px-3 py-3 font-semibold text-[#1a1a1a] whitespace-nowrap text-xs uppercase tracking-wide w-[13.7%]">Preference</th>
+      <th className="px-3 py-3 font-semibold text-[#1a1a1a] whitespace-nowrap text-xs uppercase tracking-wide w-[13.7%]">Date Added</th>
+      <th className="px-3 py-3 font-semibold text-[#1a1a1a] whitespace-nowrap text-xs uppercase tracking-wide w-[13.7%]">Captured By</th>
     </tr>
   )
 }
