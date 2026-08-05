@@ -50,7 +50,7 @@ export async function refreshAccessToken(refreshToken: string) {
 
 export async function upsertCalendarEvent(
   accessToken: string,
-  event: { summary: string; description: string; location: string; start: string; end: string },
+  event: { summary: string; description: string; location: string; start: string; end: string; attendees?: string[] },
   existingEventId?: string | null,
 ) {
   const body = {
@@ -59,8 +59,13 @@ export async function upsertCalendarEvent(
     location:    event.location,
     start: { dateTime: event.start, timeZone: 'Africa/Johannesburg' },
     end:   { dateTime: event.end,   timeZone: 'Africa/Johannesburg' },
+    ...(event.attendees && event.attendees.length > 0
+      ? { attendees: event.attendees.map(email => ({ email })) }
+      : {}),
   }
-  const url    = existingEventId ? `${CALENDAR_BASE}/${existingEventId}` : CALENDAR_BASE
+  const base   = existingEventId ? `${CALENDAR_BASE}/${existingEventId}` : CALENDAR_BASE
+  // sendUpdates=all so attendees actually receive the invite email.
+  const url    = `${base}?sendUpdates=all`
   const method = existingEventId ? 'PUT' : 'POST'
   const res = await fetch(url, {
     method,

@@ -661,12 +661,9 @@ export function EvaluationForm({ evaluationId, readOnly = false, onSaved, onCanc
     const reasonLostLabel   = status === 'lost'
       ? (reasonLost === 'other' ? `Other: ${reasonLostOther}` : (REASONS_LOST.find(r => r.value === reasonLost)?.label ?? null))
       : null
-    // Booking a date automatically moves a fresh evaluation to Scheduled.
-    const finalStatus = (scheduledAt && status === 'new') ? 'scheduled' : status
-
     const payload = {
       property_id:                      selectedProperty.id,
-      status:                           finalStatus,
+      status,
       reason_lost:                      reasonLostLabel,
       sellers_agent_user_id:            agentId || null,
       transaction_coordinator_user_id:  tcId || null,
@@ -700,6 +697,17 @@ export function EvaluationForm({ evaluationId, readOnly = false, onSaved, onCanc
         }))
       )
 
+      // An Evaluation Date and Time captured on save automatically creates/
+      // updates the Google Calendar event; the evaluation only advances to
+      // "Scheduled" once that event is actually sent (handled server-side).
+      if (scheduledAt) {
+        await fetch('/api/calendar/sync', {
+          method:  'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body:    JSON.stringify({ evaluationId, userId }),
+        })
+      }
+
       setSaving(false)
       await fetchEvaluation()
       onSaved?.()
@@ -731,6 +739,17 @@ export function EvaluationForm({ evaluationId, readOnly = false, onSaved, onCanc
       { evaluation_id: ev.id, step_key: 'description_captured', sort_order: 3 },
       { evaluation_id: ev.id, step_key: 'lightstone_uploaded',  sort_order: 4 },
     ])
+
+    // An Evaluation Date and Time captured on save automatically creates the
+    // Google Calendar event; the evaluation only advances to "Scheduled"
+    // once that event is actually sent (handled server-side).
+    if (scheduledAt) {
+      await fetch('/api/calendar/sync', {
+        method:  'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body:    JSON.stringify({ evaluationId: ev.id, userId }),
+      })
+    }
 
     router.push(`/dashboard/evaluations/${ev.id}`)
   }

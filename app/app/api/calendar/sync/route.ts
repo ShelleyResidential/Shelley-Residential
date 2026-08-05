@@ -2,6 +2,8 @@ import { NextRequest, NextResponse } from 'next/server'
 import { supabaseAdmin } from '@/lib/supabase-admin'
 import { refreshAccessToken, upsertCalendarEvent } from '@/lib/google-calendar'
 
+const PARTNERS_EMAIL = 'Partners@shelley.co.za'
+
 export async function POST(request: NextRequest) {
   const { evaluationId, userId } = await request.json()
 
@@ -42,11 +44,14 @@ export async function POST(request: NextRequest) {
     .from('evaluations')
     .select(`
       scheduled_at, google_calendar_event_id,
-      properties (property_type, unit_number, complex_or_building_name, street_number, street_name, suburb, google_maps_url),
+      motivation_for_selling_notes, selling_timeline_notes,
+      lead_generated_by, lead_source_other_text, sellers_agent_user_id,
+      properties (property_type, unit_number, complex_or_building_name, street_number, street_name, suburb, city, google_maps_url),
       lead_source_picklist:lead_source_option_id (label),
       evaluation_contacts (
-        is_primary,
-        contacts (first_name, last_name)
+        is_primary, sort_order,
+        contacts (first_name, last_name, phone_number, email_address),
+        picklist_options:tag_option_id (label)
       )
     `)
     .eq('id', evaluationId)
@@ -66,6 +71,7 @@ export async function POST(request: NextRequest) {
     street_number: string | null
     street_name: string | null
     suburb: string | null
+    city: string | null
     google_maps_url: string | null
   }
   function capitalizeWords(text: string): string {
@@ -76,34 +82,80 @@ export async function POST(request: NextRequest) {
   let mapAddress = ''
   if (prop) {
     const street = [prop.street_number, prop.street_name].filter(Boolean).join(' ')
-    mapAddress = [street, prop.suburb].filter(Boolean).join(', ')
+    // Space-joined and including the city, matching the address format used
+    // for the "View Maps" navigation link elsewhere in the app.
+    mapAddress = [street, prop.suburb, prop.city].filter(Boolean).join(' ')
     if (prop.property_type === 'sectional_title' && prop.unit_number) {
       const unit = [`Unit ${prop.unit_number}`, prop.complex_or_building_name ? capitalizeWords(prop.complex_or_building_name) : null].filter(Boolean).join(' ')
       title = [unit, prop.suburb].filter(Boolean).join(', ')
     } else {
-      title = mapAddress || 'Unknown address'
+      title = [street, prop.suburb].filter(Boolean).join(', ') || 'Unknown address'
     }
   }
   const mapsLink = prop?.google_maps_url
-    || (mapAddress ? `https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(mapAddress)}` : null)
+    || (mapAddress ? `https://www.google.com/maps/dir/?api=1&destination=${encodeURIComponent(mapAddress)}` : null)
 
-  type ContactRow = { is_primary: boolean; contacts: { first_name: string; last_name: string } | null }
-  const contacts    = (ev.evaluation_contacts as unknown as ContactRow[]) ?? []
-  const primary     = contacts.find(c => c.is_primary) ?? contacts[0]
-  const contactName = primary?.contacts ? `${primary.contacts.first_name} ${primary.contacts.last_name}`.trim() : ''
-  const leadSource  = (ev.lead_source_picklist as unknown as { label: string } | null)?.label ?? ''
+  // ── Description: one bold-headed section per evaluation detail. Any
+  // section with no underlying value must literally say "left blank".
+  function section(heading: string, lines: string[]): string {
+    const body = lines.filter(Boolean).length > 0 ? lines.filter(Boolean).join('\n') : 'left blank'
+    return `<b>${heading}</b>\n${body}`
+  }
+
+  const leadGeneratedByLabel = ev.lead_generated_by === 'seller_agent_partner'
+    ? 'Agent'
+    : ev.lead_generated_by === 'shelley_residential'
+      ? 'Shelley Residential'
+      : ''
+  const leadSourceLabel = ev.lead_source_other_text
+    ?? (ev.lead_source_picklist as unknown as { label: string } | null)?.label
+    ?? ''
+
+  type ContactRow = {
+    is_primary: boolean
+    sort_order: number | null
+    contacts: { first_name: string; last_name: string; phone_number: string | null; email_address: string | null } | null
+    picklist_options: { label: string } | null
+  }
+  const contactRows = ((ev.evaluation_contacts as unknown as ContactRow[]) ?? [])
+    .slice()
+    .sort((a, b) => (a.sort_order ?? 0) - (b.sort_order ?? 0))
+
+  const contactLines = contactRows.flatMap(row => {
+    if (!row.contacts) return []
+    const name       = [row.contacts.first_name, row.contacts.last_name].filter(Boolean).join(' ')
+    const tag        = row.picklist_options?.label ?? ''
+    const phoneEmail = [row.contacts.phone_number, row.contacts.email_address].filter(Boolean).join(' | ')
+    return [name, tag, phoneEmail].filter(Boolean)
+  })
+
+  const { data: agentProfile } = ev.sellers_agent_user_id
+    ? await supabaseAdmin.from('profiles').select('full_name, email').eq('id', ev.sellers_agent_user_id).single()
+    : { data: null }
+  const agentName = agentProfile?.full_name ?? agentProfile?.email ?? ''
+
+  const description = [
+    section('Motivation for Selling', [ev.motivation_for_selling_notes ?? '']),
+    section('Selling Timeline',       [ev.selling_timeline_notes ?? '']),
+    section('Lead Generated By',      [leadGeneratedByLabel]),
+    section('Lead Source',            [leadSourceLabel]),
+    section('Contact Details',        contactLines),
+    section('Agent',                  [agentName]),
+  ].join('\n\n')
 
   const start = new Date(ev.scheduled_at).toISOString()
-  const end   = new Date(new Date(ev.scheduled_at).getTime() + 60 * 60 * 1000).toISOString()
+  // Duration is always fixed at 45 minutes, regardless of any other setting.
+  const end   = new Date(new Date(ev.scheduled_at).getTime() + 45 * 60 * 1000).toISOString()
 
   const calEvent = await upsertCalendarEvent(
     accessToken,
     {
       summary:     `Evaluation | ${title}`,
-      description: [contactName && `Contact: ${contactName}`, leadSource && `Source: ${leadSource}`].filter(Boolean).join('\n'),
+      description,
       location:    mapsLink ?? (mapAddress || title),
       start,
       end,
+      attendees: [PARTNERS_EMAIL],
     },
     (ev as Record<string, unknown>).google_calendar_event_id as string | null,
   )
@@ -117,6 +169,13 @@ export async function POST(request: NextRequest) {
     google_calendar_event_id: calEvent.id,
     calendar_event_link:      calEvent.htmlLink,
   }).eq('id', evaluationId)
+
+  // The "Scheduled" status only fires once the calendar event has actually
+  // been sent -- never override a manually-chosen or already-progressed
+  // status, so this only ever promotes from 'new'.
+  await supabaseAdmin.from('evaluations').update({
+    status: 'scheduled',
+  }).eq('id', evaluationId).eq('status', 'new')
 
   return NextResponse.json({ link: calEvent.htmlLink, eventId: calEvent.id })
 }
