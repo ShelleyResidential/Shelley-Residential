@@ -906,7 +906,7 @@ export function EvaluationForm({ evaluationId, readOnly = false, calendarEventLi
               )}
             </div>
             <Link href={`/dashboard/contacts/${c.contact_id}`} className={`${btn.primary} flex-shrink-0`}>
-              View Contact
+              Details
             </Link>
           </div>
         ) : (
@@ -958,7 +958,7 @@ export function EvaluationForm({ evaluationId, readOnly = false, calendarEventLi
               target="_blank" rel="noopener noreferrer"
               className={`${btn.primary} flex-shrink-0`}
             >
-              View Maps
+              Map
             </a>
           </div>
         ) : selectedProperty ? (
