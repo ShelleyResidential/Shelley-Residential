@@ -79,6 +79,17 @@ export async function upsertCalendarEvent(
   return res.json() as Promise<{ id: string; htmlLink: string; error?: { message: string } }>
 }
 
+export async function getCalendarEvent(accessToken: string, eventId: string) {
+  const res = await fetch(`${CALENDAR_BASE}/${eventId}`, {
+    headers: { Authorization: `Bearer ${accessToken}` },
+  })
+  return res.json() as Promise<{
+    id: string
+    start?: { dateTime?: string; date?: string }
+    error?: { message: string }
+  }>
+}
+
 // ── Push notifications (watch channel) ──────────────────────────
 // Lets Google tell us the moment something changes on a user's calendar
 // (e.g. an evaluation's event gets dragged to a new time), instead of only

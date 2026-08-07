@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { supabaseAdmin } from '@/lib/supabase-admin'
-import { upsertCalendarEvent } from '@/lib/google-calendar'
+import { upsertCalendarEvent, getCalendarEvent } from '@/lib/google-calendar'
 import { getValidAccessToken } from '@/lib/calendar-tokens'
 import { ensureWatchChannel, hasWatchChannel } from '@/lib/calendar-watch'
 
@@ -173,6 +173,21 @@ export async function POST(request: NextRequest) {
   if (!(await hasWatchChannel(userId))) {
     try {
       await ensureWatchChannel(userId)
+
+      // Close a narrow race: the channel's baseline snapshot is taken a
+      // moment after this event was just created, so if the agent edits
+      // the event in Google Calendar directly in that gap, the baseline
+      // treats the edited time as the original state -- there's never a
+      // "before" to diff against, so the push-notification sync never
+      // fires. Re-check the event we just wrote against Google one more
+      // time and reconcile immediately if it's already moved.
+      const liveEvent  = await getCalendarEvent(accessToken, calEvent.id)
+      const liveLiteral = liveEvent.start?.dateTime?.match(/^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}/)?.[0]
+      if (liveLiteral && liveLiteral !== start.slice(0, 16)) {
+        await supabaseAdmin.from('evaluations')
+          .update({ scheduled_at: `${liveLiteral}:00` })
+          .eq('id', evaluationId)
+      }
     } catch (err) {
       console.error('Failed to set up calendar watch channel:', err)
     }
