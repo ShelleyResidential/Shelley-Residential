@@ -11,7 +11,7 @@ import { LEAD_SOURCES, REFERRAL_TYPES, MOTIVATIONS, TIMELINES, REASONS_LOST, CON
 const DRAFT_STORAGE_KEY = 'evaluationFormDraft'
 
 const STATUS_DISPLAY: Record<string, string> = {
-  new: 'New', scheduled: 'Scheduled', completed: 'Completed', presented: 'Presented',
+  new: 'New', scheduled: 'Scheduled', completed: 'Prepared', presented: 'Presented',
   follow_up: 'Follow-Up', won: 'Won', lost: 'Lost', cancelled: 'Cancelled',
   in_progress: 'In Progress (legacy)', open: 'Open Mandate (legacy)', future: 'Future Mandate (legacy)',
 }
@@ -20,6 +20,18 @@ function formatZAR(value: string): string {
   const n = Number(value)
   if (!value || Number.isNaN(n)) return value
   return new Intl.NumberFormat('en-ZA', { style: 'currency', currency: 'ZAR', maximumFractionDigits: 0 }).format(n)
+}
+
+// Evaluation times may only land on the hour or a quarter past/half/quarter
+// to -- the "step" attribute alone only constrains the native picker's
+// spinner, not typed input, so round explicitly on every change too.
+function roundToQuarterHour(value: string): string {
+  const [h, m] = value.split(':').map(Number)
+  if (Number.isNaN(h) || Number.isNaN(m)) return value
+  const totalMinutes = (h * 60 + Math.round(m / 15) * 15) % (24 * 60)
+  const hh = Math.floor(totalMinutes / 60)
+  const mm = totalMinutes % 60
+  return `${String(hh).padStart(2, '0')}:${String(mm).padStart(2, '0')}`
 }
 
 // ── Field: same label-above-content layout either way — plain text (no
@@ -723,7 +735,6 @@ export function EvaluationForm({ evaluationId, readOnly = false, calendarEventLi
   async function handleSubmit(e: React.FormEvent) {
     e.preventDefault()
     if (!selectedProperty) { setError('Please select or add a property.'); return }
-    if (contacts.length === 0) { setError('Please add at least one contact.'); return }
     if (!userId) return
 
     setError('')
@@ -770,15 +781,17 @@ export function EvaluationForm({ evaluationId, readOnly = false, calendarEventLi
       if (evErr) { setError(evErr.message); setSaving(false); return }
 
       await supabase.from('evaluation_contacts').delete().eq('evaluation_id', evaluationId)
-      await supabase.from('evaluation_contacts').insert(
-        contacts.map((c, i) => ({
-          evaluation_id: evaluationId,
-          contact_id: c.contact_id,
-          is_primary: i === 0,
-          sort_order: i,
-          tag_option_id: c.tag_option_id ? resolveTagId(c.tag_option_id) : null,
-        }))
-      )
+      if (contacts.length > 0) {
+        await supabase.from('evaluation_contacts').insert(
+          contacts.map((c, i) => ({
+            evaluation_id: evaluationId,
+            contact_id: c.contact_id,
+            is_primary: i === 0,
+            sort_order: i,
+            tag_option_id: c.tag_option_id ? resolveTagId(c.tag_option_id) : null,
+          }))
+        )
+      }
 
       // An Evaluation Date and Time captured on save automatically creates/
       // updates the Google Calendar event; the evaluation only advances to
@@ -804,15 +817,17 @@ export function EvaluationForm({ evaluationId, readOnly = false, calendarEventLi
 
     if (evErr || !ev) { setError(evErr?.message ?? 'Failed to save.'); setSaving(false); return }
 
-    await supabase.from('evaluation_contacts').insert(
-      contacts.map((c, i) => ({
-        evaluation_id: ev.id,
-        contact_id: c.contact_id,
-        is_primary: i === 0,
-        sort_order: i,
-        tag_option_id: c.tag_option_id ? resolveTagId(c.tag_option_id) : null,
-      }))
-    )
+    if (contacts.length > 0) {
+      await supabase.from('evaluation_contacts').insert(
+        contacts.map((c, i) => ({
+          evaluation_id: ev.id,
+          contact_id: c.contact_id,
+          is_primary: i === 0,
+          sort_order: i,
+          tag_option_id: c.tag_option_id ? resolveTagId(c.tag_option_id) : null,
+        }))
+      )
+    }
 
     // Seed pipeline steps — inspection before lightstone
     await supabase.from('evaluation_pipeline_steps').insert([
@@ -961,7 +976,7 @@ export function EvaluationForm({ evaluationId, readOnly = false, calendarEventLi
       <Section title="Contact Details">
         {!readOnly && (
           <p className="text-xs text-gray-400 -mt-1 mb-3">
-            Primary contact is required. Add secondary contacts once the primary is set.
+            Optional. Add a primary contact, then any secondary contacts once it's set.
           </p>
         )}
 
@@ -1233,7 +1248,7 @@ export function EvaluationForm({ evaluationId, readOnly = false, calendarEventLi
           <select value={status} onChange={e => setStatus(e.target.value)} className={select}>
             <option value="new">New</option>
             <option value="scheduled">Scheduled</option>
-            <option value="completed">Completed</option>
+            <option value="completed">Prepared</option>
             <option value="presented">Presented</option>
             <option value="follow_up">Follow-Up</option>
             <option value="won">Won</option>
@@ -1293,7 +1308,7 @@ export function EvaluationForm({ evaluationId, readOnly = false, calendarEventLi
             </div>
             <div>
               <label className="text-xs text-gray-400 mb-1 block">Time</label>
-              <input type="time" value={schedTime} onChange={e => setSchedTime(e.target.value)} className={input} />
+              <input type="time" step={900} value={schedTime} onChange={e => setSchedTime(roundToQuarterHour(e.target.value))} className={input} />
             </div>
           </div>
         </Field>

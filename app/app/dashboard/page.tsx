@@ -12,7 +12,7 @@ type Stats = {
 }
 
 const STATUS_LABELS: Record<string, string> = {
-  new: 'New', scheduled: 'Scheduled', completed: 'Completed', presented: 'Presented',
+  new: 'New', scheduled: 'Scheduled', completed: 'Prepared', presented: 'Presented',
   follow_up: 'Follow-Up', won: 'Won', lost: 'Lost', cancelled: 'Cancelled',
 }
 

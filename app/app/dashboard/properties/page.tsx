@@ -45,7 +45,7 @@ const STATUS_COLOURS: Record<string, string> = {
 }
 
 const STATUS_LABELS: Record<string, string> = {
-  new: 'New', scheduled: 'Scheduled', completed: 'Completed', presented: 'Presented',
+  new: 'New', scheduled: 'Scheduled', completed: 'Prepared', presented: 'Presented',
   follow_up: 'Follow-Up', won: 'Won', lost: 'Lost', cancelled: 'Cancelled',
   // Legacy statuses (kept for evaluations created before this status list changed)
   in_progress: 'In Progress', open: 'Open Mandate', future: 'Future Mandate',

@@ -26,7 +26,7 @@ type ContactRow = { id: string; status: string | null; date_added: string | null
 type PropertyRow = { id: string; property_type: string | null; suburb: string | null; evaluations: { id: string }[] }
 
 const STATUS_LABELS: Record<string, string> = {
-  new: 'New', scheduled: 'Scheduled', completed: 'Completed', presented: 'Presented',
+  new: 'New', scheduled: 'Scheduled', completed: 'Prepared', presented: 'Presented',
   follow_up: 'Follow-Up', won: 'Won', lost: 'Lost', cancelled: 'Cancelled',
   in_progress: 'In Progress', open: 'Open Mandate', future: 'Future Mandate',
 }
