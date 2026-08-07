@@ -160,7 +160,6 @@ function reverseResolve(options: { value: string; label: string }[], stored: str
 // on return so progress on the form is never lost.
 type EvaluationDraftSnapshot = {
   selectedProperty: Property | null
-  showAddProperty: boolean
   newPropertyType: string
   newPropertyAddress: string
   showPropertyReview: boolean
@@ -237,7 +236,6 @@ export function EvaluationForm({ evaluationId, readOnly = false, calendarEventLi
 
   // Property
   const [selectedProperty, setSelectedProperty] = useState<Property | null>(null)
-  const [showAddProperty, setShowAddProperty]   = useState(false)
   const [newPropertyType, setNewPropertyType]   = useState('')
   const [newPropertyAddress, setNewPropertyAddress] = useState('')
   const [addressMatches, setAddressMatches]     = useState<Property[]>([])
@@ -387,7 +385,7 @@ export function EvaluationForm({ evaluationId, readOnly = false, calendarEventLi
 
   function buildDraftSnapshot(): EvaluationDraftSnapshot {
     return {
-      selectedProperty, showAddProperty, newPropertyType, newPropertyAddress,
+      selectedProperty, newPropertyType, newPropertyAddress,
       showPropertyReview, propertyDraft, contacts, status,
       reasonLost, reasonLostOther, agentId, tcId, leadGeneratedBy, leadSource,
       leadSourceOther, referralType, referralTypeOther, referredByContactId,
@@ -398,7 +396,6 @@ export function EvaluationForm({ evaluationId, readOnly = false, calendarEventLi
 
   function applyDraftSnapshot(d: EvaluationDraftSnapshot) {
     setSelectedProperty(d.selectedProperty)
-    setShowAddProperty(d.showAddProperty)
     setNewPropertyType(d.newPropertyType)
     setNewPropertyAddress(d.newPropertyAddress)
     setShowPropertyReview(d.showPropertyReview)
@@ -520,10 +517,20 @@ export function EvaluationForm({ evaluationId, readOnly = false, calendarEventLi
     resetAddPropertyForm()
   }
 
-  // ── Add property: look up address, then review/edit fields before saving ──
+  // ── Add property: look up address, then review/edit fields before saving.
+  // Duplicate prevention is two-layered: (1) refuse to proceed at all while
+  // the live fuzzy address match above is showing a possible existing
+  // property, forcing an explicit pick instead, and (2) after geocoding,
+  // check for an exact Google Place ID match -- the authoritative signal
+  // that this is a place we already have on file -- and if found, silently
+  // switch to that record instead of ever offering to create a new one.
   async function lookupAddress() {
     if (!newPropertyType) { setError('Please select a property type.'); return }
     if (!newPropertyAddress.trim()) { setError('Please enter an address.'); return }
+    if (addressMatches.length > 0) {
+      setError('This address matches an existing property — select it above instead of adding a new one.')
+      return
+    }
     setError('')
     setLookingUpAddress(true)
 
@@ -539,6 +546,22 @@ export function EvaluationForm({ evaluationId, readOnly = false, calendarEventLi
 
     if (geoRes.ok) {
       const geo = await geoRes.json()
+
+      // Authoritative duplicate check: the exact same Google Place already
+      // has a property record, so use it instead of creating a second one.
+      if (geo.google_place_id) {
+        const { data: existing } = await supabase
+          .from('properties')
+          .select('id, property_type, unit_number, complex_or_building_name, street_number, street_name, suburb, city')
+          .eq('google_place_id', geo.google_place_id)
+          .maybeSingle()
+        if (existing) {
+          selectExistingProperty(existing as Property)
+          setLookingUpAddress(false)
+          return
+        }
+      }
+
       setPropertyDraft({
         ...EMPTY_DRAFT,
         street_number: geo.street_number ?? '',
@@ -575,7 +598,6 @@ export function EvaluationForm({ evaluationId, readOnly = false, calendarEventLi
   }
 
   function resetAddPropertyForm() {
-    setShowAddProperty(false)
     setShowPropertyReview(false)
     setNewPropertyType('')
     setNewPropertyAddress('')
@@ -586,6 +608,21 @@ export function EvaluationForm({ evaluationId, readOnly = false, calendarEventLi
   async function saveProperty() {
     setSavingProperty(true)
     setError('')
+
+    // Final guard against a race between two agents adding the same address
+    // at once -- never insert a second row for a Place we already have.
+    if (propertyDraft.google_place_id) {
+      const { data: existing } = await supabase
+        .from('properties')
+        .select('id, property_type, unit_number, complex_or_building_name, street_number, street_name, suburb, city')
+        .eq('google_place_id', propertyDraft.google_place_id)
+        .maybeSingle()
+      if (existing) {
+        selectExistingProperty(existing as Property)
+        setSavingProperty(false)
+        return
+      }
+    }
 
     const { data, error: err } = await supabase
       .from('properties')
@@ -974,7 +1011,7 @@ export function EvaluationForm({ evaluationId, readOnly = false, calendarEventLi
           </div>
         ) : readOnly ? (
           <p className="text-sm text-gray-400">No property linked.</p>
-        ) : showAddProperty && showPropertyReview ? (
+        ) : showPropertyReview ? (
           <div className="space-y-4 border border-gray-200 rounded-xl p-4 bg-gray-50">
             {newPropertyType === 'sectional_title' && (
               <>
@@ -1066,7 +1103,7 @@ export function EvaluationForm({ evaluationId, readOnly = false, calendarEventLi
               </button>
             </div>
           </div>
-        ) : showAddProperty ? (
+        ) : (
           <div className="space-y-4 border border-gray-200 rounded-xl p-4 bg-gray-50">
             <div>
               <label className={labelCls}>Property Type <span className="text-red-400">*</span></label>
@@ -1126,18 +1163,10 @@ export function EvaluationForm({ evaluationId, readOnly = false, calendarEventLi
             <div className="flex gap-2 pt-1">
               <button type="button" onClick={resetAddPropertyForm}
                 className={`${btn.secondary} flex-1`}>Cancel</button>
-              <button type="button" onClick={lookupAddress} disabled={lookingUpAddress} className={`${btn.primary} flex-1`}>
+              <button type="button" onClick={lookupAddress} disabled={lookingUpAddress || addressMatches.length > 0} className={`${btn.primary} flex-1`}>
                 {lookingUpAddress ? 'Looking up address…' : 'Look Up Address'}
               </button>
             </div>
-          </div>
-        ) : (
-          <div className="space-y-3">
-            <PropertySearch onSelect={setSelectedProperty} />
-            <p className="text-xs text-gray-400 text-center">— or —</p>
-            <button type="button" onClick={() => setShowAddProperty(true)} className={`${btn.primary} w-full`}>
-              + Add New Property
-            </button>
           </div>
         )}
       </Section>
@@ -1252,64 +1281,6 @@ export function EvaluationForm({ evaluationId, readOnly = false, calendarEventLi
       )}
 
     </form>
-  )
-}
-
-// ── PropertySearch combobox ───────────────────────────────────
-function PropertySearch({ onSelect }: { onSelect: (p: Property) => void }) {
-  const [query, setQuery]     = useState('')
-  const [results, setResults] = useState<Property[]>([])
-  const [open, setOpen]       = useState(false)
-  const [loading, setLoading] = useState(false)
-  const containerRef          = useRef<HTMLDivElement>(null)
-
-  useEffect(() => {
-    function handleClick(e: MouseEvent) {
-      if (containerRef.current && !containerRef.current.contains(e.target as Node)) setOpen(false)
-    }
-    document.addEventListener('mousedown', handleClick)
-    return () => document.removeEventListener('mousedown', handleClick)
-  }, [])
-
-  useEffect(() => {
-    if (!query.trim()) { setResults([]); setOpen(false); return }
-    const timer = setTimeout(async () => {
-      setLoading(true)
-      const q = applyAddressSearch(
-        supabase.from('properties').select('id, property_type, unit_number, complex_or_building_name, street_number, street_name, suburb, city'),
-        query
-      )
-      const { data } = await q.limit(8)
-      setResults(data ?? [])
-      setOpen(true)
-      setLoading(false)
-    }, 250)
-    return () => clearTimeout(timer)
-  }, [query])
-
-  return (
-    <div ref={containerRef} className="relative">
-      <input type="text" value={query} onChange={e => setQuery(e.target.value)}
-        onFocus={() => { if (results.length > 0) setOpen(true) }}
-        placeholder="Search Property…"
-        className={input} />
-      {open && (
-        <div className="absolute top-full left-0 right-0 z-50 bg-white border border-gray-200 border-t-0 rounded-b-lg shadow-md max-h-60 overflow-y-auto">
-          {loading && <div className="px-4 py-3 text-sm text-gray-400">Searching…</div>}
-          {!loading && results.length === 0 && <div className="px-4 py-3 text-sm text-gray-400">No properties found</div>}
-          {!loading && results.map(p => (
-            <button key={p.id} type="button"
-              onMouseDown={() => { onSelect(p); setQuery(''); setOpen(false) }}
-              className="w-full text-left px-4 py-2.5 text-sm text-[#1a1a1a] hover:bg-[#f8f7f4] border-b border-gray-100 last:border-b-0 transition-colors">
-              <span className="font-medium">{displayAddress(p)}</span>
-              {p.property_type && (
-                <span className="ml-2 text-xs text-gray-400 capitalize">{p.property_type.replace('_', ' ')}</span>
-              )}
-            </button>
-          ))}
-        </div>
-      )}
-    </div>
   )
 }
 
