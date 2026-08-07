@@ -133,15 +133,58 @@ function propertyMapQuery(p: Property): string {
   return [p.street_number, p.street_name, p.suburb, p.city].filter(Boolean).join(' ')
 }
 
-// Search across street number/name, suburb and city, requiring every word
-// in the query to match at least one of those fields (so "27 audley" finds
-// a property whose number and name are stored in separate columns).
+// Common street-type abbreviations Google's autocomplete/geocoder may hand
+// back (e.g. "Rd") that won't ILIKE-match the full word we store (e.g.
+// "Road", via capitalizeWords(geo.route)) -- expand them before matching.
+const STREET_TYPE_EXPANSIONS: Record<string, string> = {
+  rd: 'road', st: 'street', ave: 'avenue', dr: 'drive', cr: 'crescent', cres: 'crescent',
+  blvd: 'boulevard', ln: 'lane', pl: 'place', cl: 'close', ct: 'court', hwy: 'highway',
+  sq: 'square', ter: 'terrace', pk: 'park', gr: 'grove',
+}
+
+// A full Google-style address ends in a country name our schema doesn't
+// index for this search (street_number/street_name/suburb/city only) --
+// strip it so it can't zero out the match below.
+const COUNTRY_SUFFIX = /,?\s*south africa\s*$/i
+
+// Search across street number/name, suburb and city. Works equally for a
+// bare fragment ("26") or a full address pasted/selected from Google's
+// autocomplete ("26 Audley Rd, Grayleigh, Westville, South Africa").
+//
+// Two strategies, depending on whether the query has a house number:
+// - With one: anchor on an EXACT street_number match (the one field two
+//   different addresses on the same street never share), then require just
+//   ONE more word to appear anywhere in street_name/suburb/city. That "one
+//   of" is deliberately loose -- Google's autocomplete predictions and its
+//   geocoder (used when the existing property was first saved) don't always
+//   split suburb vs. city the same way for the same real address, so
+//   requiring every trailing word to match would silently miss real
+//   duplicates again.
+// - Without one (e.g. searching by suburb alone): fall back to requiring
+//   every word to match somewhere, so a single short/common word doesn't
+//   match half the database.
 function applyAddressSearch<T extends { or(filters: string): T }>(query: T, raw: string): T {
-  const words = raw.trim().split(/\s+/).filter(Boolean).map(w => w.replace(/[%,_]/g, ''))
-  return words.reduce(
-    (q, word) => word ? q.or(`street_number.ilike.%${word}%,street_name.ilike.%${word}%,suburb.ilike.%${word}%,city.ilike.%${word}%`) : q,
-    query
-  )
+  const cleaned = raw.trim().replace(COUNTRY_SUFFIX, '')
+  const words = cleaned.split(/[\s,]+/).filter(Boolean).map(w => w.replace(/[%_]/g, ''))
+  if (words.length === 0) return query
+
+  const [first, ...rest] = words
+  const hasHouseNumber = /^\d+[a-zA-Z]?$/.test(first)
+
+  if (hasHouseNumber && rest.length > 0) {
+    const terms = rest.map(w => STREET_TYPE_EXPANSIONS[w.toLowerCase()] ?? w)
+    const orClause = terms.flatMap(t => [`street_name.ilike.%${t}%`, `suburb.ilike.%${t}%`, `city.ilike.%${t}%`]).join(',')
+    // Cast around Supabase's query-builder generics here -- constraining T
+    // to include .eq() as well as .or() blows up TS's type instantiation
+    // depth (TS2589) on the real PostgrestFilterBuilder type.
+    const withNumber = (query as unknown as { eq(column: string, value: string): T }).eq('street_number', first)
+    return withNumber.or(orClause)
+  }
+
+  return words.reduce((q, word) => {
+    const term = STREET_TYPE_EXPANSIONS[word.toLowerCase()] ?? word
+    return q.or(`street_number.ilike.%${term}%,street_name.ilike.%${term}%,suburb.ilike.%${term}%,city.ilike.%${term}%`)
+  }, query)
 }
 
 // Hardcoded dropdown values resolve to a stored LABEL, not the slug — an
