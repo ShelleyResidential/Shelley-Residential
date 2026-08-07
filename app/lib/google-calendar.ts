@@ -1,5 +1,6 @@
-const GOOGLE_TOKEN_URL = 'https://oauth2.googleapis.com/token'
-const CALENDAR_BASE    = 'https://www.googleapis.com/calendar/v3/calendars/primary/events'
+const GOOGLE_TOKEN_URL   = 'https://oauth2.googleapis.com/token'
+const CALENDAR_BASE      = 'https://www.googleapis.com/calendar/v3/calendars/primary/events'
+const CALENDAR_CHANNELS_STOP_URL = 'https://www.googleapis.com/calendar/v3/channels/stop'
 
 // Combined sign-in + Calendar consent — used by the login flow so Calendar
 // access is granted automatically as part of signing in with Google.
@@ -76,4 +77,81 @@ export async function upsertCalendarEvent(
     body: JSON.stringify(body),
   })
   return res.json() as Promise<{ id: string; htmlLink: string; error?: { message: string } }>
+}
+
+// ── Push notifications (watch channel) ──────────────────────────
+// Lets Google tell us the moment something changes on a user's calendar
+// (e.g. an evaluation's event gets dragged to a new time), instead of only
+// ever syncing app -> Calendar. See app/lib/calendar-watch.ts for the
+// orchestration (token lookup, DB bookkeeping, renewal).
+export async function watchCalendarEvents(
+  accessToken: string,
+  channelId: string,
+  channelToken: string,
+  webhookUrl: string,
+) {
+  const res = await fetch(`${CALENDAR_BASE}/watch`, {
+    method: 'POST',
+    headers: {
+      Authorization:  `Bearer ${accessToken}`,
+      'Content-Type': 'application/json',
+    },
+    body: JSON.stringify({
+      id:      channelId,
+      type:    'web_hook',
+      address: webhookUrl,
+      token:   channelToken,
+    }),
+  })
+  return res.json() as Promise<{
+    resourceId?: string
+    expiration?: string
+    error?: { message: string }
+  }>
+}
+
+export async function stopWatchChannel(accessToken: string, channelId: string, resourceId: string) {
+  await fetch(CALENDAR_CHANNELS_STOP_URL, {
+    method: 'POST',
+    headers: {
+      Authorization:  `Bearer ${accessToken}`,
+      'Content-Type': 'application/json',
+    },
+    body: JSON.stringify({ id: channelId, resourceId }),
+  })
+}
+
+type CalendarEventSummary = {
+  id: string
+  status: string
+  start?: { dateTime?: string; date?: string }
+}
+
+// Pulls everything that changed since `syncToken` (or, with no token yet,
+// establishes a fresh baseline by listing everything currently on the
+// calendar). Always uses the same parameters either way -- Google requires
+// that for a sync token to stay valid across calls.
+export async function listChangedEvents(accessToken: string, syncToken?: string | null) {
+  const items: CalendarEventSummary[] = []
+  let pageToken: string | undefined
+  let nextSyncToken: string | undefined
+  let error: { message: string; code?: number } | undefined
+
+  do {
+    const params = new URLSearchParams({ singleEvents: 'true' })
+    if (syncToken) params.set('syncToken', syncToken)
+    if (pageToken) params.set('pageToken', pageToken)
+
+    const res  = await fetch(`${CALENDAR_BASE}?${params}`, {
+      headers: { Authorization: `Bearer ${accessToken}` },
+    })
+    const json = await res.json()
+    if (json.error) { error = { message: json.error.message, code: res.status }; break }
+
+    items.push(...(json.items ?? []))
+    pageToken     = json.nextPageToken
+    nextSyncToken = json.nextSyncToken
+  } while (pageToken)
+
+  return { items, nextSyncToken, error }
 }

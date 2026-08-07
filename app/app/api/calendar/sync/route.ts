@@ -1,6 +1,8 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { supabaseAdmin } from '@/lib/supabase-admin'
-import { refreshAccessToken, upsertCalendarEvent } from '@/lib/google-calendar'
+import { upsertCalendarEvent } from '@/lib/google-calendar'
+import { getValidAccessToken } from '@/lib/calendar-tokens'
+import { ensureWatchChannel, hasWatchChannel } from '@/lib/calendar-watch'
 
 const PARTNERS_EMAIL = 'Partners@shelley.co.za'
 
@@ -11,32 +13,12 @@ export async function POST(request: NextRequest) {
     return NextResponse.json({ error: 'Missing fields' }, { status: 400 })
   }
 
-  // Get stored tokens
-  const { data: tokenRow } = await supabaseAdmin
-    .from('user_google_tokens')
-    .select('access_token, refresh_token, token_expiry')
-    .eq('user_id', userId)
-    .single()
-
-  if (!tokenRow) {
+  const accessToken = await getValidAccessToken(userId)
+  if (!accessToken) {
     return NextResponse.json(
       { error: 'Google Calendar not connected. Go to Settings to connect it.' },
       { status: 400 },
     )
-  }
-
-  // Refresh access token if expired (within 60 s of expiry)
-  let accessToken = tokenRow.access_token
-  const expiryMs  = tokenRow.token_expiry ? new Date(tokenRow.token_expiry).getTime() : 0
-  if (Date.now() >= expiryMs - 60_000 && tokenRow.refresh_token) {
-    const refreshed = await refreshAccessToken(tokenRow.refresh_token)
-    if (!refreshed.error) {
-      accessToken = refreshed.access_token
-      await supabaseAdmin.from('user_google_tokens').update({
-        access_token: refreshed.access_token,
-        token_expiry: new Date(Date.now() + refreshed.expires_in * 1000).toISOString(),
-      }).eq('user_id', userId)
-    }
   }
 
   // Get evaluation details
@@ -182,6 +164,19 @@ export async function POST(request: NextRequest) {
   await supabaseAdmin.from('evaluations').update({
     status: 'scheduled',
   }).eq('id', evaluationId).eq('status', 'new')
+
+  // Fallback for users who connected Google Calendar before automatic
+  // Calendar -> evaluation sync existed: the normal path sets this up on
+  // login (see google-signin/callback), so this only ever runs once per
+  // user -- awaited because a fire-and-forget promise isn't guaranteed to
+  // finish once a serverless response has been sent.
+  if (!(await hasWatchChannel(userId))) {
+    try {
+      await ensureWatchChannel(userId)
+    } catch (err) {
+      console.error('Failed to set up calendar watch channel:', err)
+    }
+  }
 
   return NextResponse.json({ link: calEvent.htmlLink, eventId: calEvent.id })
 }

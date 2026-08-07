@@ -3,6 +3,7 @@ import { createClient } from '@supabase/supabase-js'
 import { exchangeCodeForTokens } from '@/lib/google-calendar'
 import { verifyGoogleIdToken } from '@/lib/google-signin'
 import { supabaseAdmin } from '@/lib/supabase-admin'
+import { ensureWatchChannel } from '@/lib/calendar-watch'
 
 const ALLOWED_DOMAIN = 'shelley.co.za'
 
@@ -110,6 +111,16 @@ export async function GET(request: NextRequest) {
         token_expiry:  expiry,
       })
     }
+  }
+
+  // Set up (or refresh) the push-notification channel that lets a change
+  // made directly in Google Calendar -- e.g. dragging an evaluation's event
+  // to a new time -- flow back into the app automatically. Best-effort:
+  // never block login over it.
+  try {
+    await ensureWatchChannel(data.user.id)
+  } catch (err) {
+    console.error('Failed to set up calendar watch channel:', err)
   }
 
   const response = NextResponse.redirect(
