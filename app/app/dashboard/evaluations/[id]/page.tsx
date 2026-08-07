@@ -230,7 +230,7 @@ export default function EvaluationDetailPage() {
           {/* Progress bar */}
           <div className="w-full bg-gray-100 rounded-full h-2 mb-8">
             <div
-              className="bg-[#1a1a1a] h-2 rounded-full transition-all"
+              className="bg-[#E8266F] h-2 rounded-full transition-all"
               style={{ width: `${sortedSteps.length > 0 ? (stepsComplete / sortedSteps.length) * 100 : 0}%` }}
             />
           </div>
