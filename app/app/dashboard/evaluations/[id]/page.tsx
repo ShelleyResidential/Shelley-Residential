@@ -174,7 +174,7 @@ export default function EvaluationDetailPage() {
               {STATUS_LABELS[ev.status] ?? ev.status}
             </span>
             {!editing && (
-              <button onClick={() => setEditing(true)} className={`${btn.secondary} whitespace-nowrap`}>Edit</button>
+              <button onClick={() => { setActiveTab('details'); setEditing(true) }} className={`${btn.secondary} whitespace-nowrap`}>Edit</button>
             )}
             {canDelete(userEmail) && (
               <button onClick={deleteEvaluation} disabled={deleting} className={`${btn.danger} whitespace-nowrap`}>
