@@ -336,7 +336,7 @@ function SortArrows({ column, sortColumn, sortDirection, onSort }: {
   const isAsc  = sortColumn === column && sortDirection === 'asc'
   const isDesc = sortColumn === column && sortDirection === 'desc'
   return (
-    <span className="inline-flex flex-col -space-y-0.5 align-middle normal-case">
+    <span className="inline-flex flex-col ml-1 -space-y-0.5 align-middle normal-case">
       <button type="button" onClick={() => onSort(column, 'asc')}
         className={`leading-none text-[8px] cursor-pointer transition-colors ${isAsc ? 'text-[#E8266F]' : 'text-gray-300 hover:text-gray-500'}`}
         aria-label="Sort ascending">▲</button>
@@ -347,14 +347,18 @@ function SortArrows({ column, sortColumn, sortDirection, onSort }: {
   )
 }
 
-const HEADER_COLUMNS: { key: SortColumn; label: string }[] = [
-  { key: 'status',             label: 'Status' },
-  { key: 'name',                label: 'Name' },
-  { key: 'phone_number',        label: 'Phone Number' },
-  { key: 'email_address',       label: 'Email' },
-  { key: 'contact_preference',  label: 'Preference' },
-  { key: 'date_added',          label: 'Date Added' },
-  { key: 'created_by',          label: 'Captured By' },
+// Status gets a much narrower column than the rest -- its content (a short
+// "Active"/"Inactive" badge) was leaving a big gap before Name started
+// under the old equal-width columns. The freed-up width is spread across
+// the remaining columns.
+const HEADER_COLUMNS: { key: SortColumn; label: string; width: string }[] = [
+  { key: 'status',             label: 'Status',       width: 'w-[7%]' },
+  { key: 'name',                label: 'Name',         width: 'w-[16%]' },
+  { key: 'phone_number',        label: 'Phone Number', width: 'w-[14%]' },
+  { key: 'email_address',       label: 'Email',        width: 'w-[17%]' },
+  { key: 'contact_preference',  label: 'Preference',   width: 'w-[13%]' },
+  { key: 'date_added',          label: 'Date Added',   width: 'w-[13%]' },
+  { key: 'created_by',          label: 'Captured By',  width: 'w-[16%]' },
 ]
 
 // ── Table header row, repeated at both the top (thead) and bottom (tfoot)
@@ -368,11 +372,9 @@ function TableHeaderRow({ sortColumn, sortDirection, onSort }: {
     <tr className="border-b border-gray-100 text-left">
       <th className="px-3 py-3 whitespace-nowrap w-[4%]" />
       {HEADER_COLUMNS.map(col => (
-        <th key={col.key} className="px-3 py-3 font-semibold text-[#1a1a1a] whitespace-nowrap text-xs uppercase tracking-wide w-[13.7%] text-center">
-          <span className="inline-flex items-center justify-center gap-1">
-            {col.label}
-            <SortArrows column={col.key} sortColumn={sortColumn} sortDirection={sortDirection} onSort={onSort} />
-          </span>
+        <th key={col.key} className={`px-3 py-3 font-semibold text-[#1a1a1a] whitespace-nowrap text-xs uppercase tracking-wide ${col.width}`}>
+          {col.label}
+          <SortArrows column={col.key} sortColumn={sortColumn} sortDirection={sortDirection} onSort={onSort} />
         </th>
       ))}
     </tr>
