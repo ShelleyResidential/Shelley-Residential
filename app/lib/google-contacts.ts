@@ -64,32 +64,35 @@ function normalize(person: PersonResource): GoogleContact | null {
   }
 }
 
-// Pulls every contact in the user's "My Contacts" -- paginated, since a
-// personal Google account can easily have hundreds to thousands saved.
-export async function fetchAllGoogleContacts(accessToken: string): Promise<{ contacts: GoogleContact[]; error?: string }> {
+// Pulls ONE page of the user's "My Contacts" (~150-200 people). Deliberately
+// not looped internally into "fetch everything" -- on Vercel Hobby, a
+// serverless function hard-stops at 10 seconds, and a personal account can
+// have thousands of contacts, so paginating through all of them plus
+// writing each page to the database can blow past that limit and get
+// silently killed mid-sync. The caller (a client-side loop for the manual
+// button, or a time-budgeted loop for the cron) drives the pagination
+// across many short calls instead of one long one.
+export async function fetchGoogleContactsPage(
+  accessToken: string,
+  pageToken?: string | null,
+): Promise<{ contacts: GoogleContact[]; nextPageToken?: string; error?: string }> {
+  const params = new URLSearchParams({
+    personFields: PERSON_FIELDS,
+    pageSize:     '200',
+  })
+  if (pageToken) params.set('pageToken', pageToken)
+
+  const res  = await fetch(`${PEOPLE_CONNECTIONS_URL}?${params}`, {
+    headers: { Authorization: `Bearer ${accessToken}` },
+  })
+  const json = await res.json()
+  if (json.error) return { contacts: [], error: json.error.message }
+
   const contacts: GoogleContact[] = []
-  let pageToken: string | undefined
+  for (const person of (json.connections ?? []) as PersonResource[]) {
+    const normalized = normalize(person)
+    if (normalized) contacts.push(normalized)
+  }
 
-  do {
-    const params = new URLSearchParams({
-      personFields: PERSON_FIELDS,
-      pageSize:     '1000',
-    })
-    if (pageToken) params.set('pageToken', pageToken)
-
-    const res  = await fetch(`${PEOPLE_CONNECTIONS_URL}?${params}`, {
-      headers: { Authorization: `Bearer ${accessToken}` },
-    })
-    const json = await res.json()
-    if (json.error) return { contacts, error: json.error.message }
-
-    for (const person of (json.connections ?? []) as PersonResource[]) {
-      const normalized = normalize(person)
-      if (normalized) contacts.push(normalized)
-    }
-
-    pageToken = json.nextPageToken
-  } while (pageToken)
-
-  return { contacts }
+  return { contacts, nextPageToken: json.nextPageToken }
 }

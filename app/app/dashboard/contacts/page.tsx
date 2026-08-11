@@ -145,18 +145,36 @@ export default function ContactsPage() {
     if (!userId) return
     setSyncing(true)
     setSyncMessage('')
-    const res  = await fetch('/api/contacts/sync', {
-      method:  'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body:    JSON.stringify({ userId }),
-    })
-    const json = await res.json()
-    if (!res.ok) {
-      setSyncMessage(json.error ?? 'Sync failed.')
-    } else {
-      setSyncMessage(`Synced — ${json.created} new, ${json.updated} updated.`)
-      await fetchContacts()
+
+    // The endpoint only ever processes one page (~200 contacts) per call --
+    // on Vercel's Hobby plan a serverless function hard-stops at 10 seconds,
+    // which a full multi-thousand-contact sync can easily exceed. Looping
+    // it here, one short request at a time, means the sync always finishes
+    // completely regardless of how large the contact list is.
+    let pageToken: string | null = null
+    let totalCreated = 0
+    let totalUpdated = 0
+    for (;;) {
+      const res: Response = await fetch('/api/contacts/sync', {
+        method:  'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body:    JSON.stringify({ userId, pageToken }),
+      })
+      const json = await res.json()
+      if (!res.ok) {
+        setSyncMessage(json.error ?? 'Sync failed.')
+        setSyncing(false)
+        return
+      }
+      totalCreated += json.created
+      totalUpdated += json.updated
+      pageToken = json.nextPageToken
+      setSyncMessage(`Syncing… ${totalCreated + totalUpdated} contacts so far`)
+      if (!pageToken) break
     }
+
+    setSyncMessage(`Synced — ${totalCreated} new, ${totalUpdated} updated.`)
+    await fetchContacts()
     setSyncing(false)
   }
 

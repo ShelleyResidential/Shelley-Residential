@@ -1,26 +1,25 @@
 import { NextRequest, NextResponse } from 'next/server'
-import { syncContactsForUser } from '@/lib/contacts-sync'
+import { syncContactsPage } from '@/lib/contacts-sync'
 
-// A large personal contact list (thousands of entries, paginated from
-// Google plus chunked reads/writes to Supabase) can take longer than the
-// platform's default function timeout -- ask for more headroom. Vercel
-// caps this to whatever the plan actually allows, so it's a no-op on plans
-// that don't support the full 300s.
-export const maxDuration = 300
-
-// Manual "Sync Contacts" button -- pulls the requesting user's Google
-// contacts into the system immediately, instead of waiting for the daily
-// automatic sync (see /api/contacts/sync-all).
+// Manual "Sync Contacts" button. Processes ONE page (~200 contacts) per
+// call and hands back nextPageToken -- the client loops this until it's
+// empty, so a personal account with thousands of contacts still finishes
+// completely, just across several quick requests instead of one that would
+// risk exceeding Vercel's 10s Hobby-plan function limit.
 export async function POST(request: NextRequest) {
-  const { userId } = await request.json()
+  const { userId, pageToken } = await request.json()
   if (!userId) {
     return NextResponse.json({ error: 'Missing userId' }, { status: 400 })
   }
 
-  const result = await syncContactsForUser(userId)
+  const result = await syncContactsPage(userId, pageToken ?? null)
   if (!result.ok) {
     return NextResponse.json({ error: result.error ?? 'Sync failed' }, { status: 400 })
   }
 
-  return NextResponse.json({ created: result.created, updated: result.updated })
+  return NextResponse.json({
+    created: result.created,
+    updated: result.updated,
+    nextPageToken: result.nextPageToken ?? null,
+  })
 }
