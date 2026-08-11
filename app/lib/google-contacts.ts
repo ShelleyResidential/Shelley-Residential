@@ -37,10 +37,11 @@ function normalize(person: PersonResource): GoogleContact | null {
   const firstName = name?.givenName?.trim() || null
   const lastName  = name?.familyName?.trim() || null
 
-  // Nothing usable to save as a contact -- Google phone contacts saved as
-  // just a bare number with no name still need at least one identifying
-  // field, otherwise there's nothing to show anywhere in the app.
-  if (!firstName && !lastName && !phone?.value && !email?.value) return null
+  // A contact must have both a name and a phone number to be worth
+  // anything in the app -- skip anything Google has as just a bare number
+  // with no name, or a name with no number, rather than saving a record
+  // nobody can actually use to reach the person.
+  if ((!firstName && !lastName) || !phone?.value?.trim()) return null
 
   const birthday = bday?.year && bday.month && bday.day
     ? `${bday.year}-${String(bday.month).padStart(2, '0')}-${String(bday.day).padStart(2, '0')}`

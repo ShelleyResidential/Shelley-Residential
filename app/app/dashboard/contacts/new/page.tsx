@@ -94,6 +94,7 @@ function AddContactForm() {
   async function handleSubmit(e: React.FormEvent) {
     e.preventDefault()
     if (!form.first_name.trim()) { setError('First name is required.'); return }
+    if (!form.phone_number.trim()) { setError('Phone number is required.'); return }
     setError('')
     setSaving(true)
 
@@ -192,7 +193,7 @@ function AddContactForm() {
           <Section title="Contact Details">
             <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
               <div>
-                <label className={labelCls}>Phone Number</label>
+                <label className={labelCls}>Phone Number <span className="text-red-400">*</span></label>
                 <input value={form.phone_number} onChange={e => set('phone_number', e.target.value)} placeholder="e.g. 083 123 4567" className={input} />
               </div>
               <div>

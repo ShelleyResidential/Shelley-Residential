@@ -120,6 +120,14 @@ export default function ContactDetailPage() {
   }
 
   async function saveContact() {
+    if (!editForm.first_name?.trim() && !editForm.last_name?.trim()) {
+      setSaveError('A contact needs a name.')
+      return
+    }
+    if (!editForm.phone_number?.trim()) {
+      setSaveError('A contact needs a phone number.')
+      return
+    }
     setSaving(true); setSaveError('')
     const updated = {
       ...editForm,
