@@ -2,29 +2,55 @@
 
 import { useState, useEffect } from 'react'
 import { supabase } from '@/lib/supabase'
-import { card, btn, sectionTitle, label as labelCls } from '@/lib/styles'
+import { card, btn, input, sectionTitle, label as labelCls } from '@/lib/styles'
 import { useRouter } from 'next/navigation'
 import Image from 'next/image'
 
 export default function SettingsPage() {
   const router = useRouter()
+  const [userId, setUserId]       = useState<string | null>(null)
   const [userEmail, setUserEmail] = useState('')
   const [fullName, setFullName]   = useState('')
   const [avatarUrl, setAvatarUrl] = useState<string | null>(null)
+
+  const [title, setTitle]             = useState('')
+  const [phoneNumber, setPhoneNumber] = useState('')
+  const [saving, setSaving]           = useState(false)
+  const [saved, setSaved]             = useState(false)
+  const [saveError, setSaveError]     = useState('')
 
   useEffect(() => {
     supabase.auth.getUser().then(({ data }) => {
       if (!data.user) { router.push('/'); return }
       const meta = data.user.user_metadata ?? {}
+      setUserId(data.user.id)
       setUserEmail(data.user.email ?? '')
       setFullName(meta.full_name ?? meta.name ?? '')
       setAvatarUrl(meta.avatar_url ?? meta.picture ?? null)
+
+      supabase.from('profiles').select('title, phone_number').eq('id', data.user.id).single().then(({ data: profile }) => {
+        setTitle(profile?.title ?? '')
+        setPhoneNumber(profile?.phone_number ?? '')
+      })
     })
   }, [router])
 
   async function signOut() {
     await supabase.auth.signOut()
     router.push('/')
+  }
+
+  async function saveProfile() {
+    if (!userId) return
+    setSaving(true)
+    setSaveError('')
+    const { error } = await supabase.from('profiles')
+      .update({ title: title.trim() || null, phone_number: phoneNumber.trim() || null })
+      .eq('id', userId)
+    if (error) { setSaveError(error.message); setSaving(false); return }
+    setSaving(false)
+    setSaved(true)
+    setTimeout(() => setSaved(false), 2500)
   }
 
   return (
@@ -36,7 +62,7 @@ export default function SettingsPage() {
         </button>
       </div>
 
-      <div className="max-w-2xl">
+      <div className="max-w-2xl space-y-6">
         {/* Account */}
         <div className={`${card} p-6`}>
           <h3 className={sectionTitle}>Account</h3>
@@ -70,6 +96,28 @@ export default function SettingsPage() {
               <p className="text-[#1a1a1a] font-medium">{userEmail}</p>
             </div>
           </div>
+        </div>
+
+        {/* Professional Details -- used on generated documents like the
+            evaluation Cover Letter (job title + phone under your name). */}
+        <div className={`${card} p-6`}>
+          <h3 className={sectionTitle}>Professional Details</h3>
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 mb-4">
+            <div>
+              <label className={labelCls}>Title</label>
+              <input value={title} onChange={e => setTitle(e.target.value)}
+                placeholder="e.g. Property Practitioner" className={input} />
+            </div>
+            <div>
+              <label className={labelCls}>Phone Number</label>
+              <input value={phoneNumber} onChange={e => setPhoneNumber(e.target.value)}
+                placeholder="e.g. 082 123 4567" className={input} />
+            </div>
+          </div>
+          {saveError && <p className="text-sm text-red-500 mb-3">{saveError}</p>}
+          <button onClick={saveProfile} disabled={saving} className={btn.primary}>
+            {saving ? 'Saving…' : saved ? '✓ Saved' : 'Save'}
+          </button>
         </div>
       </div>
     </div>

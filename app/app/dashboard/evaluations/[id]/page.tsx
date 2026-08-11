@@ -333,6 +333,7 @@ function DocumentsTab({ evaluationId, userId, propertyType }: { evaluationId: st
   if (loading) return <div className="text-center py-16 text-gray-400 text-sm">Loading documents…</div>
 
   return (
+    <>
     <div className={`${card} p-6`}>
       <h3 className={sectionTitle}>Transfer Reports</h3>
 
@@ -373,6 +374,79 @@ function DocumentsTab({ evaluationId, userId, propertyType }: { evaluationId: st
           )
         })}
       </div>
+    </div>
+
+    <div className={`${card} p-6 mt-6`}>
+      <h3 className={sectionTitle}>Forms</h3>
+      <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
+        <CoverLetterCard
+          evaluationId={evaluationId}
+          userId={userId}
+          doc={documents.find(d => d.report_type === 'cover_letter')}
+          onGenerated={fetchDocuments}
+        />
+      </div>
+    </div>
+    </>
+  )
+}
+
+// A card that generates its own file server-side instead of taking an
+// upload -- same look as the Transfer Report cards, but Generate/
+// Regenerate instead of Upload/Replace.
+function CoverLetterCard({ evaluationId, userId, doc, onGenerated }: {
+  evaluationId: string
+  userId: string | null
+  doc: EvaluationDocument | undefined
+  onGenerated: () => void
+}) {
+  const [generating, setGenerating] = useState(false)
+  const [error, setError]           = useState('')
+
+  async function generate() {
+    if (!userId) return
+    setGenerating(true)
+    setError('')
+    const res = await fetch(`/api/evaluations/${evaluationId}/cover-letter`, {
+      method:  'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body:    JSON.stringify({ userId }),
+    })
+    if (!res.ok) {
+      const json = await res.json().catch(() => ({}))
+      setError(json.error ?? 'Generation failed.')
+    } else {
+      onGenerated()
+    }
+    setGenerating(false)
+  }
+
+  return (
+    <div className="border border-gray-200 rounded-xl p-4 flex flex-col gap-3">
+      <h4 className="text-sm font-bold text-[#1a1a1a]">Cover Letter</h4>
+      {error && <p className="text-xs text-red-500">{error}</p>}
+      {doc ? (
+        <>
+          <p className="text-xs text-gray-500 truncate" title={doc.file_name}>{doc.file_name}</p>
+          <div className="flex gap-2">
+            <a href={`/api/documents/${doc.id}/download`} className={`${btn.primary} flex-1 text-center`}>
+              Download
+            </a>
+            <button type="button" onClick={generate} disabled={generating}
+              className={`${btn.secondary} flex-1 ${generating ? 'opacity-50 cursor-not-allowed' : ''}`}>
+              {generating ? 'Regenerating…' : 'Regenerate'}
+            </button>
+          </div>
+        </>
+      ) : (
+        <>
+          <p className="text-xs text-gray-400">Not generated yet.</p>
+          <button type="button" onClick={generate} disabled={generating}
+            className={`${btn.primary} ${generating ? 'opacity-50 cursor-not-allowed' : ''}`}>
+            {generating ? 'Generating…' : 'Generate'}
+          </button>
+        </>
+      )}
     </div>
   )
 }

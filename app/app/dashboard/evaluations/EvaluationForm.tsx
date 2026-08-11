@@ -849,6 +849,18 @@ export function EvaluationForm({ evaluationId, readOnly = false, calendarEventLi
       })
     }
 
+    // The Cover Letter only generates once, right here, if a contact was
+    // captured -- there's no seller to address it to otherwise. Best-effort:
+    // never blocks the evaluation from being created. It can always be made
+    // later from the Documents tab's Generate button.
+    if (contacts.length > 0) {
+      await fetch(`/api/evaluations/${ev.id}/cover-letter`, {
+        method:  'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body:    JSON.stringify({ userId }),
+      }).catch(() => {})
+    }
+
     router.push(`/dashboard/evaluations/${ev.id}`)
   }
 
