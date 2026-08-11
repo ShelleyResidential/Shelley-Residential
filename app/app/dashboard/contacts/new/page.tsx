@@ -15,7 +15,7 @@ const RELATIONSHIP_TYPES = [
 ]
 
 const EMPTY_FORM = {
-  title: '', first_name: '', last_name: '', phone_number: '', email_address: '',
+  title: '', first_name: '', last_name: '', status: 'Active', phone_number: '', email_address: '',
   contact_preference: '', marital_status: '',
   occupation: '', company_name: '', division: '', branch: '',
   birthday: '', wedding_anniversary: '', home_anniversary: '',
@@ -103,7 +103,7 @@ function AddContactForm() {
       first_name: form.first_name.trim(),
       last_name: form.last_name.trim(),
       name: [form.first_name.trim(), form.last_name.trim()].filter(Boolean).join(' '),
-      status: 'Active',
+      status: form.status || 'Active',
       phone_number: form.phone_number || null, email_address: form.email_address || null,
       contact_preference: form.contact_preference || null,
       marital_status: form.marital_status || null, occupation: form.occupation || null,
@@ -187,6 +187,13 @@ function AddContactForm() {
                 <label className={labelCls}>Surname</label>
                 <input value={form.last_name} onChange={e => set('last_name', e.target.value)} placeholder="Smith" className={input} />
               </div>
+            </div>
+            <div>
+              <label className={labelCls}>Status</label>
+              <select value={form.status} onChange={e => set('status', e.target.value)} className={select}>
+                <option>Active</option>
+                <option>Inactive</option>
+              </select>
             </div>
           </Section>
 
