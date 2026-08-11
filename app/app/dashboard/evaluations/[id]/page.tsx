@@ -218,7 +218,7 @@ export default function EvaluationDetailPage() {
 
       {/* ── Documents tab ── */}
       {activeTab === 'documents' && (
-        <DocumentsTab evaluationId={id} userId={userId} />
+        <DocumentsTab evaluationId={id} userId={userId} propertyType={ev.properties?.property_type ?? null} />
       )}
 
       {/* ── Inspection tab ── */}
@@ -287,7 +287,13 @@ type EvaluationDocument = {
   uploaded_at: string
 }
 
-function DocumentsTab({ evaluationId, userId }: { evaluationId: string; userId: string | null }) {
+function DocumentsTab({ evaluationId, userId, propertyType }: { evaluationId: string; userId: string | null; propertyType: string | null }) {
+  // Sectional titles get an SS (Sectional Scheme) report; freehold and
+  // vacant land don't have one to upload.
+  const visibleReportTypes = propertyType === 'sectional_title'
+    ? REPORT_TYPES
+    : REPORT_TYPES.filter(rt => rt.key !== 'ss_report')
+
   const [documents, setDocuments]         = useState<EvaluationDocument[]>([])
   const [loading, setLoading]             = useState(true)
   const [uploadingType, setUploadingType] = useState<string | null>(null)
@@ -333,7 +339,7 @@ function DocumentsTab({ evaluationId, userId }: { evaluationId: string; userId: 
       {error && <p className="text-sm text-red-500 bg-red-50 px-4 py-3 rounded-lg mb-4">{error}</p>}
 
       <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
-        {REPORT_TYPES.map(rt => {
+        {visibleReportTypes.map(rt => {
           const doc       = documents.find(d => d.report_type === rt.key)
           const uploading = uploadingType === rt.key
           return (
@@ -343,7 +349,7 @@ function DocumentsTab({ evaluationId, userId }: { evaluationId: string; userId: 
                 <>
                   <p className="text-xs text-gray-500 truncate" title={doc.file_name}>{doc.file_name}</p>
                   <div className="flex gap-2">
-                    <a href={`/api/documents/${doc.id}/download`} className={`${btn.secondary} flex-1 text-center`}>
+                    <a href={`/api/documents/${doc.id}/download`} className={`${btn.primary} flex-1 text-center`}>
                       Download
                     </a>
                     <label className={`${btn.secondary} flex-1 text-center cursor-pointer ${uploading ? 'opacity-50 pointer-events-none' : ''}`}>
