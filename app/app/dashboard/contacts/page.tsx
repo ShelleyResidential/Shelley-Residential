@@ -9,6 +9,9 @@ import Link from 'next/link'
 
 const PAGE_SIZE = 50
 
+type SortColumn = 'status' | 'name' | 'phone_number' | 'email_address' | 'contact_preference' | 'date_added' | 'created_by'
+type SortDirection = 'asc' | 'desc'
+
 type Contact = {
   id: string
   title: string | null
@@ -47,15 +50,56 @@ export default function ContactsPage() {
   const [selectedId, setSelectedId]   = useState<string | null>(null)
   const [syncing, setSyncing]         = useState(false)
   const [syncMessage, setSyncMessage] = useState('')
+  const [sortColumn, setSortColumn]       = useState<SortColumn>('name')
+  const [sortDirection, setSortDirection] = useState<SortDirection>('asc')
 
   const totalPages = Math.max(1, Math.ceil(totalCount / PAGE_SIZE))
 
+  const SELECT_COLUMNS = 'id, title, first_name, last_name, status, phone_number, email_address, contact_preference, agent_id, date_added, created_by'
+
   const fetchContacts = useCallback(async () => {
     setLoading(true)
+    const ascending = sortDirection === 'asc'
+
+    // "Captured By" sorts by a joined profile's display name, which
+    // PostgREST can't order by directly on the contacts table -- fetch
+    // every matching contact (paginated past Supabase's 1000-row cap),
+    // resolve + sort client-side, then slice out just this page.
+    if (sortColumn === 'created_by') {
+      let base = supabase.from('contacts').select(SELECT_COLUMNS)
+      if (myOnly && userId) base = base.eq('agent_id', userId)
+      if (search) base = base.or(`first_name.ilike.%${search}%,last_name.ilike.%${search}%`)
+
+      let all: Contact[] = []
+      for (let from = 0; ; from += 1000) {
+        const { data } = await base.range(from, from + 999)
+        if (!data || data.length === 0) break
+        all = all.concat(data)
+        if (data.length < 1000) break
+      }
+
+      const nameFor = (c: Contact) => {
+        const p = profiles.find(p => p.id === c.created_by)
+        return (p?.full_name ?? p?.email ?? '').toLowerCase()
+      }
+      all.sort((a, b) => nameFor(a).localeCompare(nameFor(b)) * (ascending ? 1 : -1))
+
+      const from = (page - 1) * PAGE_SIZE
+      setContacts(all.slice(from, from + PAGE_SIZE))
+      setTotalCount(all.length)
+      setLoading(false)
+      return
+    }
+
     let query = supabase
       .from('contacts')
-      .select('id, title, first_name, last_name, status, phone_number, email_address, contact_preference, agent_id, date_added, created_by', { count: 'exact' })
-      .order('first_name')
+      .select(SELECT_COLUMNS, { count: 'exact' })
+
+    if (sortColumn === 'name') {
+      query = query.order('first_name', { ascending }).order('last_name', { ascending })
+    } else {
+      query = query.order(sortColumn, { ascending })
+    }
 
     if (myOnly && userId) query = query.eq('agent_id', userId)
     if (search) query = query.or(`first_name.ilike.%${search}%,last_name.ilike.%${search}%`)
@@ -67,7 +111,13 @@ export default function ContactsPage() {
     setContacts(data ?? [])
     setTotalCount(count ?? 0)
     setLoading(false)
-  }, [search, myOnly, userId, page])
+  }, [search, myOnly, userId, page, sortColumn, sortDirection, profiles])
+
+  function handleSort(column: SortColumn, direction: SortDirection) {
+    setSortColumn(column)
+    setSortDirection(direction)
+    setPage(1)
+  }
 
   useEffect(() => {
     supabase.auth.getUser().then(({ data }) => {
@@ -191,7 +241,7 @@ export default function ContactsPage() {
       <div className="flex items-center justify-between flex-wrap gap-3 mb-4">
         {!loading && (
           <p className="text-sm text-gray-400">
-            {totalCount.toLocaleString('en-ZA')} {totalCount === 1 ? 'Contact' : 'Contacts'}
+            {totalCount.toLocaleString('en-US')} {totalCount === 1 ? 'Contact' : 'Contacts'}
           </p>
         )}
         {paginationControls}
@@ -208,7 +258,7 @@ export default function ContactsPage() {
         <div className={`${card} overflow-x-auto`}>
           <table className="w-full text-sm table-fixed">
             <thead>
-              <TableHeaderRow />
+              <TableHeaderRow sortColumn={sortColumn} sortDirection={sortDirection} onSort={handleSort} />
             </thead>
             <tbody>
               {contacts.map((c, i) => (
@@ -261,7 +311,7 @@ export default function ContactsPage() {
               ))}
             </tbody>
             <tfoot>
-              <TableHeaderRow />
+              <TableHeaderRow sortColumn={sortColumn} sortDirection={sortDirection} onSort={handleSort} />
             </tfoot>
           </table>
         </div>
@@ -274,19 +324,55 @@ export default function ContactsPage() {
   )
 }
 
+// ── Sort arrows: one for ascending, one for descending, each clickable on
+// its own so an agent can jump straight to the direction they want instead
+// of toggling through a single button.
+function SortArrows({ column, sortColumn, sortDirection, onSort }: {
+  column: SortColumn
+  sortColumn: SortColumn
+  sortDirection: SortDirection
+  onSort: (column: SortColumn, direction: SortDirection) => void
+}) {
+  const isAsc  = sortColumn === column && sortDirection === 'asc'
+  const isDesc = sortColumn === column && sortDirection === 'desc'
+  return (
+    <span className="inline-flex flex-col ml-1 -space-y-0.5 align-middle normal-case">
+      <button type="button" onClick={() => onSort(column, 'asc')}
+        className={`leading-none text-[8px] cursor-pointer transition-colors ${isAsc ? 'text-[#E8266F]' : 'text-gray-300 hover:text-gray-500'}`}
+        aria-label="Sort ascending">▲</button>
+      <button type="button" onClick={() => onSort(column, 'desc')}
+        className={`leading-none text-[8px] cursor-pointer transition-colors ${isDesc ? 'text-[#E8266F]' : 'text-gray-300 hover:text-gray-500'}`}
+        aria-label="Sort descending">▼</button>
+    </span>
+  )
+}
+
+const HEADER_COLUMNS: { key: SortColumn; label: string }[] = [
+  { key: 'status',             label: 'Status' },
+  { key: 'name',                label: 'Name' },
+  { key: 'phone_number',        label: 'Phone Number' },
+  { key: 'email_address',       label: 'Email' },
+  { key: 'contact_preference',  label: 'Preference' },
+  { key: 'date_added',          label: 'Date Added' },
+  { key: 'created_by',          label: 'Captured By' },
+]
+
 // ── Table header row, repeated at both the top (thead) and bottom (tfoot)
 // of the contacts table so the column labels stay visible either way.
-function TableHeaderRow() {
+function TableHeaderRow({ sortColumn, sortDirection, onSort }: {
+  sortColumn: SortColumn
+  sortDirection: SortDirection
+  onSort: (column: SortColumn, direction: SortDirection) => void
+}) {
   return (
     <tr className="border-b border-gray-100 text-left">
       <th className="px-3 py-3 whitespace-nowrap w-[4%]" />
-      <th className="px-3 py-3 font-semibold text-[#1a1a1a] whitespace-nowrap text-xs uppercase tracking-wide w-[13.7%]">Status</th>
-      <th className="px-3 py-3 font-semibold text-[#1a1a1a] whitespace-nowrap text-xs uppercase tracking-wide w-[13.7%]">Name</th>
-      <th className="px-3 py-3 font-semibold text-[#1a1a1a] whitespace-nowrap text-xs uppercase tracking-wide w-[13.7%]">Phone Number</th>
-      <th className="px-3 py-3 font-semibold text-[#1a1a1a] whitespace-nowrap text-xs uppercase tracking-wide w-[13.7%]">Email</th>
-      <th className="px-3 py-3 font-semibold text-[#1a1a1a] whitespace-nowrap text-xs uppercase tracking-wide w-[13.7%]">Preference</th>
-      <th className="px-3 py-3 font-semibold text-[#1a1a1a] whitespace-nowrap text-xs uppercase tracking-wide w-[13.7%]">Date Added</th>
-      <th className="px-3 py-3 font-semibold text-[#1a1a1a] whitespace-nowrap text-xs uppercase tracking-wide w-[13.7%]">Captured By</th>
+      {HEADER_COLUMNS.map(col => (
+        <th key={col.key} className="px-3 py-3 font-semibold text-[#1a1a1a] whitespace-nowrap text-xs uppercase tracking-wide w-[13.7%]">
+          {col.label}
+          <SortArrows column={col.key} sortColumn={sortColumn} sortDirection={sortDirection} onSort={onSort} />
+        </th>
+      ))}
     </tr>
   )
 }
