@@ -120,7 +120,7 @@ export default function ContactsPage() {
   const paginationControls = !loading && contacts.length > 0 && (
     <div className="flex items-center gap-3 flex-wrap justify-end">
       <p className="text-xs text-gray-400">
-        Page {page} of {totalPages} · {PAGE_SIZE} Records
+        Page {page} of {totalPages} · {PAGE_SIZE} Records Per Page
       </p>
       <div className="flex items-center gap-1">
         <button onClick={() => setPage(1)} disabled={page <= 1}
@@ -148,11 +148,11 @@ export default function ContactsPage() {
       <Breadcrumbs items={[{ label: 'Analyse' }, { label: 'Contacts' }]} />
       <div className="flex items-center justify-between mb-4">
         <h1 className="text-2xl font-bold text-[#1a1a1a]">Contacts</h1>
-        <div className="fixed top-8 right-10 z-40 flex items-center gap-3">
-          <button onClick={syncContacts} disabled={syncing} className={`${btn.secondary} shadow-md bg-white`}>
+        <div className="flex items-center gap-3">
+          <button onClick={syncContacts} disabled={syncing} className={btn.primary}>
             {syncing ? 'Syncing…' : 'Sync Contacts'}
           </button>
-          <Link href="/dashboard/contacts/new" className={`${btn.primary} shadow-md`}>+ New Contact</Link>
+          <Link href="/dashboard/contacts/new" className={btn.primary}>+ New Contact</Link>
         </div>
       </div>
       {syncMessage && <p className="text-xs text-gray-400 -mt-2 mb-4">{syncMessage}</p>}
@@ -191,7 +191,7 @@ export default function ContactsPage() {
       <div className="flex items-center justify-between flex-wrap gap-3 mb-4">
         {!loading && (
           <p className="text-sm text-gray-400">
-            {totalCount} {totalCount === 1 ? 'Contact' : 'Contacts'}
+            {totalCount.toLocaleString('en-ZA')} {totalCount === 1 ? 'Contact' : 'Contacts'}
           </p>
         )}
         {paginationControls}
