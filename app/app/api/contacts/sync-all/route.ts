@@ -2,6 +2,11 @@ import { NextRequest, NextResponse } from 'next/server'
 import { supabaseAdmin } from '@/lib/supabase-admin'
 import { syncContactsForUser } from '@/lib/contacts-sync'
 
+// Every connected user is synced concurrently, and any one of them could
+// have a large personal contact list -- same headroom as the manual sync
+// route, for the same reason.
+export const maxDuration = 300
+
 // Daily cron (see vercel.json) -- syncs Google Contacts for every user who
 // has Google Calendar/Contacts connected, so everyone's contacts stay
 // current without anyone having to remember to click "Sync Contacts".

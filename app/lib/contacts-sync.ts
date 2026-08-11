@@ -25,14 +25,22 @@ export async function syncContactsForUser(userId: string): Promise<SyncResult> {
 
   // Fields we must never clobber on a re-sync -- they're either edited by
   // hand in the app or set once at creation, not something Google knows
-  // about, so preserve whatever's already there.
-  const { data: existingRows } = await supabaseAdmin
-    .from('contacts')
-    .select('id, google_resource_name, status, marital_status, contact_preference')
-    .eq('created_by', userId)
-    .in('google_resource_name', resourceNames)
+  // about, so preserve whatever's already there. Chunked: a large personal
+  // contact list (thousands of entries) would otherwise build a single
+  // .in() filter long enough to get rejected outright.
+  const existingByResource = new Map<string, { status: string | null; marital_status: string | null; contact_preference: string | null }>()
+  for (let i = 0; i < resourceNames.length; i += CHUNK_SIZE) {
+    const chunk = resourceNames.slice(i, i + CHUNK_SIZE)
+    const { data: existingRows } = await supabaseAdmin
+      .from('contacts')
+      .select('google_resource_name, status, marital_status, contact_preference')
+      .eq('created_by', userId)
+      .in('google_resource_name', chunk)
 
-  const existingByResource = new Map((existingRows ?? []).map(r => [r.google_resource_name as string, r]))
+    for (const row of existingRows ?? []) {
+      existingByResource.set(row.google_resource_name as string, row)
+    }
+  }
 
   const rows = googleContacts.map(gc => {
     const existing = existingByResource.get(gc.resourceName)
@@ -59,17 +67,28 @@ export async function syncContactsForUser(userId: string): Promise<SyncResult> {
     }
   })
 
+  // Chunked so a large contact list never lands in a single oversized
+  // request -- and counted so that if one chunk fails partway through, the
+  // caller still learns how much of a big sync actually landed rather than
+  // losing that entirely.
   let created = 0
+  let updated = 0
   for (let i = 0; i < rows.length; i += CHUNK_SIZE) {
     const chunk = rows.slice(i, i + CHUNK_SIZE)
-    created += chunk.filter(r => !existingByResource.has(r.google_resource_name)).length
 
     const { error: upsertError } = await supabaseAdmin
       .from('contacts')
       .upsert(chunk, { onConflict: 'created_by,google_resource_name' })
 
-    if (upsertError) return { ok: false, created: 0, updated: 0, error: upsertError.message }
+    if (upsertError) {
+      return { ok: false, created, updated, error: `${upsertError.message} (after ${created + updated} of ${rows.length} synced)` }
+    }
+
+    for (const r of chunk) {
+      if (existingByResource.has(r.google_resource_name)) updated++
+      else created++
+    }
   }
 
-  return { ok: true, created, updated: rows.length - created }
+  return { ok: true, created, updated }
 }
