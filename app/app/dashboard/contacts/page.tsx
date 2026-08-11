@@ -45,6 +45,8 @@ export default function ContactsPage() {
   const [page, setPage]               = useState(1)
   const [totalCount, setTotalCount]   = useState(0)
   const [selectedId, setSelectedId]   = useState<string | null>(null)
+  const [syncing, setSyncing]         = useState(false)
+  const [syncMessage, setSyncMessage] = useState('')
 
   const totalPages = Math.max(1, Math.ceil(totalCount / PAGE_SIZE))
 
@@ -89,6 +91,25 @@ export default function ContactsPage() {
     setSelectedId(prev => prev === id ? null : id)
   }
 
+  async function syncContacts() {
+    if (!userId) return
+    setSyncing(true)
+    setSyncMessage('')
+    const res  = await fetch('/api/contacts/sync', {
+      method:  'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body:    JSON.stringify({ userId }),
+    })
+    const json = await res.json()
+    if (!res.ok) {
+      setSyncMessage(json.error ?? 'Sync failed.')
+    } else {
+      setSyncMessage(`Synced — ${json.created} new, ${json.updated} updated.`)
+      await fetchContacts()
+    }
+    setSyncing(false)
+  }
+
   const rowActionControls = selectedId && (
     <RowActionButtons
       onEdit={() => router.push(`/dashboard/contacts/${selectedId}?edit=1`)}
@@ -127,8 +148,14 @@ export default function ContactsPage() {
       <Breadcrumbs items={[{ label: 'Analyse' }, { label: 'Contacts' }]} />
       <div className="flex items-center justify-between mb-4">
         <h1 className="text-2xl font-bold text-[#1a1a1a]">Contacts</h1>
-        <Link href="/dashboard/contacts/new" className={`${btn.primary} fixed top-8 right-10 z-40 shadow-md`}>+ New Contact</Link>
+        <div className="fixed top-8 right-10 z-40 flex items-center gap-3">
+          <button onClick={syncContacts} disabled={syncing} className={`${btn.secondary} shadow-md bg-white`}>
+            {syncing ? 'Syncing…' : 'Sync Contacts'}
+          </button>
+          <Link href="/dashboard/contacts/new" className={`${btn.primary} shadow-md`}>+ New Contact</Link>
+        </div>
       </div>
+      {syncMessage && <p className="text-xs text-gray-400 -mt-2 mb-4">{syncMessage}</p>}
 
       {/* Search */}
       <div className={`${card} p-4 mb-3 flex gap-3 flex-wrap items-center`}>

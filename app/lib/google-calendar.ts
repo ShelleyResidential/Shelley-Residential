@@ -9,7 +9,7 @@ export function buildGoogleLoginAuthUrl(state: string, redirectUri: string) {
     client_id:     process.env.GOOGLE_CLIENT_ID!,
     redirect_uri:  redirectUri,
     response_type: 'code',
-    scope:         'openid email profile https://www.googleapis.com/auth/calendar.events',
+    scope:         'openid email profile https://www.googleapis.com/auth/calendar.events https://www.googleapis.com/auth/contacts.readonly',
     access_type:   'offline',
     prompt:        'select_account',
     hd:            'shelley.co.za',

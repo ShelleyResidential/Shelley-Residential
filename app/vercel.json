@@ -1,5 +1,6 @@
 {
   "crons": [
-    { "path": "/api/calendar/renew-watch", "schedule": "0 3 * * *" }
+    { "path": "/api/calendar/renew-watch", "schedule": "0 3 * * *" },
+    { "path": "/api/contacts/sync-all",    "schedule": "0 4 * * *" }
   ]
 }
