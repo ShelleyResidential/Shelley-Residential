@@ -11,7 +11,12 @@ export function buildGoogleLoginAuthUrl(state: string, redirectUri: string) {
     response_type: 'code',
     scope:         'openid email profile https://www.googleapis.com/auth/calendar.events https://www.googleapis.com/auth/contacts.readonly https://www.googleapis.com/auth/drive https://www.googleapis.com/auth/documents',
     access_type:   'offline',
-    prompt:        'select_account',
+    // "select_account" alone doesn't reliably re-show the consent screen
+    // when the requested scopes grow (e.g. adding Drive/Docs after
+    // Calendar/Contacts) -- Google can silently reuse the old, narrower
+    // grant. Forcing "consent" too guarantees the new scopes actually get
+    // asked for and stored on every login, not just the very first one.
+    prompt:        'consent select_account',
     hd:            'shelley.co.za',
     state,
   })
