@@ -8,6 +8,7 @@ import { Breadcrumbs } from '@/lib/Breadcrumbs'
 import { useRouter, useParams, useSearchParams } from 'next/navigation'
 import Link from 'next/link'
 import { EvaluationForm } from '../EvaluationForm'
+import { REPORT_TYPES } from '@/lib/evaluation-documents'
 
 // ── Types ─────────────────────────────────────────────────────
 type Property = {
@@ -88,7 +89,7 @@ export default function EvaluationDetailPage() {
 
   const [evaluation, setEvaluation] = useState<Evaluation | null>(null)
   const [loading, setLoading]       = useState(true)
-  const [activeTab, setActiveTab]   = useState<'details' | 'inspection' | 'pipeline'>('details')
+  const [activeTab, setActiveTab]   = useState<'details' | 'documents' | 'inspection' | 'pipeline'>('details')
   const [userId, setUserId]         = useState<string | null>(null)
   const [userEmail, setUserEmail]   = useState<string | null>(null)
   const [editing, setEditing]       = useState(() => searchParams.get('edit') === '1' || searchParams.get('newContactId') !== null)
@@ -189,6 +190,7 @@ export default function EvaluationDetailPage() {
       <div className="flex gap-1 mb-6 border-b border-gray-200">
         {([
           { key: 'details',    label: 'Details' },
+          { key: 'documents',  label: 'Documents' },
           { key: 'inspection', label: 'Inspection' },
           { key: 'pipeline',   label: 'Pipeline' },
         ] as const).map(tab => (
@@ -212,6 +214,11 @@ export default function EvaluationDetailPage() {
             onCancel={() => setEditing(false)}
           />
         </div>
+      )}
+
+      {/* ── Documents tab ── */}
+      {activeTab === 'documents' && (
+        <DocumentsTab evaluationId={id} userId={userId} />
       )}
 
       {/* ── Inspection tab ── */}
@@ -268,6 +275,98 @@ export default function EvaluationDetailPage() {
           </div>
         </div>
       )}
+    </div>
+  )
+}
+
+// ── DocumentsTab ─────────────────────────────────────────────
+type EvaluationDocument = {
+  id: string
+  report_type: string
+  file_name: string
+  uploaded_at: string
+}
+
+function DocumentsTab({ evaluationId, userId }: { evaluationId: string; userId: string | null }) {
+  const [documents, setDocuments]         = useState<EvaluationDocument[]>([])
+  const [loading, setLoading]             = useState(true)
+  const [uploadingType, setUploadingType] = useState<string | null>(null)
+  const [error, setError]                 = useState('')
+
+  const fetchDocuments = useCallback(async () => {
+    const { data } = await supabase
+      .from('evaluation_documents')
+      .select('id, report_type, file_name, uploaded_at')
+      .eq('evaluation_id', evaluationId)
+    setDocuments(data ?? [])
+    setLoading(false)
+  }, [evaluationId])
+
+  useEffect(() => { fetchDocuments() }, [fetchDocuments])
+
+  async function handleUpload(reportType: string, file: File) {
+    if (!userId) return
+    setUploadingType(reportType)
+    setError('')
+
+    const formData = new FormData()
+    formData.append('file', file)
+    formData.append('report_type', reportType)
+    formData.append('user_id', userId)
+
+    const res = await fetch(`/api/evaluations/${evaluationId}/documents`, { method: 'POST', body: formData })
+    if (!res.ok) {
+      const json = await res.json().catch(() => ({}))
+      setError(json.error ?? 'Upload failed.')
+    } else {
+      await fetchDocuments()
+    }
+    setUploadingType(null)
+  }
+
+  if (loading) return <div className="text-center py-16 text-gray-400 text-sm">Loading documents…</div>
+
+  return (
+    <div className={`${card} p-6`}>
+      <h3 className={sectionTitle}>Transfer Reports</h3>
+
+      {error && <p className="text-sm text-red-500 bg-red-50 px-4 py-3 rounded-lg mb-4">{error}</p>}
+
+      <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
+        {REPORT_TYPES.map(rt => {
+          const doc       = documents.find(d => d.report_type === rt.key)
+          const uploading = uploadingType === rt.key
+          return (
+            <div key={rt.key} className="border border-gray-200 rounded-xl p-4 flex flex-col gap-3">
+              <h4 className="text-sm font-bold text-[#1a1a1a]">{rt.label}</h4>
+              {doc ? (
+                <>
+                  <p className="text-xs text-gray-500 truncate" title={doc.file_name}>{doc.file_name}</p>
+                  <div className="flex gap-2">
+                    <a href={`/api/documents/${doc.id}/download`} className={`${btn.secondary} flex-1 text-center`}>
+                      Download
+                    </a>
+                    <label className={`${btn.secondary} flex-1 text-center cursor-pointer ${uploading ? 'opacity-50 pointer-events-none' : ''}`}>
+                      {uploading ? 'Uploading…' : 'Replace'}
+                      <input type="file" className="hidden"
+                        onChange={e => e.target.files?.[0] && handleUpload(rt.key, e.target.files[0])} />
+                    </label>
+                  </div>
+                </>
+              ) : (
+                <>
+                  <p className="text-xs text-gray-400">No file uploaded yet.</p>
+                  <label className={`${btn.primary} text-center cursor-pointer ${uploading ? 'opacity-50 pointer-events-none' : ''}`}>
+                    {uploading ? 'Uploading…' : '+ Upload'}
+                    <input type="file" className="hidden"
+                      onChange={e => e.target.files?.[0] && handleUpload(rt.key, e.target.files[0])} />
+                  </label>
+                </>
+              )}
+            </div>
+          )
+        })}
+      </div>
     </div>
   )
 }
