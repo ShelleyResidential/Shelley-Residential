@@ -377,7 +377,7 @@ function ContactSearch({ selectedName, onSelect, onClear }: {
       const { data } = await supabase
         .from('contacts')
         .select('id, first_name, last_name, title')
-        .or(`first_name.ilike.%${query}%,last_name.ilike.%${query}%`)
+        .or(`first_name.ilike.%${query}%,last_name.ilike.%${query}%,name.ilike.%${query}%`)
         .order('first_name').limit(8)
       setResults(data ?? [])
       setOpen(true)

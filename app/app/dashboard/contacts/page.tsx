@@ -68,7 +68,7 @@ export default function ContactsPage() {
     if (sortColumn === 'created_by') {
       let base = supabase.from('contacts').select(SELECT_COLUMNS)
       if (myOnly && userId) base = base.eq('agent_id', userId)
-      if (search) base = base.or(`first_name.ilike.%${search}%,last_name.ilike.%${search}%`)
+      if (search) base = base.or(`first_name.ilike.%${search}%,last_name.ilike.%${search}%,name.ilike.%${search}%`)
 
       let all: Contact[] = []
       for (let from = 0; ; from += 1000) {
@@ -102,7 +102,7 @@ export default function ContactsPage() {
     }
 
     if (myOnly && userId) query = query.eq('agent_id', userId)
-    if (search) query = query.or(`first_name.ilike.%${search}%,last_name.ilike.%${search}%`)
+    if (search) query = query.or(`first_name.ilike.%${search}%,last_name.ilike.%${search}%,name.ilike.%${search}%`)
 
     const from = (page - 1) * PAGE_SIZE
     query = query.range(from, from + PAGE_SIZE - 1)

@@ -15,7 +15,7 @@ export type GoogleContact = {
 
 type PersonResource = {
   resourceName: string
-  names?: { givenName?: string; familyName?: string; honorificPrefix?: string; metadata?: { primary?: boolean } }[]
+  names?: { givenName?: string; middleName?: string; familyName?: string; honorificPrefix?: string; metadata?: { primary?: boolean } }[]
   emailAddresses?: { value?: string; metadata?: { primary?: boolean } }[]
   phoneNumbers?: { value?: string; metadata?: { primary?: boolean } }[]
   organizations?: { name?: string; title?: string; metadata?: { primary?: boolean } }[]
@@ -34,7 +34,11 @@ function normalize(person: PersonResource): GoogleContact | null {
   const org     = primaryOrFirst(person.organizations)
   const bday    = person.birthdays?.[0]?.date
 
-  const firstName = name?.givenName?.trim() || null
+  // Our schema has no middle-name column -- fold it into first name (e.g.
+  // "Test" + "Contact" -> "Test Contact") rather than silently dropping it,
+  // which is what happens when Google splits a full name like
+  // "Test Contact V2" into given="Test", middle="Contact", family="V2".
+  const firstName = [name?.givenName?.trim(), name?.middleName?.trim()].filter(Boolean).join(' ') || null
   const lastName  = name?.familyName?.trim() || null
 
   // A contact must have both a name and a phone number to be worth
