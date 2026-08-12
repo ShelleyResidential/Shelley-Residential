@@ -21,7 +21,6 @@ export default function SettingsPage() {
   const [fullName, setFullName]   = useState('')
   const [avatarUrl, setAvatarUrl] = useState<string | null>(null)
 
-  const [title, setTitle]             = useState('')
   const [phoneNumber, setPhoneNumber] = useState('')
   const [designation, setDesignation]           = useState('')
   const [ppStatus, setPpStatus]                 = useState('')
@@ -41,9 +40,8 @@ export default function SettingsPage() {
       setAvatarUrl(meta.avatar_url ?? meta.picture ?? null)
 
       supabase.from('profiles')
-        .select('title, phone_number, designation, property_practitioner_status, property_practitioner_qualification, ffc_number')
+        .select('phone_number, designation, property_practitioner_status, property_practitioner_qualification, ffc_number')
         .eq('id', data.user.id).single().then(({ data: profile }) => {
-          setTitle(profile?.title ?? '')
           setPhoneNumber(profile?.phone_number ?? '')
           setDesignation(profile?.designation ?? '')
           setPpStatus(profile?.property_practitioner_status ?? '')
@@ -65,7 +63,6 @@ export default function SettingsPage() {
     setSaveError('')
     const { error } = await supabase.from('profiles')
       .update({
-        title:                                 title.trim() || null,
         phone_number:                          phoneNumber.trim() || null,
         designation,
         property_practitioner_status:          ppStatus || null,
@@ -125,15 +122,10 @@ export default function SettingsPage() {
         </div>
 
         {/* Professional Details -- used on generated documents like the
-            evaluation Cover Letter (job title + phone under your name). */}
+            evaluation Cover Letter (designation + phone under your name). */}
         <div className={`${card} p-6`}>
           <h3 className={sectionTitle}>Professional Details</h3>
           <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 mb-4">
-            <div>
-              <label className={labelCls}>Title</label>
-              <input value={title} onChange={e => setTitle(e.target.value)}
-                placeholder="e.g. Property Practitioner" className={input} />
-            </div>
             <div>
               <label className={labelCls}>Phone Number</label>
               <input value={phoneNumber} onChange={e => setPhoneNumber(e.target.value)}
