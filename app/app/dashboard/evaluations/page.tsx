@@ -515,7 +515,9 @@ function RowActionButtons({ evaluationId, propertyType, onEdit, onDetails }: {
 
   // Sectional titles also need an SS (Sectional Scheme) report; freehold
   // and vacant land only need Property + Suburb -- same split as the
-  // evaluation's own Transfer Reports card.
+  // evaluation's own Transfer Reports card. Downloaded as one zip rather
+  // than one click per file: browsers silently drop automatic downloads
+  // after the first when a page fires off several at once.
   async function handleTransferReportsDownload() {
     setDownloadMenuOpen(false)
     if (!evaluationId) return
@@ -526,7 +528,7 @@ function RowActionButtons({ evaluationId, propertyType, onEdit, onDetails }: {
 
     const { data } = await supabase
       .from('evaluation_documents')
-      .select('id, report_type')
+      .select('report_type')
       .eq('evaluation_id', evaluationId)
       .in('report_type', requiredTypes)
 
@@ -539,13 +541,7 @@ function RowActionButtons({ evaluationId, propertyType, onEdit, onDetails }: {
       return
     }
 
-    for (const doc of found) {
-      const a = document.createElement('a')
-      a.href = `/api/documents/${doc.id}/download`
-      document.body.appendChild(a)
-      a.click()
-      a.remove()
-    }
+    window.location.href = `/api/evaluations/${evaluationId}/transfer-reports`
   }
 
   function handleDownload(docName: string) {
