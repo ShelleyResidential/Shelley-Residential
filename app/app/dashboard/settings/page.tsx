@@ -7,11 +7,11 @@ import { useRouter } from 'next/navigation'
 import Image from 'next/image'
 
 const DESIGNATIONS = [
-  'Co founder', 'Head Transaction Coordinator', 'Transaction coordinator', 'Partner',
-  'Marketing coordinator', 'Social media manager', 'Interior designer',
-  'Field Support Assistant', 'Financial manager',
+  'Co-Founder', 'Head Transaction Coordinator', 'Transaction Coordinator', 'Partner',
+  'Marketing Coordinator', 'Social Media Manager', 'Interior Designer',
+  'Field Support Assistant', 'Financial Manager',
 ]
-const PP_STATUSES = ['Candidate property practitioner', 'Property practitioner', 'Principal Property Practitioner']
+const PP_STATUSES = ['Candidate Property Practitioner', 'Property Practitioner', 'Principal Property Practitioner']
 const PP_QUALIFICATIONS = ['NQF4', 'NQF5']
 
 export default function SettingsPage() {

@@ -377,7 +377,7 @@ function DocumentsTab({ evaluationId, userId, propertyType }: { evaluationId: st
     </div>
 
     <div className={`${card} p-6 mt-6`}>
-      <h3 className={sectionTitle}>Forms</h3>
+      <h3 className={sectionTitle}>Evaluation Pack</h3>
       <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
         <CoverLetterCard
           evaluationId={evaluationId}

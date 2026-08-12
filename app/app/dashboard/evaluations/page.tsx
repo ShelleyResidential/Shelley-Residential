@@ -4,6 +4,7 @@ import { useState, useEffect, useCallback, useRef } from 'react'
 import { supabase } from '@/lib/supabase'
 import { btn, card, input } from '@/lib/styles'
 import { Breadcrumbs } from '@/lib/Breadcrumbs'
+import { REPORT_TYPES } from '@/lib/evaluation-documents'
 import { useRouter } from 'next/navigation'
 import Link from 'next/link'
 
@@ -273,8 +274,12 @@ export default function EvaluationsPage() {
     setSelectedId(prev => prev === id ? null : id)
   }
 
+  const selectedEvaluation = evaluations.find(e => e.id === selectedId) ?? null
+
   const rowActionControls = selectedId && (
     <RowActionButtons
+      evaluationId={selectedId}
+      propertyType={selectedEvaluation?.properties?.property_type ?? null}
       onEdit={() => router.push(`/dashboard/evaluations/${selectedId}?edit=1`)}
       onDetails={() => router.push(`/dashboard/evaluations/${selectedId}`)}
     />
@@ -489,7 +494,12 @@ function TableHeaderRow() {
 // ── Row action buttons (Edit / Details / Download), shown once a row is
 // selected. Rendered independently at both the top and bottom of the
 // results, so each instance owns its own download-menu open state.
-function RowActionButtons({ onEdit, onDetails }: { onEdit?: () => void; onDetails?: () => void }) {
+function RowActionButtons({ evaluationId, propertyType, onEdit, onDetails }: {
+  evaluationId?: string
+  propertyType?: string | null
+  onEdit?: () => void
+  onDetails?: () => void
+}) {
   const [downloadMenuOpen, setDownloadMenuOpen] = useState(false)
   const downloadMenuRef = useRef<HTMLDivElement>(null)
 
@@ -502,6 +512,41 @@ function RowActionButtons({ onEdit, onDetails }: { onEdit?: () => void; onDetail
     document.addEventListener('mousedown', onClickOutside)
     return () => document.removeEventListener('mousedown', onClickOutside)
   }, [])
+
+  // Sectional titles also need an SS (Sectional Scheme) report; freehold
+  // and vacant land only need Property + Suburb -- same split as the
+  // evaluation's own Transfer Reports card.
+  async function handleTransferReportsDownload() {
+    setDownloadMenuOpen(false)
+    if (!evaluationId) return
+
+    const requiredTypes = propertyType === 'sectional_title'
+      ? REPORT_TYPES.map(rt => rt.key)
+      : REPORT_TYPES.filter(rt => rt.key !== 'ss_report').map(rt => rt.key)
+
+    const { data } = await supabase
+      .from('evaluation_documents')
+      .select('id, report_type')
+      .eq('evaluation_id', evaluationId)
+      .in('report_type', requiredTypes)
+
+    const found   = data ?? []
+    const missing = requiredTypes.filter(rt => !found.some(d => d.report_type === rt))
+
+    if (missing.length > 0) {
+      const missingLabels = missing.map(rt => REPORT_TYPES.find(r => r.key === rt)?.label ?? rt).join(', ')
+      alert(`These Transfer Reports still need to be uploaded before you can download them: ${missingLabels}`)
+      return
+    }
+
+    for (const doc of found) {
+      const a = document.createElement('a')
+      a.href = `/api/documents/${doc.id}/download`
+      document.body.appendChild(a)
+      a.click()
+      a.remove()
+    }
+  }
 
   function handleDownload(docName: string) {
     setDownloadMenuOpen(false)
@@ -525,7 +570,7 @@ function RowActionButtons({ onEdit, onDetails }: { onEdit?: () => void; onDetail
             <button onClick={() => handleDownload('Form')} className="w-full text-left px-4 py-2 text-sm text-[#1a1a1a] hover:bg-gray-50 transition-colors cursor-pointer">
               Form
             </button>
-            <button onClick={() => handleDownload('Transfer Reports')} className="w-full text-left px-4 py-2 text-sm text-[#1a1a1a] hover:bg-gray-50 transition-colors cursor-pointer">
+            <button onClick={handleTransferReportsDownload} className="w-full text-left px-4 py-2 text-sm text-[#1a1a1a] hover:bg-gray-50 transition-colors cursor-pointer">
               Transfer Reports
             </button>
             <button onClick={() => handleDownload('Market Report')} className="w-full text-left px-4 py-2 text-sm text-[#1a1a1a] hover:bg-gray-50 transition-colors cursor-pointer">
