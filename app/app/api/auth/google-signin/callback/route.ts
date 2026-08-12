@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { createClient } from '@supabase/supabase-js'
-import { exchangeCodeForTokens } from '@/lib/google-calendar'
+import { exchangeCodeForTokens, REQUIRED_GOOGLE_SCOPES } from '@/lib/google-calendar'
 import { verifyGoogleIdToken } from '@/lib/google-signin'
 import { supabaseAdmin } from '@/lib/supabase-admin'
 import { ensureWatchChannel } from '@/lib/calendar-watch'
@@ -29,6 +29,29 @@ export async function GET(request: NextRequest) {
 
   if (tokens.error || !tokens.id_token) {
     return NextResponse.redirect(`${appUrl}/?error=token_exchange`)
+  }
+
+  // This account may not have granted every scope the app now needs (e.g.
+  // it last logged in before Drive/Docs access was added). Rather than
+  // forcing the full permission screen on every single login forever, only
+  // do it the one time it's actually missing something -- everyday logins
+  // stay a quick account picker. The cookie guards against looping forever
+  // if Google keeps omitting a scope for some other reason (e.g. it was
+  // explicitly denied): top up once, then proceed regardless.
+  const grantedScopes = new Set((tokens.scope ?? '').split(' ').filter(Boolean))
+  const missingScopes = REQUIRED_GOOGLE_SCOPES.filter(s => !grantedScopes.has(s))
+  const alreadyForced = request.cookies.get('google_force_consent_attempted')?.value === '1'
+
+  if (missingScopes.length > 0 && !alreadyForced) {
+    const response = NextResponse.redirect(`${appUrl}/api/auth/google-signin?force=1`)
+    response.cookies.set('google_force_consent_attempted', '1', {
+      httpOnly: true,
+      secure:   process.env.NODE_ENV === 'production',
+      maxAge:   300,
+      sameSite: 'lax',
+      path:     '/',
+    })
+    return response
   }
 
   let payload
@@ -127,5 +150,6 @@ export async function GET(request: NextRequest) {
     `${appUrl}/auth/complete#access_token=${encodeURIComponent(data.session.access_token)}&refresh_token=${encodeURIComponent(data.session.refresh_token)}`,
   )
   response.cookies.set('google_login_nonce', '', { maxAge: 0, path: '/' })
+  response.cookies.set('google_force_consent_attempted', '', { maxAge: 0, path: '/' })
   return response
 }

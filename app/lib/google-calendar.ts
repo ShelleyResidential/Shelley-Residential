@@ -2,21 +2,31 @@ const GOOGLE_TOKEN_URL   = 'https://oauth2.googleapis.com/token'
 const CALENDAR_BASE      = 'https://www.googleapis.com/calendar/v3/calendars/primary/events'
 const CALENDAR_CHANNELS_STOP_URL = 'https://www.googleapis.com/calendar/v3/channels/stop'
 
-// Combined sign-in + Calendar consent — used by the login flow so Calendar
-// access is granted automatically as part of signing in with Google.
-export function buildGoogleLoginAuthUrl(state: string, redirectUri: string) {
+// Every non-basic scope the app needs Google access to -- checked after
+// each login (see the callback route) so we can tell whether THIS account
+// actually already granted all of them, or needs a one-time top-up.
+export const REQUIRED_GOOGLE_SCOPES = [
+  'https://www.googleapis.com/auth/calendar.events',
+  'https://www.googleapis.com/auth/contacts.readonly',
+  'https://www.googleapis.com/auth/drive',
+  'https://www.googleapis.com/auth/documents',
+]
+
+// Combined sign-in + Calendar/Contacts/Drive/Docs consent — used by the
+// login flow so all of it is granted automatically as part of signing in
+// with Google. `forceConsent` re-shows the full permission screen even if
+// Google would otherwise silently skip it (needed the one time an account
+// is missing a scope it hasn't granted yet -- see the callback route,
+// which is the only caller that ever passes true); everyday logins leave
+// it off so returning agents just pick their account and go straight in.
+export function buildGoogleLoginAuthUrl(state: string, redirectUri: string, forceConsent = false) {
   const params = new URLSearchParams({
     client_id:     process.env.GOOGLE_CLIENT_ID!,
     redirect_uri:  redirectUri,
     response_type: 'code',
-    scope:         'openid email profile https://www.googleapis.com/auth/calendar.events https://www.googleapis.com/auth/contacts.readonly https://www.googleapis.com/auth/drive https://www.googleapis.com/auth/documents',
+    scope:         ['openid', 'email', 'profile', ...REQUIRED_GOOGLE_SCOPES].join(' '),
     access_type:   'offline',
-    // "select_account" alone doesn't reliably re-show the consent screen
-    // when the requested scopes grow (e.g. adding Drive/Docs after
-    // Calendar/Contacts) -- Google can silently reuse the old, narrower
-    // grant. Forcing "consent" too guarantees the new scopes actually get
-    // asked for and stored on every login, not just the very first one.
-    prompt:        'consent select_account',
+    prompt:        forceConsent ? 'consent select_account' : 'select_account',
     hd:            'shelley.co.za',
     state,
   })
@@ -36,7 +46,7 @@ export async function exchangeCodeForTokens(code: string, redirectUri: string) {
     }),
   })
   return res.json() as Promise<{
-    access_token: string; refresh_token?: string; id_token?: string; expires_in: number; error?: string
+    access_token: string; refresh_token?: string; id_token?: string; expires_in: number; scope?: string; error?: string
   }>
 }
 
