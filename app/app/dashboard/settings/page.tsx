@@ -2,9 +2,17 @@
 
 import { useState, useEffect } from 'react'
 import { supabase } from '@/lib/supabase'
-import { card, btn, input, sectionTitle, label as labelCls } from '@/lib/styles'
+import { card, btn, input, select, sectionTitle, label as labelCls } from '@/lib/styles'
 import { useRouter } from 'next/navigation'
 import Image from 'next/image'
+
+const DESIGNATIONS = [
+  'Co founder', 'Head Transaction Coordinator', 'Transaction coordinator', 'Partner',
+  'Marketing coordinator', 'Social media manager', 'Interior designer',
+  'Field Support Assistant', 'Financial manager',
+]
+const PP_STATUSES = ['Candidate property practitioner', 'Property practitioner', 'Principal Property Practitioner']
+const PP_QUALIFICATIONS = ['NQF4', 'NQF5']
 
 export default function SettingsPage() {
   const router = useRouter()
@@ -15,6 +23,10 @@ export default function SettingsPage() {
 
   const [title, setTitle]             = useState('')
   const [phoneNumber, setPhoneNumber] = useState('')
+  const [designation, setDesignation]           = useState('')
+  const [ppStatus, setPpStatus]                 = useState('')
+  const [ppQualification, setPpQualification]   = useState('')
+  const [ffcNumber, setFfcNumber]               = useState('')
   const [saving, setSaving]           = useState(false)
   const [saved, setSaved]             = useState(false)
   const [saveError, setSaveError]     = useState('')
@@ -28,10 +40,16 @@ export default function SettingsPage() {
       setFullName(meta.full_name ?? meta.name ?? '')
       setAvatarUrl(meta.avatar_url ?? meta.picture ?? null)
 
-      supabase.from('profiles').select('title, phone_number').eq('id', data.user.id).single().then(({ data: profile }) => {
-        setTitle(profile?.title ?? '')
-        setPhoneNumber(profile?.phone_number ?? '')
-      })
+      supabase.from('profiles')
+        .select('title, phone_number, designation, property_practitioner_status, property_practitioner_qualification, ffc_number')
+        .eq('id', data.user.id).single().then(({ data: profile }) => {
+          setTitle(profile?.title ?? '')
+          setPhoneNumber(profile?.phone_number ?? '')
+          setDesignation(profile?.designation ?? '')
+          setPpStatus(profile?.property_practitioner_status ?? '')
+          setPpQualification(profile?.property_practitioner_qualification ?? '')
+          setFfcNumber(profile?.ffc_number ?? '')
+        })
     })
   }, [router])
 
@@ -42,10 +60,18 @@ export default function SettingsPage() {
 
   async function saveProfile() {
     if (!userId) return
+    if (!designation) { setSaveError('Designation is required'); return }
     setSaving(true)
     setSaveError('')
     const { error } = await supabase.from('profiles')
-      .update({ title: title.trim() || null, phone_number: phoneNumber.trim() || null })
+      .update({
+        title:                                 title.trim() || null,
+        phone_number:                          phoneNumber.trim() || null,
+        designation,
+        property_practitioner_status:          ppStatus || null,
+        property_practitioner_qualification:   ppQualification || null,
+        ffc_number:                            ffcNumber.trim() || null,
+      })
       .eq('id', userId)
     if (error) { setSaveError(error.message); setSaving(false); return }
     setSaving(false)
@@ -112,6 +138,32 @@ export default function SettingsPage() {
               <label className={labelCls}>Phone Number</label>
               <input value={phoneNumber} onChange={e => setPhoneNumber(e.target.value)}
                 placeholder="e.g. 082 123 4567" className={input} />
+            </div>
+            <div>
+              <label className={labelCls}>Designation *</label>
+              <select value={designation} onChange={e => setDesignation(e.target.value)} className={select}>
+                <option value="">—</option>
+                {DESIGNATIONS.map(d => <option key={d} value={d}>{d}</option>)}
+              </select>
+            </div>
+            <div>
+              <label className={labelCls}>FFC Number</label>
+              <input value={ffcNumber} onChange={e => setFfcNumber(e.target.value)}
+                placeholder="e.g. 2024/123456" className={input} />
+            </div>
+            <div>
+              <label className={labelCls}>Property Practitioner Status</label>
+              <select value={ppStatus} onChange={e => setPpStatus(e.target.value)} className={select}>
+                <option value="">—</option>
+                {PP_STATUSES.map(s => <option key={s} value={s}>{s}</option>)}
+              </select>
+            </div>
+            <div>
+              <label className={labelCls}>Property Practitioner Qualification</label>
+              <select value={ppQualification} onChange={e => setPpQualification(e.target.value)} className={select}>
+                <option value="">—</option>
+                {PP_QUALIFICATIONS.map(q => <option key={q} value={q}>{q}</option>)}
+              </select>
             </div>
           </div>
           {saveError && <p className="text-sm text-red-500 mb-3">{saveError}</p>}

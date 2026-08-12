@@ -3,8 +3,7 @@ import { getValidAccessToken } from '@/lib/calendar-tokens'
 import { copyDriveFile, replaceTextInDoc, exportDocAsPdf, deleteDriveFile } from '@/lib/google-docs'
 import { DOCUMENTS_BUCKET } from '@/lib/evaluation-documents'
 
-const TEMPLATE_DOC_ID     = process.env.GOOGLE_COVER_LETTER_TEMPLATE_ID
-const DEFAULT_AGENT_TITLE = 'Property Practitioner'
+const TEMPLATE_DOC_ID = process.env.GOOGLE_COVER_LETTER_TEMPLATE_ID
 
 type Result = { ok: boolean; error?: string }
 
@@ -59,7 +58,7 @@ export async function generateCoverLetter(evaluationId: string, userId: string):
   }
   const { data: agent } = await supabaseAdmin
     .from('profiles')
-    .select('full_name, email, title, phone_number')
+    .select('full_name, email, phone_number, designation, property_practitioner_status, property_practitioner_qualification, ffc_number')
     .eq('id', ev.sellers_agent_user_id)
     .single()
 
@@ -74,13 +73,18 @@ export async function generateCoverLetter(evaluationId: string, userId: string):
     return { ok: false, error: copy.error?.message ?? 'Failed to copy the cover letter template' }
   }
 
-  // 2. Fill in the merge fields.
+  // 2. Fill in the merge fields. Note: the template has "PPRE" as fixed text
+  // directly before {{property_practitioner_qualification}}, so that value
+  // is just "NQF4"/"NQF5" -- no prefix added here.
   const fillResult = await replaceTextInDoc(accessToken, copy.id, {
-    '{{seller_names}}': seller.contacts.first_name,
-    '{{agent_name}}':   agent.full_name ?? agent.email ?? '',
-    '{{agent_title}}':  agent.title ?? DEFAULT_AGENT_TITLE,
-    '{{agent_number}}': agent.phone_number ?? '',
-    '{{agent_email}}':  agent.email ?? '',
+    '{{seller_names}}':                        seller.contacts.first_name,
+    '{{agent_name}}':                          agent.full_name ?? agent.email ?? '',
+    '{{designation}}':                         agent.designation ?? '',
+    '{{property_practitioner_status}}':        agent.property_practitioner_status ?? '',
+    '{{property_practitioner_qualification}}': agent.property_practitioner_qualification ?? '',
+    '{{ffc_number}}':                          agent.ffc_number ?? '',
+    '{{agent_number}}':                        agent.phone_number ?? '',
+    '{{agent_email}}':                         agent.email ?? '',
   })
   if (fillResult.error) {
     await deleteDriveFile(accessToken, copy.id)
