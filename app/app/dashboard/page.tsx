@@ -21,6 +21,15 @@ export default function DashboardPage() {
     contacts: 0, properties: 0, evaluations: 0, evaluationsByStatus: {},
   })
   const [loading, setLoading] = useState(true)
+  const [firstName, setFirstName] = useState('')
+
+  useEffect(() => {
+    supabase.auth.getUser().then(({ data }) => {
+      const meta = data.user?.user_metadata ?? {}
+      const name = meta.full_name ?? meta.name ?? data.user?.email?.split('@')[0] ?? ''
+      setFirstName(name.split(' ')[0])
+    })
+  }, [])
 
   useEffect(() => {
     async function load() {
@@ -52,7 +61,8 @@ export default function DashboardPage() {
 
   return (
     <div className="p-10">
-      <h1 className="text-2xl font-bold text-[#1a1a1a] mb-8">Dashboard</h1>
+      <h1 className="text-2xl font-bold text-[#1a1a1a]">Dashboard</h1>
+      <p className="text-sm text-gray-400 mb-8">Good day{firstName ? `, ${firstName}` : ', Agent'}</p>
 
       {/* ── Top stat blocks ── */}
       <div className="grid grid-cols-1 sm:grid-cols-3 gap-4 mb-8">
