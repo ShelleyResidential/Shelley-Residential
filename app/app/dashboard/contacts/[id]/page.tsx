@@ -133,10 +133,19 @@ export default function ContactDetailPage() {
       ...editForm,
       name: [editForm.first_name, editForm.last_name].filter(Boolean).join(' '),
     }
-    const { error } = await supabase.from('contacts').update(updated).eq('id', id)
-    if (error) { setSaveError(error.message); setSaving(false); return }
+    // Routed through an API route rather than a direct client update -- if
+    // this contact came from Google, the route also pushes the change back
+    // out to the person's Google Contacts (see app/api/contacts/[id]/route.ts).
+    const res  = await fetch(`/api/contacts/${id}`, {
+      method: 'PATCH',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(updated),
+    })
+    const json = await res.json().catch(() => ({}))
+    if (!res.ok) { setSaveError(json.error ?? 'Failed to save.'); setSaving(false); return }
     setContact({ ...contact!, ...updated } as Contact)
     setEditing(false); setSaving(false)
+    if (json.googlePushError) alert(json.googlePushError)
   }
 
   async function addNote() {

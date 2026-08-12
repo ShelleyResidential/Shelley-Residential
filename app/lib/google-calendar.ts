@@ -7,7 +7,10 @@ const CALENDAR_CHANNELS_STOP_URL = 'https://www.googleapis.com/calendar/v3/chann
 // actually already granted all of them, or needs a one-time top-up.
 export const REQUIRED_GOOGLE_SCOPES = [
   'https://www.googleapis.com/auth/calendar.events',
-  'https://www.googleapis.com/auth/contacts.readonly',
+  // Full read/write (not .readonly) -- editing a synced contact in the app
+  // pushes the change back out to the user's Google Contacts, see
+  // lib/google-contacts.ts:updateGoogleContact.
+  'https://www.googleapis.com/auth/contacts',
   'https://www.googleapis.com/auth/drive',
   'https://www.googleapis.com/auth/documents',
 ]

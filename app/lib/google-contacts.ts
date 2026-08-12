@@ -1,5 +1,10 @@
-const PEOPLE_CONNECTIONS_URL = 'https://people.googleapis.com/v1/people/me/connections'
+const PEOPLE_BASE_URL         = 'https://people.googleapis.com/v1'
+const PEOPLE_CONNECTIONS_URL  = `${PEOPLE_BASE_URL}/people/me/connections`
 const PERSON_FIELDS = 'names,nicknames,emailAddresses,phoneNumbers,organizations,birthdays'
+// Only the fields we ever write back -- kept separate from PERSON_FIELDS
+// (which also reads nicknames, something we have no app-side field for and
+// so never push).
+const WRITABLE_PERSON_FIELDS = 'names,phoneNumbers,emailAddresses,organizations,birthdays'
 
 export type GoogleContact = {
   resourceName:  string
@@ -95,4 +100,64 @@ export async function fetchGoogleContactsPage(
   }
 
   return { contacts, nextPageToken: json.nextPageToken }
+}
+
+export type ContactPushFields = {
+  title:        string | null
+  firstName:    string | null
+  lastName:     string | null
+  phone:        string | null
+  email:        string | null
+  companyName:  string | null
+  occupation:   string | null
+  birthday:     string | null // ISO 'YYYY-MM-DD'
+}
+
+// Pushes an app-side edit back out to the matching Google Contact, so the
+// two stay in sync instead of the app being a one-way mirror of Google.
+// Google requires the contact's current etag on every write (optimistic
+// concurrency) -- fetched fresh right here rather than cached anywhere, so
+// a write from elsewhere (the person's phone, Google Contacts itself)
+// never causes this update to fail with a stale-etag error.
+export async function updateGoogleContact(
+  accessToken: string,
+  resourceName: string,
+  fields: ContactPushFields,
+): Promise<{ ok: boolean; error?: string }> {
+  const getRes  = await fetch(`${PEOPLE_BASE_URL}/${resourceName}?personFields=metadata`, {
+    headers: { Authorization: `Bearer ${accessToken}` },
+  })
+  const person = await getRes.json()
+  if (person.error) return { ok: false, error: person.error.message }
+
+  let birthdays: { date: { year: number; month: number; day: number } }[] = []
+  if (fields.birthday) {
+    const [year, month, day] = fields.birthday.split('-').map(Number)
+    birthdays = [{ date: { year, month, day } }]
+  }
+
+  const body = {
+    etag: person.etag,
+    names: [{
+      givenName:       fields.firstName ?? '',
+      familyName:      fields.lastName ?? '',
+      honorificPrefix: fields.title ?? '',
+    }],
+    phoneNumbers:   fields.phone ? [{ value: fields.phone }] : [],
+    emailAddresses: fields.email ? [{ value: fields.email }] : [],
+    organizations: (fields.companyName || fields.occupation)
+      ? [{ name: fields.companyName ?? '', title: fields.occupation ?? '' }]
+      : [],
+    birthdays,
+  }
+
+  const params = new URLSearchParams({ updatePersonFields: WRITABLE_PERSON_FIELDS })
+  const res = await fetch(`${PEOPLE_BASE_URL}/${resourceName}:updateContact?${params}`, {
+    method: 'PATCH',
+    headers: { Authorization: `Bearer ${accessToken}`, 'Content-Type': 'application/json' },
+    body: JSON.stringify(body),
+  })
+  const json = await res.json()
+  if (json.error) return { ok: false, error: json.error.message }
+  return { ok: true }
 }
