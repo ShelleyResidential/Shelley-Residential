@@ -27,9 +27,10 @@ type Property = {
 type PipelineStep = {
   id: string; step_key: string; is_complete: boolean; status: string
   owner_role: string | null; due_date: string | null; created_at: string | null
-  completed_at: string | null; sort_order: number
-  completed_by: { full_name: string | null; email: string | null; designation: string | null } | { full_name: string | null; email: string | null; designation: string | null }[] | null
+  completed_at: string | null; completed_by_user_id: string | null; sort_order: number
 }
+
+type PipelineProfile = { full_name: string | null; email: string | null; designation: string | null }
 
 type Evaluation = {
   id: string; status: string; date_captured: string
@@ -70,6 +71,11 @@ export default function EvaluationDetailPage() {
   const [userDesignation, setUserDesignation] = useState<string | null>(null)
   const [editing, setEditing]       = useState(() => searchParams.get('edit') === '1' || searchParams.get('newContactId') !== null)
   const [deleting, setDeleting]     = useState(false)
+  // Looked up separately rather than embedded via a PostgREST relationship
+  // join -- completed_by_user_id has no foreign key constraint, so an
+  // embed there 400s the whole query. Same pattern the rest of the app
+  // already uses for user references (evaluations list, EvaluationForm).
+  const [profiles, setProfiles]     = useState<Record<string, PipelineProfile>>({})
 
   const fetchEvaluation = useCallback(async () => {
     const { data } = await supabase
@@ -80,8 +86,7 @@ export default function EvaluationDetailPage() {
           street_number, street_name, suburb, city, province, postal_code,
           google_maps_url, latitude, longitude),
         evaluation_pipeline_steps (
-          id, step_key, is_complete, status, owner_role, due_date, created_at, completed_at, sort_order,
-          completed_by:completed_by_user_id (full_name, email, designation)
+          id, step_key, is_complete, status, owner_role, due_date, created_at, completed_at, completed_by_user_id, sort_order
         )
       `)
       .eq('id', id)
@@ -94,6 +99,13 @@ export default function EvaluationDetailPage() {
   }, [id])
 
   useEffect(() => {
+    supabase.from('profiles').select('id, full_name, email, designation').then(({ data }) => {
+      const map: Record<string, PipelineProfile> = {}
+      for (const p of (data ?? []) as { id: string; full_name: string | null; email: string | null; designation: string | null }[]) {
+        map[p.id] = { full_name: p.full_name, email: p.email, designation: p.designation }
+      }
+      setProfiles(map)
+    })
     supabase.auth.getUser().then(({ data }) => {
       if (!data.user) { router.push('/'); return }
       setUserId(data.user.id)
@@ -241,7 +253,7 @@ export default function EvaluationDetailPage() {
           <div className="space-y-3">
             {sortedSteps.map((step, i) => {
               const complete       = step.status === 'complete' || step.is_complete
-              const completedBy    = Array.isArray(step.completed_by) ? step.completed_by[0] : step.completed_by
+              const completedBy    = step.completed_by_user_id ? profiles[step.completed_by_user_id] : null
               // Derived from the step key via the code's own catalogue rather
               // than the DB row's owner_role column -- evaluations created
               // before this pipeline rebuild have that column as null.
