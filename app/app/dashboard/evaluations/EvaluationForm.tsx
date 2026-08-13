@@ -998,6 +998,11 @@ export function EvaluationForm({ evaluationId, readOnly = false, calendarEventLi
       }
     }
 
+    // A brand-new evaluation can already have every Evaluation Form
+    // Completed field filled in on this very first save -- same check the
+    // update path runs on every subsequent save.
+    await checkEvaluationFormGate(ev.id, userId, evaluationFormComplete)
+
     // The Cover Letter only generates once, right here, if a contact was
     // captured -- there's no seller to address it to otherwise. Best-effort:
     // never blocks the evaluation from being created. It can always be made
