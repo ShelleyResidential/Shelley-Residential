@@ -881,14 +881,20 @@ export function EvaluationForm({ evaluationId, readOnly = false, calendarEventLi
       }
 
       // An Evaluation Date and Time captured on save automatically creates/
-      // updates the Google Calendar event; the evaluation only advances to
-      // "Scheduled" once that event is actually sent (handled server-side).
+      // updates the Google Calendar event; the "Evaluation Scheduled" step
+      // (and the Scheduled status, set server-side) only complete once that
+      // event is actually created -- per EV-02, a failed calendar sync must
+      // never silently mark it done, so it stays pending for a retry.
       if (scheduledAt) {
-        await fetch('/api/calendar/sync', {
+        const syncRes = await fetch('/api/calendar/sync', {
           method:  'POST',
           headers: { 'Content-Type': 'application/json' },
           body:    JSON.stringify({ evaluationId, userId }),
         })
+        if (syncRes.ok) {
+          await markStepComplete(evaluationId, 'scheduled', userId)
+          await promoteStatus(evaluationId, 'scheduled')
+        }
       }
 
       // Same pattern for the Presentation Date and Time -- its own calendar
@@ -956,7 +962,11 @@ export function EvaluationForm({ evaluationId, readOnly = false, calendarEventLi
           dueDate = new Date(new Date(scheduledAt).getTime() - 24 * 60 * 60 * 1000).toISOString()
         }
 
-        const isComplete = step.key === 'captured' || (step.key === 'scheduled' && !!scheduledAt)
+        // "Evaluation Scheduled" is deliberately NOT marked complete here
+        // just because a date/time was typed in -- per EV-02, it only
+        // completes once the calendar event actually gets created, which
+        // happens right after this insert (see markStepComplete call below).
+        const isComplete = step.key === 'captured'
         return {
           evaluation_id: ev.id, step_key: step.key, sort_order: i,
           owner_role: step.ownerRole, owner_user_id: ownerUserId, due_date: dueDate,
@@ -968,14 +978,19 @@ export function EvaluationForm({ evaluationId, readOnly = false, calendarEventLi
     )
 
     // An Evaluation Date and Time captured on save automatically creates the
-    // Google Calendar event; the evaluation only advances to "Scheduled"
-    // once that event is actually sent (handled server-side).
+    // Google Calendar event; the "Evaluation Scheduled" step and the
+    // Scheduled status only complete once that event is actually created --
+    // a failed sync leaves it pending rather than silently marking it done.
     if (scheduledAt) {
-      await fetch('/api/calendar/sync', {
+      const syncRes = await fetch('/api/calendar/sync', {
         method:  'POST',
         headers: { 'Content-Type': 'application/json' },
         body:    JSON.stringify({ evaluationId: ev.id, userId }),
       })
+      if (syncRes.ok) {
+        await markStepComplete(ev.id, 'scheduled', userId)
+        await promoteStatus(ev.id, 'scheduled')
+      }
     }
 
     // The Cover Letter only generates once, right here, if a contact was
