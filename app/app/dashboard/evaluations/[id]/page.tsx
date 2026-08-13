@@ -9,6 +9,10 @@ import { useRouter, useParams, useSearchParams } from 'next/navigation'
 import Link from 'next/link'
 import { EvaluationForm } from '../EvaluationForm'
 import { REPORT_TYPES } from '@/lib/evaluation-documents'
+import {
+  STATUS_LABELS, STATUS_COLOURS, stepLabel, stepOwnerRole, canActOnRole,
+  markStepComplete, promoteStatus, checkPreparedGate, checkPresentationReadyGate,
+} from '@/lib/pipeline'
 
 // ── Types ─────────────────────────────────────────────────────
 type Property = {
@@ -21,8 +25,10 @@ type Property = {
 }
 
 type PipelineStep = {
-  id: string; step_key: string; is_complete: boolean
+  id: string; step_key: string; is_complete: boolean; status: string
+  owner_role: string | null; due_date: string | null; created_at: string | null
   completed_at: string | null; sort_order: number
+  completed_by: { full_name: string | null; email: string | null; designation: string | null } | { full_name: string | null; email: string | null; designation: string | null }[] | null
 }
 
 type Evaluation = {
@@ -49,37 +55,6 @@ function formatAddress(p: Property | null): string {
   return [street, p.suburb].filter(Boolean).join(', ') || p.city || 'Unknown address'
 }
 
-const STEP_LABELS: Record<string, string> = {
-  captured:             'Evaluation Captured',
-  scheduled:            'Evaluation Scheduled',
-  lightstone_uploaded:  'Lightstone Reports Uploaded',
-  property_inspected:   'Property Inspected',
-  description_captured: 'Description Captured',
-}
-
-const STATUS_COLOURS: Record<string, string> = {
-  // Current statuses
-  new:         'bg-blue-50 text-blue-700',
-  scheduled:   'bg-indigo-50 text-indigo-700',
-  completed:   'bg-teal-50 text-teal-700',
-  presented:   'bg-purple-50 text-purple-700',
-  follow_up:   'bg-yellow-50 text-yellow-700',
-  won:         'bg-emerald-50 text-emerald-700',
-  lost:        'bg-red-50 text-red-600',
-  cancelled:   'bg-gray-100 text-gray-500',
-  // Legacy statuses (kept for evaluations created before this status list changed)
-  in_progress: 'bg-blue-50 text-blue-700',
-  open:        'bg-green-50 text-green-700',
-  future:      'bg-yellow-50 text-yellow-700',
-}
-
-const STATUS_LABELS: Record<string, string> = {
-  new: 'New', scheduled: 'Scheduled', completed: 'Prepared', presented: 'Presented',
-  follow_up: 'Follow-Up', won: 'Won', lost: 'Lost', cancelled: 'Cancelled',
-  // Legacy statuses (kept for evaluations created before this status list changed)
-  in_progress: 'In Progress', open: 'Open Mandate', future: 'Future Mandate',
-}
-
 // ── Page ──────────────────────────────────────────────────────
 export default function EvaluationDetailPage() {
   const router = useRouter()
@@ -92,6 +67,7 @@ export default function EvaluationDetailPage() {
   const [activeTab, setActiveTab]   = useState<'details' | 'documents' | 'inspection' | 'pipeline'>('details')
   const [userId, setUserId]         = useState<string | null>(null)
   const [userEmail, setUserEmail]   = useState<string | null>(null)
+  const [userDesignation, setUserDesignation] = useState<string | null>(null)
   const [editing, setEditing]       = useState(() => searchParams.get('edit') === '1' || searchParams.get('newContactId') !== null)
   const [deleting, setDeleting]     = useState(false)
 
@@ -103,31 +79,27 @@ export default function EvaluationDetailPage() {
         properties (id, property_type, unit_number, complex_or_building_name,
           street_number, street_name, suburb, city, province, postal_code,
           google_maps_url, latitude, longitude),
-        evaluation_pipeline_steps (id, step_key, is_complete, completed_at, sort_order)
+        evaluation_pipeline_steps (
+          id, step_key, is_complete, status, owner_role, due_date, created_at, completed_at, sort_order,
+          completed_by:completed_by_user_id (full_name, email, designation)
+        )
       `)
       .eq('id', id)
       .single()
 
     if (data) {
-      const ev = data as unknown as Evaluation
-
-      // If the scheduled time has passed and nobody filled in the inspection
-      // (which would already have moved it to Completed), move it to
-      // Presented automatically.
-      if (ev.status === 'scheduled' && ev.scheduled_at && new Date(ev.scheduled_at) < new Date()) {
-        ev.status = 'presented'
-        await supabase.from('evaluations').update({ status: 'presented' }).eq('id', id).eq('status', 'scheduled')
-      }
-
-      setEvaluation(ev)
+      setEvaluation(data as unknown as Evaluation)
     }
     setLoading(false)
   }, [id])
 
   useEffect(() => {
     supabase.auth.getUser().then(({ data }) => {
-      if (!data.user) router.push('/')
-      else { setUserId(data.user.id); setUserEmail(data.user.email ?? null) }
+      if (!data.user) { router.push('/'); return }
+      setUserId(data.user.id)
+      setUserEmail(data.user.email ?? null)
+      supabase.from('profiles').select('designation').eq('id', data.user.id).single()
+        .then(({ data: profile }) => setUserDesignation(profile?.designation ?? null))
     })
     fetchEvaluation()
   }, [router, fetchEvaluation])
@@ -140,11 +112,31 @@ export default function EvaluationDetailPage() {
     router.push('/dashboard/evaluations')
   }
 
-  async function togglePipelineStep(stepId: string, currentValue: boolean) {
-    await supabase.from('evaluation_pipeline_steps').update({
-      is_complete: !currentValue,
-      completed_at: !currentValue ? new Date().toISOString() : null,
-    }).eq('id', stepId)
+  // Single-step gates -- completing these steps directly promotes status,
+  // matching their 1:1 mapping in the Status Model. (evaluation_closed is
+  // deliberately excluded: closing always goes through the Details tab's
+  // Evaluation Outcome field, which also captures Won/Lost/Cancelled --
+  // toggling it here alone would leave that outcome unrecorded.)
+  const SINGLE_STEP_STATUS: Record<string, string> = {
+    property_inspected: 'inspected', cma_approved: 'evaluated', presentation_completed: 'presented',
+  }
+
+  async function togglePipelineStep(stepId: string, stepKey: string, currentlyComplete: boolean) {
+    if (!userId) return
+    if (!canActOnRole(userDesignation, stepOwnerRole(stepKey))) return
+
+    if (currentlyComplete) {
+      // Un-completing is a plain rollback -- never demotes the evaluation's
+      // status, since other steps may already depend on having moved past it.
+      await supabase.from('evaluation_pipeline_steps').update({
+        status: 'pending', is_complete: false, completed_at: null, completed_by_user_id: null,
+      }).eq('id', stepId)
+    } else {
+      await markStepComplete(id, stepKey, userId)
+      if (SINGLE_STEP_STATUS[stepKey]) await promoteStatus(id, SINGLE_STEP_STATUS[stepKey])
+      await checkPreparedGate(id)
+      await checkPresentationReadyGate(id)
+    }
     fetchEvaluation()
   }
 
@@ -154,7 +146,7 @@ export default function EvaluationDetailPage() {
   const ev = evaluation
   const address = formatAddress(ev.properties)
   const sortedSteps    = [...(ev.evaluation_pipeline_steps ?? [])].sort((a, b) => a.sort_order - b.sort_order)
-  const stepsComplete  = sortedSteps.filter(s => s.is_complete).length
+  const stepsComplete  = sortedSteps.filter(s => s.status === 'complete' || s.is_complete).length
   const dateStr = new Date(ev.date_captured).toLocaleDateString('en-ZA', { day: 'numeric', month: 'long', year: 'numeric' })
 
   return (
@@ -218,12 +210,16 @@ export default function EvaluationDetailPage() {
 
       {/* ── Documents tab ── */}
       {activeTab === 'documents' && (
-        <DocumentsTab evaluationId={id} userId={userId} propertyType={ev.properties?.property_type ?? null} />
+        <DocumentsTab
+          evaluationId={id} userId={userId} propertyType={ev.properties?.property_type ?? null}
+          pipelineSteps={ev.evaluation_pipeline_steps} userDesignation={userDesignation}
+          onStepChanged={fetchEvaluation}
+        />
       )}
 
       {/* ── Inspection tab ── */}
       {activeTab === 'inspection' && (
-        <InspectionTab evaluationId={id} onSaved={fetchEvaluation} />
+        <InspectionTab evaluationId={id} userDesignation={userDesignation} onSaved={fetchEvaluation} />
       )}
 
       {/* ── Pipeline tab ── */}
@@ -243,35 +239,54 @@ export default function EvaluationDetailPage() {
           </div>
 
           <div className="space-y-3">
-            {sortedSteps.map((step, i) => (
-              <div key={step.id} className="flex items-center gap-4 py-3 border-b border-gray-50 last:border-0">
-                <button
-                  onClick={() => togglePipelineStep(step.id, step.is_complete)}
-                  className={`w-6 h-6 rounded-full border-2 flex-shrink-0 flex items-center justify-center transition-all ${
-                    step.is_complete
-                      ? 'bg-[#1a1a1a] border-[#1a1a1a] text-white'
-                      : 'border-gray-300 hover:border-gray-500'
-                  }`}
-                >
-                  {step.is_complete && (
-                    <svg width="10" height="8" viewBox="0 0 10 8" fill="none">
-                      <path d="M1 4L3.5 6.5L9 1" stroke="white" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round"/>
-                    </svg>
-                  )}
-                </button>
+            {sortedSteps.map((step, i) => {
+              const complete       = step.status === 'complete' || step.is_complete
+              const completedBy    = Array.isArray(step.completed_by) ? step.completed_by[0] : step.completed_by
+              // Derived from the step key via the code's own catalogue rather
+              // than the DB row's owner_role column -- evaluations created
+              // before this pipeline rebuild have that column as null.
+              const ownerRole      = stepOwnerRole(step.step_key)
+              const canAct         = canActOnRole(userDesignation, ownerRole)
+              const overdue        = !complete && step.due_date && new Date(step.due_date) < new Date()
+              return (
+                <div key={step.id} className="flex items-center gap-4 py-3 border-b border-gray-50 last:border-0">
+                  <button
+                    onClick={() => togglePipelineStep(step.id, step.step_key, complete)}
+                    disabled={!canAct}
+                    title={!canAct ? `Only ${ownerRole === 'tc' ? 'a Transaction Coordinator' : ownerRole === 'cma_approver' ? 'a CMA Approver' : 'an Agent'} can toggle this step` : undefined}
+                    className={`w-6 h-6 rounded-full border-2 flex-shrink-0 flex items-center justify-center transition-all ${
+                      complete
+                        ? 'bg-[#1a1a1a] border-[#1a1a1a] text-white'
+                        : 'border-gray-300 hover:border-gray-500'
+                    } ${!canAct ? 'opacity-40 cursor-not-allowed' : ''}`}
+                  >
+                    {complete && (
+                      <svg width="10" height="8" viewBox="0 0 10 8" fill="none">
+                        <path d="M1 4L3.5 6.5L9 1" stroke="white" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round"/>
+                      </svg>
+                    )}
+                  </button>
 
-                <div className="flex-1">
-                  <p className={`text-sm font-medium ${step.is_complete ? 'text-[#1a1a1a]' : 'text-gray-400'}`}>
-                    {i + 1}. {STEP_LABELS[step.step_key] ?? step.step_key}
-                  </p>
-                  {step.completed_at && (
-                    <p className="text-xs text-gray-400 mt-0.5">
-                      {new Date(step.completed_at).toLocaleDateString('en-ZA', { day: 'numeric', month: 'short', year: 'numeric' })}
+                  <div className="flex-1">
+                    <p className={`text-sm font-medium ${complete ? 'text-[#1a1a1a]' : 'text-gray-400'}`}>
+                      {i + 1}. {stepLabel(step.step_key)}
                     </p>
-                  )}
+                    {complete && step.completed_at ? (
+                      <p className="text-xs text-gray-400 mt-0.5">
+                        Captured by {completedBy?.full_name ?? completedBy?.email ?? '—'}
+                        {completedBy?.designation && ` | ${completedBy.designation}`}
+                        {' · '}{new Date(step.completed_at).toLocaleDateString('en-ZA', { day: 'numeric', month: 'short', year: 'numeric' })}
+                      </p>
+                    ) : step.due_date ? (
+                      <p className={`text-xs mt-0.5 ${overdue ? 'text-red-500' : 'text-gray-400'}`}>
+                        Due {new Date(step.due_date).toLocaleDateString('en-ZA', { day: 'numeric', month: 'short', year: 'numeric' })}
+                        {overdue ? ' (overdue)' : ''}
+                      </p>
+                    ) : null}
+                  </div>
                 </div>
-              </div>
-            ))}
+              )
+            })}
           </div>
         </div>
       )}
@@ -287,7 +302,11 @@ type EvaluationDocument = {
   uploaded_at: string
 }
 
-function DocumentsTab({ evaluationId, userId, propertyType }: { evaluationId: string; userId: string | null; propertyType: string | null }) {
+function DocumentsTab({ evaluationId, userId, propertyType, pipelineSteps, userDesignation, onStepChanged }: {
+  evaluationId: string; userId: string | null; propertyType: string | null
+  pipelineSteps: PipelineStep[]; userDesignation: string | null
+  onStepChanged: () => void
+}) {
   // Sectional titles get an SS (Sectional Scheme) report; freehold and
   // vacant land don't have one to upload.
   const visibleReportTypes = propertyType === 'sectional_title'
@@ -298,6 +317,11 @@ function DocumentsTab({ evaluationId, userId, propertyType }: { evaluationId: st
   const [loading, setLoading]             = useState(true)
   const [uploadingType, setUploadingType] = useState<string | null>(null)
   const [error, setError]                 = useState('')
+
+  const canTC = canActOnRole(userDesignation, 'tc')
+  const step  = (key: string) => pipelineSteps.find(s => s.step_key === key)
+  const evaluationPackComplete = step('evaluation_pack_prepared')?.status === 'complete'
+  const mandatePackComplete    = step('mandate_pack_prepared')?.status === 'complete'
 
   const fetchDocuments = useCallback(async () => {
     const { data } = await supabase
@@ -326,8 +350,33 @@ function DocumentsTab({ evaluationId, userId, propertyType }: { evaluationId: st
       setError(json.error ?? 'Upload failed.')
     } else {
       await fetchDocuments()
+
+      // "Transfer Reports Uploaded" only completes once every report this
+      // property type needs is actually on file.
+      const { data: docsNow } = await supabase.from('evaluation_documents')
+        .select('report_type').eq('evaluation_id', evaluationId)
+      const uploadedTypes = new Set((docsNow ?? []).map(d => d.report_type))
+      if (visibleReportTypes.every(rt => uploadedTypes.has(rt.key))) {
+        await markStepComplete(evaluationId, 'lightstone_uploaded', userId)
+        await checkPreparedGate(evaluationId)
+        onStepChanged()
+      }
     }
     setUploadingType(null)
+  }
+
+  async function toggleManualStep(stepKey: string, currentlyComplete: boolean, gate: 'prepared' | 'presentation_ready') {
+    if (!userId || !canTC) return
+    if (currentlyComplete) {
+      await supabase.from('evaluation_pipeline_steps').update({
+        status: 'pending', is_complete: false, completed_at: null, completed_by_user_id: null,
+      }).eq('evaluation_id', evaluationId).eq('step_key', stepKey)
+    } else {
+      await markStepComplete(evaluationId, stepKey, userId)
+      if (gate === 'prepared') await checkPreparedGate(evaluationId)
+      else await checkPresentationReadyGate(evaluationId)
+    }
+    onStepChanged()
   }
 
   if (loading) return <div className="text-center py-16 text-gray-400 text-sm">Loading documents…</div>
@@ -385,9 +434,49 @@ function DocumentsTab({ evaluationId, userId, propertyType }: { evaluationId: st
           doc={documents.find(d => d.report_type === 'cover_letter')}
           onGenerated={fetchDocuments}
         />
+        <ManualCompleteCard
+          title="Mark Complete"
+          complete={evaluationPackComplete}
+          canAct={canTC}
+          onToggle={() => toggleManualStep('evaluation_pack_prepared', evaluationPackComplete, 'prepared')}
+        />
+      </div>
+    </div>
+
+    {/* Placeholder -- the actual upload/generation feature for this comes
+        later; for now it's just a TC-owned manual completion gate, same
+        mechanism as the Evaluation Pack above. */}
+    <div className={`${card} p-6 mt-6`}>
+      <h3 className={sectionTitle}>Mandate Pack</h3>
+      <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
+        <ManualCompleteCard
+          title="Mark Complete"
+          complete={mandatePackComplete}
+          canAct={canTC}
+          onToggle={() => toggleManualStep('mandate_pack_prepared', mandatePackComplete, 'presentation_ready')}
+        />
       </div>
     </div>
     </>
+  )
+}
+
+// A simple TC-owned "confirm complete" card -- shared by the Evaluation
+// Pack and Mandate Pack sections, which are both Manual completion mode
+// per the Workflow Tasks doc (no auto-derivation from underlying data).
+function ManualCompleteCard({ title, complete, canAct, onToggle }: {
+  title: string; complete: boolean; canAct: boolean; onToggle: () => void
+}) {
+  return (
+    <div className="border border-gray-200 rounded-xl p-4 flex flex-col gap-3">
+      <h4 className="text-sm font-bold text-[#1a1a1a]">{title}</h4>
+      <p className="text-xs text-gray-400">{complete ? 'Confirmed complete.' : 'Not yet confirmed.'}</p>
+      <button type="button" onClick={onToggle} disabled={!canAct}
+        title={!canAct ? 'Only a Transaction Coordinator can confirm this' : undefined}
+        className={`${complete ? btn.secondary : btn.primary} text-center disabled:opacity-40 disabled:cursor-not-allowed`}>
+        {complete ? 'Undo' : 'Confirm Complete'}
+      </button>
+    </div>
   )
 }
 
@@ -461,6 +550,8 @@ const ADDITIONAL_OPTS   = ['Jungle Gym', 'Jojo Tank', 'Storeroom', 'Solar Panels
 type ConditionItem = { feature: string; condition: string }
 
 type InspectionForm = {
+  // Appointment Outcome -- the Status Model's gate for "Inspected"
+  appointment_outcome: string
   // Exterior
   land_size: string
   gate_type: string
@@ -504,6 +595,7 @@ type InspectionForm = {
 }
 
 const EMPTY_INSPECTION: InspectionForm = {
+  appointment_outcome: '',
   land_size: '', gate_type: '', fencing_type: '', views_present: null,
   garages_quantity: 0, garages_descriptor: '', carports_quantity: 0,
   garden_present: null, garden_selections: [],
@@ -523,7 +615,13 @@ const EMPTY_INSPECTION: InspectionForm = {
   additional_features: [],
 }
 
-function InspectionTab({ evaluationId, onSaved }: { evaluationId: string; onSaved: () => void }) {
+const APPOINTMENT_OUTCOMES = [
+  { value: 'completed',            label: 'Completed' },
+  { value: 'no_show',              label: 'No Show' },
+  { value: 'unable_to_complete',   label: 'Unable to Complete' },
+]
+
+function InspectionTab({ evaluationId, userDesignation, onSaved }: { evaluationId: string; userDesignation: string | null; onSaved: () => void }) {
   const [form, setForm]                 = useState<InspectionForm>(EMPTY_INSPECTION)
   const [inspectionId, setInspectionId] = useState<string | null>(null)
   const [loading, setLoading]           = useState(true)
@@ -560,6 +658,7 @@ function InspectionTab({ evaluationId, onSaved }: { evaluationId: string; onSave
           let gc: ConditionItem[] = []
           try { gc = data.general_condition ? JSON.parse(data.general_condition) : [] } catch { gc = [] }
           setForm({
+            appointment_outcome:           data.appointment_outcome ?? '',
             land_size:                     data.land_size ?? '',
             gate_type:                     data.gate_type ?? '',
             fencing_type:                  data.fencing_type ?? '',
@@ -650,6 +749,7 @@ function InspectionTab({ evaluationId, onSaved }: { evaluationId: string; onSave
     const payload = {
       evaluation_id:                 evaluationId,
       captured_by_user_id:           userId,
+      appointment_outcome:           form.appointment_outcome || null,
       land_size:                     form.land_size || null,
       gate_type:                     form.gate_type || null,
       fencing_type:                  form.fencing_type || null,
@@ -714,14 +814,16 @@ function InspectionTab({ evaluationId, onSaved }: { evaluationId: string; onSave
       ]
       if (selections.length > 0) await supabase.from('inspection_feature_selections').insert(selections as object[])
 
-      await supabase.from('evaluation_pipeline_steps')
-        .update({ is_complete: true, completed_at: new Date().toISOString(), completed_by_user_id: userId })
-        .eq('evaluation_id', evaluationId).eq('step_key', 'description_captured')
-
-      // Filling out the inspection marks the evaluation Completed, unless
-      // it's already moved further along the pipeline manually.
-      await supabase.from('evaluations').update({ status: 'completed' })
-        .eq('id', evaluationId).in('status', ['new', 'scheduled'])
+      // "Property Inspection Completed" only actually completes -- and
+      // advances the evaluation to Inspected -- once the Appointment
+      // Outcome says the visit happened. No Show / Unable to Complete
+      // route back to scheduling instead of moving the pipeline forward.
+      if (form.appointment_outcome === 'completed') {
+        await markStepComplete(evaluationId, 'property_inspected', userId)
+        await promoteStatus(evaluationId, 'inspected')
+      } else if (form.appointment_outcome === 'no_show' || form.appointment_outcome === 'unable_to_complete') {
+        await supabase.from('evaluations').update({ status: 'scheduled' }).eq('id', evaluationId)
+      }
     }
 
     setSaved(true)
@@ -734,6 +836,20 @@ function InspectionTab({ evaluationId, onSaved }: { evaluationId: string; onSave
 
   return (
     <div className="space-y-6">
+
+      {/* ══ APPOINTMENT OUTCOME -- gates the "Inspected" status ══ */}
+      <InspSection title="Appointment Outcome">
+        <div>
+          <label className={labelCls}>Outcome</label>
+          <select value={form.appointment_outcome} onChange={e => set('appointment_outcome', e.target.value)} className={select}>
+            <option value="">—</option>
+            {APPOINTMENT_OUTCOMES.map(o => <option key={o.value} value={o.value}>{o.label}</option>)}
+          </select>
+          {(form.appointment_outcome === 'no_show' || form.appointment_outcome === 'unable_to_complete') && (
+            <p className="text-xs text-gray-400 mt-2">Saving will move this evaluation back to Scheduled.</p>
+          )}
+        </div>
+      </InspSection>
 
       {/* ══ EXTERIOR ══ */}
       <InspSection title="Exterior">
@@ -1009,8 +1125,12 @@ function InspectionTab({ evaluationId, onSaved }: { evaluationId: string; onSave
       </InspSection>
 
       {error && <p className="text-sm text-red-500 bg-red-50 px-4 py-3 rounded-lg">{error}</p>}
+      {!canActOnRole(userDesignation, 'agent') && (
+        <p className="text-xs text-gray-400 text-center">Only an Agent can save the Property Inspection.</p>
+      )}
 
-      <button onClick={handleSave} disabled={saving} className={`${btn.primary} w-full py-4`}>
+      <button onClick={handleSave} disabled={saving || !canActOnRole(userDesignation, 'agent')}
+        className={`${btn.primary} w-full py-4 disabled:opacity-40 disabled:cursor-not-allowed`}>
         {saving ? 'Saving…' : saved ? '✓ Inspection Saved' : inspectionId ? 'Update Inspection' : 'Save Inspection'}
       </button>
     </div>

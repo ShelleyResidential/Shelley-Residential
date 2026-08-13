@@ -64,6 +64,11 @@ export async function POST(request: NextRequest) {
       await supabaseAdmin.from('evaluations')
         .update({ google_calendar_event_id: null, calendar_event_link: null })
         .eq('google_calendar_event_id', item.id)
+      // Same event ID space also covers Presentation events -- try that
+      // link too (a no-op update if this ID isn't a presentation event).
+      await supabaseAdmin.from('evaluations')
+        .update({ presentation_google_calendar_event_id: null, presentation_calendar_event_link: null })
+        .eq('presentation_google_calendar_event_id', item.id)
       continue
     }
 
@@ -84,13 +89,29 @@ export async function POST(request: NextRequest) {
       .eq('google_calendar_event_id', item.id)
       .maybeSingle()
 
-    if (!ev) continue // this event isn't linked to an evaluation
+    if (ev) {
+      if (ev.scheduled_at?.slice(0, 16) !== literal) {
+        await supabaseAdmin.from('evaluations')
+          .update({ scheduled_at: `${literal}:00` })
+          .eq('id', ev.id)
+      }
+      continue
+    }
 
-    if (ev.scheduled_at?.slice(0, 16) === literal) continue // no actual change
+    // Not the evaluation event -- check whether it's the Presentation one.
+    const { data: presEv } = await supabaseAdmin
+      .from('evaluations')
+      .select('id, presentation_scheduled_at')
+      .eq('presentation_google_calendar_event_id', item.id)
+      .maybeSingle()
+
+    if (!presEv) continue // this event isn't linked to an evaluation at all
+
+    if (presEv.presentation_scheduled_at?.slice(0, 16) === literal) continue // no actual change
 
     await supabaseAdmin.from('evaluations')
-      .update({ scheduled_at: `${literal}:00` })
-      .eq('id', ev.id)
+      .update({ presentation_scheduled_at: `${literal}:00` })
+      .eq('id', presEv.id)
   }
 
   if (result.nextSyncToken) {

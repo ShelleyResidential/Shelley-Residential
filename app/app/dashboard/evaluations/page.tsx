@@ -5,6 +5,7 @@ import { supabase } from '@/lib/supabase'
 import { btn, card, input } from '@/lib/styles'
 import { Breadcrumbs } from '@/lib/Breadcrumbs'
 import { REPORT_TYPES } from '@/lib/evaluation-documents'
+import { STATUS_LABELS, STATUS_COLOURS } from '@/lib/pipeline'
 import { useRouter } from 'next/navigation'
 import Link from 'next/link'
 
@@ -129,32 +130,16 @@ function sellerName(ev: Evaluation): string {
   return contact ? `${contact.first_name} ${contact.last_name}`.trim() : '—'
 }
 
-const STATUS_LABELS: Record<string, { label: string; colour: string }> = {
-  // Current statuses
-  new:         { label: 'New',            colour: 'bg-blue-50 text-blue-700' },
-  scheduled:   { label: 'Scheduled',      colour: 'bg-indigo-50 text-indigo-700' },
-  completed:   { label: 'Prepared',       colour: 'bg-teal-50 text-teal-700' },
-  presented:   { label: 'Presented',      colour: 'bg-purple-50 text-purple-700' },
-  follow_up:   { label: 'Follow-Up',      colour: 'bg-yellow-50 text-yellow-700' },
-  won:         { label: 'Won',            colour: 'bg-emerald-50 text-emerald-700' },
-  lost:        { label: 'Lost',           colour: 'bg-red-50 text-red-600' },
-  cancelled:   { label: 'Cancelled',      colour: 'bg-gray-100 text-gray-500' },
-  // Legacy statuses (kept for evaluations created before this status list changed)
-  in_progress: { label: 'In Progress',    colour: 'bg-blue-50 text-blue-700' },
-  open:        { label: 'Open Mandate',   colour: 'bg-green-50 text-green-700' },
-  future:      { label: 'Future Mandate', colour: 'bg-yellow-50 text-yellow-700' },
-}
-
 const STATUS_TABS = [
-  { key: '',          label: 'All' },
-  { key: 'new',        label: 'New' },
-  { key: 'scheduled',  label: 'Scheduled' },
-  { key: 'completed',  label: 'Prepared' },
-  { key: 'presented',  label: 'Presented' },
-  { key: 'follow_up',  label: 'Follow-Up' },
-  { key: 'won',        label: 'Won' },
-  { key: 'lost',       label: 'Lost' },
-  { key: 'cancelled',  label: 'Cancelled' },
+  { key: '',                   label: 'All' },
+  { key: 'new',                label: 'New' },
+  { key: 'scheduled',          label: 'Scheduled' },
+  { key: 'prepared',           label: 'Prepared' },
+  { key: 'inspected',          label: 'Inspected' },
+  { key: 'evaluated',          label: 'Evaluated' },
+  { key: 'presentation_ready', label: 'Presentation Ready' },
+  { key: 'presented',          label: 'Presented' },
+  { key: 'closed',             label: 'Closed' },
 ]
 
 export default function EvaluationsPage() {
@@ -217,18 +202,6 @@ export default function EvaluationsPage() {
 
     const { data, count } = await query
     let results = (data ?? []) as unknown as Evaluation[]
-
-    // If the scheduled time has passed and nobody filled in the inspection
-    // (which would already have moved it to Completed), move it to
-    // Presented automatically.
-    const now = new Date()
-    const overdueIds = results
-      .filter(e => e.status === 'scheduled' && e.scheduled_at && new Date(e.scheduled_at) < now)
-      .map(e => e.id)
-    if (overdueIds.length > 0) {
-      results = results.map(e => overdueIds.includes(e.id) ? { ...e, status: 'presented' } : e)
-      await supabase.from('evaluations').update({ status: 'presented' }).in('id', overdueIds).eq('status', 'scheduled')
-    }
 
     if (isSearching) {
       const q = search.toLowerCase()
@@ -389,7 +362,10 @@ export default function EvaluationsPage() {
             </thead>
             <tbody>
               {evaluations.map((ev, i) => {
-                const statusMeta = STATUS_LABELS[ev.status] ?? { label: ev.status, colour: 'bg-gray-100 text-gray-500' }
+                const statusMeta = {
+                  label:  STATUS_LABELS[ev.status] ?? ev.status,
+                  colour: STATUS_COLOURS[ev.status] ?? 'bg-gray-100 text-gray-500',
+                }
                 const date = new Date(ev.date_captured).toLocaleDateString('en-ZA', { day: 'numeric', month: 'short', year: 'numeric' })
                 const leadSource = ev.lead_source_picklist?.label ?? ev.lead_source_other_text ?? '—'
                 const agent = ev.sellers_agent_user_id ? profiles[ev.sellers_agent_user_id] : null
@@ -412,7 +388,8 @@ export default function EvaluationsPage() {
                       />
                     </td>
                     <td className="px-3 py-3 overflow-hidden">
-                      <span className={`text-xs px-2 py-0.5 rounded-full font-medium truncate inline-block max-w-full align-bottom ${statusMeta.colour}`}>
+                      <span className={`text-xs px-2 py-0.5 rounded-full font-medium truncate inline-block max-w-full align-bottom ${statusMeta.colour}`}
+                        title={statusMeta.label}>
                         {statusMeta.label}
                       </span>
                     </td>

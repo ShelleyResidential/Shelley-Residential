@@ -7,14 +7,24 @@ import { WarningIcon } from '@/lib/icons'
 import { useRouter, useSearchParams } from 'next/navigation'
 import Link from 'next/link'
 import { LEAD_SOURCES, REFERRAL_TYPES, MOTIVATIONS, TIMELINES, REASONS_LOST, CONTACT_TAGS } from '@/lib/evaluationOptions'
+import {
+  STATUS_LABELS, PIPELINE_STEPS, getPipelineRoles,
+  checkEvaluationFormGate, markStepComplete, promoteStatus,
+} from '@/lib/pipeline'
 
 const DRAFT_STORAGE_KEY = 'evaluationFormDraft'
 
-const STATUS_DISPLAY: Record<string, string> = {
-  new: 'New', scheduled: 'Scheduled', completed: 'Prepared', presented: 'Presented',
-  follow_up: 'Follow-Up', won: 'Won', lost: 'Lost', cancelled: 'Cancelled',
-  in_progress: 'In Progress (legacy)', open: 'Open Mandate (legacy)', future: 'Future Mandate (legacy)',
-}
+const OWNERSHIP_OPTIONS = ['Sole Owner', 'Joint Owners', 'Company Owned', 'Trust', 'Deceased Estate']
+const PRESENTATION_OUTCOMES = [
+  { value: 'completed',   label: 'Completed' },
+  { value: 'rescheduled', label: 'Rescheduled' },
+  { value: 'no_show',     label: 'No Show' },
+]
+const EVALUATION_OUTCOMES = [
+  { value: 'won',       label: 'Won' },
+  { value: 'lost',      label: 'Lost' },
+  { value: 'cancelled', label: 'Cancelled' },
+]
 
 function formatZAR(value: string): string {
   const n = Number(value)
@@ -127,7 +137,7 @@ type ContactSlot = {
   email_address: string | null
 }
 
-type Profile = { id: string; full_name: string | null; email: string | null; role: string | null }
+type Profile = { id: string; full_name: string | null; email: string | null; role: string | null; designation: string | null }
 
 // ── Address helper ────────────────────────────────────────────
 function displayAddress(p: Property): string {
@@ -240,6 +250,11 @@ type EvaluationDraftSnapshot = {
   schedTime: string
   evaluationPrice: string
   marketingPrice: string
+  ownership: string
+  presentationDate: string
+  presentationTime: string
+  presentationOutcome: string
+  evaluationOutcome: string
 }
 
 type RawEvaluationRow = {
@@ -261,6 +276,13 @@ type RawEvaluationRow = {
   marketing_price: number | null
   date_captured: string
   captured_by_user_id: string | null
+  ownership: string | null
+  evaluation_outcome: string | null
+  cma_approved_by_user_id: string | null
+  cma_approved_at: string | null
+  presentation_scheduled_at: string | null
+  presentation_calendar_event_link: string | null
+  presentation_outcome: string | null
   properties: Property | null
   evaluation_contacts: {
     contact_id: string
@@ -313,6 +335,20 @@ export function EvaluationForm({ evaluationId, readOnly = false, calendarEventLi
   const [tcId, setTcId]                   = useState('')
   const [evaluationPrice, setEvaluationPrice] = useState('')
   const [marketingPrice, setMarketingPrice]   = useState('')
+  const [ownership, setOwnership]             = useState('')
+
+  // CMA approval -- read-only display, set only via the Approve CMA action
+  const [cmaApprovedByUserId, setCmaApprovedByUserId] = useState<string | null>(null)
+  const [cmaApprovedAt, setCmaApprovedAt]             = useState<string | null>(null)
+  const [approvingCma, setApprovingCma]               = useState(false)
+
+  // Presentation
+  const [presentationDate, setPresentationDate]       = useState('')
+  const [presentationTime, setPresentationTime]       = useState('')
+  const presentationScheduledAt = presentationDate && presentationTime ? `${presentationDate}T${presentationTime}` : ''
+  const [presentationCalendarLink, setPresentationCalendarLink] = useState<string | null>(null)
+  const [presentationOutcome, setPresentationOutcome] = useState('')
+  const [evaluationOutcome, setEvaluationOutcome]     = useState('')
 
   // Lead info
   const [leadGeneratedBy, setLeadGeneratedBy]     = useState('')
@@ -345,7 +381,7 @@ export function EvaluationForm({ evaluationId, readOnly = false, calendarEventLi
     supabase.auth.getUser().then(({ data }) => {
       setUserId(data.user?.id ?? null)
     })
-    supabase.from('profiles').select('id, full_name, email, role').then(({ data }) => {
+    supabase.from('profiles').select('id, full_name, email, role, designation').then(({ data }) => {
       const rows = (data ?? []) as Profile[]
       rows.sort((a, b) => (a.full_name ?? a.email ?? '').localeCompare(b.full_name ?? b.email ?? ''))
       setProfiles(rows)
@@ -368,6 +404,16 @@ export function EvaluationForm({ evaluationId, readOnly = false, calendarEventLi
     setTcId(row.transaction_coordinator_user_id ?? '')
     setEvaluationPrice(row.evaluation_price != null ? String(row.evaluation_price) : '')
     setMarketingPrice(row.marketing_price != null ? String(row.marketing_price) : '')
+    setOwnership(row.ownership ?? '')
+    setEvaluationOutcome(row.evaluation_outcome ?? '')
+    setCmaApprovedByUserId(row.cma_approved_by_user_id)
+    setCmaApprovedAt(row.cma_approved_at)
+    setPresentationCalendarLink(row.presentation_calendar_event_link)
+    setPresentationOutcome(row.presentation_outcome ?? '')
+
+    const presIso = row.presentation_scheduled_at ? row.presentation_scheduled_at.slice(0, 16) : ''
+    setPresentationDate(presIso ? presIso.slice(0, 10) : '')
+    setPresentationTime(presIso ? presIso.slice(11, 16) : '')
 
     setLeadGeneratedBy(row.lead_generated_by ?? '')
     const leadResolved = reverseResolve(LEAD_SOURCES, row.lead_source_other_text)
@@ -410,7 +456,9 @@ export function EvaluationForm({ evaluationId, readOnly = false, calendarEventLi
         referral_type, referral_contact_id, referral_contact:referral_contact_id (id, first_name, last_name),
         motivation_for_selling_notes, selling_timeline_notes, scheduled_at,
         sellers_agent_user_id, transaction_coordinator_user_id, evaluation_price, marketing_price,
-        date_captured, captured_by_user_id,
+        date_captured, captured_by_user_id, ownership, evaluation_outcome,
+        cma_approved_by_user_id, cma_approved_at,
+        presentation_scheduled_at, presentation_calendar_event_link, presentation_outcome,
         properties (id, property_type, unit_number, complex_or_building_name, street_number, street_name, suburb, city),
         evaluation_contacts (
           contact_id, is_primary, sort_order,
@@ -446,6 +494,7 @@ export function EvaluationForm({ evaluationId, readOnly = false, calendarEventLi
       leadSourceOther, referralType, referralTypeOther, referredByContactId,
       referredByContactName, leadReferralNotes, motivation, motivationOther,
       timeline, schedDate, schedTime, evaluationPrice, marketingPrice,
+      ownership, presentationDate, presentationTime, presentationOutcome, evaluationOutcome,
     }
   }
 
@@ -476,6 +525,11 @@ export function EvaluationForm({ evaluationId, readOnly = false, calendarEventLi
     setSchedTime(d.schedTime)
     setEvaluationPrice(d.evaluationPrice)
     setMarketingPrice(d.marketingPrice)
+    setOwnership(d.ownership)
+    setPresentationDate(d.presentationDate)
+    setPresentationTime(d.presentationTime)
+    setPresentationOutcome(d.presentationOutcome)
+    setEvaluationOutcome(d.evaluationOutcome)
   }
 
   // ── Navigate to Add New Contact, saving current progress first so it can
@@ -731,11 +785,29 @@ export function EvaluationForm({ evaluationId, readOnly = false, calendarEventLi
     }
   }
 
+  // ── CMA approval — Co-Founders only, once Evaluation Price and Marketing
+  // Price are both captured. Advances status straight to Evaluated.
+  async function approveCma() {
+    if (!evaluationId || !userId) return
+    setApprovingCma(true)
+    const nowIso = new Date().toISOString()
+    await supabase.from('evaluations').update({
+      cma_approved_by_user_id: userId, cma_approved_at: nowIso,
+    }).eq('id', evaluationId)
+    await markStepComplete(evaluationId, 'cma_approved', userId)
+    await promoteStatus(evaluationId, 'evaluated')
+    setCmaApprovedByUserId(userId)
+    setCmaApprovedAt(nowIso)
+    setApprovingCma(false)
+    await fetchEvaluation()
+  }
+
   // ── Submit ───────────────────────────────────────────────
   async function handleSubmit(e: React.FormEvent) {
     e.preventDefault()
     if (!selectedProperty) { setError('Please select or add a property.'); return }
     if (!userId) return
+    if (status === 'closed' && !evaluationOutcome) { setError('Select an Evaluation Outcome (Won/Lost/Cancelled) before closing.'); return }
 
     setError('')
     setSaving(true)
@@ -752,9 +824,20 @@ export function EvaluationForm({ evaluationId, readOnly = false, calendarEventLi
       ? `Other: ${referralTypeOther}`
       : (REFERRAL_TYPES.find(r => r.value === referralType)?.label ?? null)
     const timelineLabel     = TIMELINES.find(t => t.value === timeline)?.label ?? null
-    const reasonLostLabel   = status === 'lost'
+    const reasonLostLabel   = evaluationOutcome === 'lost'
       ? (reasonLost === 'other' ? `Other: ${reasonLostOther}` : (REASONS_LOST.find(r => r.value === reasonLost)?.label ?? null))
       : null
+
+    // EV-03's required-field set (everything except Evaluation Price and
+    // Marketing Price) -- drives the "Evaluation Form Completed" pipeline
+    // step, which in turn gates the Prepared status.
+    const evaluationFormComplete = !!(
+      motivation && (motivation !== 'other' || motivationOther.trim()) &&
+      timeline && leadGeneratedBy &&
+      leadSource && (leadSource !== 'other' || leadSourceOther.trim()) &&
+      contacts.length > 0 && ownership && agentId && tcId && scheduledAt
+    )
+
     const payload = {
       property_id:                      selectedProperty.id,
       status,
@@ -771,6 +854,10 @@ export function EvaluationForm({ evaluationId, readOnly = false, calendarEventLi
       scheduled_at:                     scheduledAt || null,
       evaluation_price:                 evaluationPrice ? Number(evaluationPrice) : null,
       marketing_price:                  marketingPrice ? Number(marketingPrice) : null,
+      ownership:                        ownership || null,
+      evaluation_outcome:               status === 'closed' ? evaluationOutcome : null,
+      presentation_scheduled_at:        presentationScheduledAt || null,
+      presentation_outcome:             presentationOutcome || null,
     }
 
     const { data: tagOptions } = await supabase.from('picklist_options').select('id, label').eq('list_name', 'contact_tag')
@@ -804,6 +891,26 @@ export function EvaluationForm({ evaluationId, readOnly = false, calendarEventLi
         })
       }
 
+      // Same pattern for the Presentation Date and Time -- its own calendar
+      // event, gating "Presentation Ready" alongside the Mandate Pack.
+      if (presentationScheduledAt) {
+        await fetch('/api/calendar/sync-presentation', {
+          method:  'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body:    JSON.stringify({ evaluationId, userId }),
+        })
+      }
+
+      await checkEvaluationFormGate(evaluationId, userId, evaluationFormComplete)
+
+      if (presentationOutcome === 'completed') {
+        await markStepComplete(evaluationId, 'presentation_completed', userId)
+        await promoteStatus(evaluationId, 'presented')
+      }
+      if (status === 'closed' && evaluationOutcome) {
+        await markStepComplete(evaluationId, 'evaluation_closed', userId)
+      }
+
       setSaving(false)
       await fetchEvaluation()
       onSaved?.()
@@ -829,14 +936,36 @@ export function EvaluationForm({ evaluationId, readOnly = false, calendarEventLi
       )
     }
 
-    // Seed pipeline steps — inspection before lightstone
-    await supabase.from('evaluation_pipeline_steps').insert([
-      { evaluation_id: ev.id, step_key: 'captured',             sort_order: 0, is_complete: true,  completed_at: new Date().toISOString(), completed_by_user_id: userId },
-      { evaluation_id: ev.id, step_key: 'scheduled',            sort_order: 1, is_complete: !!scheduledAt },
-      { evaluation_id: ev.id, step_key: 'property_inspected',   sort_order: 2 },
-      { evaluation_id: ev.id, step_key: 'description_captured', sort_order: 3 },
-      { evaluation_id: ev.id, step_key: 'lightstone_uploaded',  sort_order: 4 },
-    ])
+    // Seed the full pipeline task list, each stamped with its Owner Role so
+    // the Pipeline tab can restrict who's allowed to complete it. Owner
+    // user snapshots whoever's assigned Agent/TC right now; CMA Approver
+    // steps aren't tied to one specific person. Every row must carry the
+    // exact same set of keys -- PostgREST's bulk insert derives columns
+    // from the first row in the batch, and rejects the whole insert
+    // (PGRST102) if a later row's key set doesn't match.
+    const nowIso = new Date().toISOString()
+    await supabase.from('evaluation_pipeline_steps').insert(
+      PIPELINE_STEPS.map((step, i) => {
+        const ownerUserId = step.ownerRole === 'agent' ? (agentId || null) : step.ownerRole === 'tc' ? (tcId || null) : null
+
+        // "Before Evaluation" / "Day before Evaluation" SLAs, only computable
+        // once there's a scheduled date to measure against.
+        let dueDate: string | null = null
+        if (scheduledAt && ['evaluation_form_completed', 'lightstone_uploaded'].includes(step.key)) dueDate = scheduledAt
+        if (scheduledAt && step.key === 'evaluation_pack_prepared') {
+          dueDate = new Date(new Date(scheduledAt).getTime() - 24 * 60 * 60 * 1000).toISOString()
+        }
+
+        const isComplete = step.key === 'captured' || (step.key === 'scheduled' && !!scheduledAt)
+        return {
+          evaluation_id: ev.id, step_key: step.key, sort_order: i,
+          owner_role: step.ownerRole, owner_user_id: ownerUserId, due_date: dueDate,
+          status: isComplete ? 'complete' : 'pending', is_complete: isComplete,
+          completed_at: isComplete ? nowIso : null,
+          completed_by_user_id: isComplete ? userId : null,
+        }
+      })
+    )
 
     // An Evaluation Date and Time captured on save automatically creates the
     // Google Calendar event; the evaluation only advances to "Scheduled"
@@ -870,6 +999,10 @@ export function EvaluationForm({ evaluationId, readOnly = false, calendarEventLi
   const capturedByProfile = evaluationId
     ? profiles.find(p => p.id === capturedByUserId)
     : profiles.find(p => p.id === userId)
+
+  const currentUserDesignation = profiles.find(p => p.id === userId)?.designation ?? null
+  const currentUserRoles       = getPipelineRoles(currentUserDesignation)
+  const cmaApprovedByProfile   = profiles.find(p => p.id === cmaApprovedByUserId)
 
   if (initialLoading) {
     return <div className="p-10 text-gray-400 text-sm">Loading…</div>
@@ -1256,20 +1389,37 @@ export function EvaluationForm({ evaluationId, readOnly = false, calendarEventLi
           </div>
         </div>
 
-        <Field label="Evaluation Status" readOnly={readOnly} value={STATUS_DISPLAY[status] ?? status}>
-          <select value={status} onChange={e => setStatus(e.target.value)} className={select}>
-            <option value="new">New</option>
-            <option value="scheduled">Scheduled</option>
-            <option value="completed">Prepared</option>
-            <option value="presented">Presented</option>
-            <option value="follow_up">Follow-Up</option>
-            <option value="won">Won</option>
-            <option value="lost">Lost</option>
-            <option value="cancelled">Cancelled</option>
+        <Field label="Ownership" readOnly={readOnly} value={ownership || undefined}>
+          <select value={ownership} onChange={e => setOwnership(e.target.value)} className={select}>
+            <option value="">—</option>
+            {OWNERSHIP_OPTIONS.map(o => <option key={o} value={o}>{o}</option>)}
           </select>
         </Field>
 
-        {status === 'lost' && (
+        <Field label="Evaluation Status" readOnly={readOnly} value={STATUS_LABELS[status] ?? status}>
+          <select value={status} onChange={e => setStatus(e.target.value)} className={select}>
+            <option value="new">New</option>
+            <option value="scheduled">Scheduled</option>
+            <option value="prepared">Prepared</option>
+            <option value="inspected">Inspected</option>
+            <option value="evaluated">Evaluated</option>
+            <option value="presentation_ready">Presentation Ready</option>
+            <option value="presented">Presented</option>
+            <option value="closed">Closed</option>
+          </select>
+        </Field>
+
+        {status === 'closed' && (
+          <Field label="Evaluation Outcome" readOnly={readOnly}
+            value={EVALUATION_OUTCOMES.find(o => o.value === evaluationOutcome)?.label}>
+            <select value={evaluationOutcome} onChange={e => setEvaluationOutcome(e.target.value)} className={select}>
+              <option value="">—</option>
+              {EVALUATION_OUTCOMES.map(o => <option key={o.value} value={o.value}>{o.label}</option>)}
+            </select>
+          </Field>
+        )}
+
+        {evaluationOutcome === 'lost' && (
           <Field label="Reason Lost" readOnly={readOnly}
             value={reasonLost === 'other' ? (reasonLostOther || 'Other') : REASONS_LOST.find(r => r.value === reasonLost)?.label}>
             <select value={reasonLost} onChange={e => setReasonLost(e.target.value)} className={select}>
@@ -1336,6 +1486,70 @@ export function EvaluationForm({ evaluationId, readOnly = false, calendarEventLi
           </Field>
         </div>
       </Section>
+
+      {/* ── CMA Approval — Co-Founders only, gates status "Evaluated" ── */}
+      {evaluationId && (
+        <Section title="CMA Approval">
+          {cmaApprovedByUserId ? (
+            <p className="text-sm text-[#1a1a1a]">
+              Approved by {cmaApprovedByProfile?.full_name ?? cmaApprovedByProfile?.email ?? '—'}
+              {cmaApprovedByProfile?.designation && <span className="text-gray-400"> | {cmaApprovedByProfile.designation}</span>}
+              {cmaApprovedAt && <span className="text-gray-400"> on {new Date(cmaApprovedAt).toLocaleDateString('en-ZA', { day: 'numeric', month: 'long', year: 'numeric' })}</span>}
+            </p>
+          ) : (
+            <>
+              <p className="text-sm text-gray-400">
+                {!evaluationPrice || !marketingPrice
+                  ? 'Capture the Evaluation Price and Marketing Price above before a CMA can be approved.'
+                  : currentUserRoles.isCmaApprover
+                    ? 'Pricing is ready for CMA approval.'
+                    : 'Only a Co-Founder can approve a CMA.'}
+              </p>
+              <button type="button" onClick={approveCma}
+                disabled={approvingCma || !evaluationPrice || !marketingPrice || !currentUserRoles.isCmaApprover}
+                className={`${btn.primary} disabled:opacity-40 disabled:cursor-not-allowed`}>
+                {approvingCma ? 'Approving…' : 'Approve CMA'}
+              </button>
+            </>
+          )}
+        </Section>
+      )}
+
+      {/* ── Presentation — its own date/time, calendar event, and outcome ── */}
+      {evaluationId && (
+        <Section title="Presentation">
+          <Field label="Presentation Date and Time" readOnly={readOnly}
+            value={presentationDate ? (
+              <span className="flex items-center gap-2 flex-wrap">
+                {`${new Date(presentationDate).toLocaleDateString('en-ZA', { day: 'numeric', month: 'long', year: 'numeric' })}${presentationTime ? ' at ' + presentationTime : ''}`}
+                {presentationCalendarLink && (
+                  <a href={presentationCalendarLink} target="_blank" rel="noopener noreferrer" className="text-sm text-blue-600 hover:underline">
+                    View Event ↗
+                  </a>
+                )}
+              </span>
+            ) : undefined}>
+            <div className="grid grid-cols-2 gap-4 mt-1">
+              <div>
+                <label className="text-xs text-gray-400 mb-1 block">Date</label>
+                <input type="date" value={presentationDate} onChange={e => setPresentationDate(e.target.value)} className={input} />
+              </div>
+              <div>
+                <label className="text-xs text-gray-400 mb-1 block">Time</label>
+                <input type="time" step={900} value={presentationTime} onChange={e => setPresentationTime(roundToQuarterHour(e.target.value))} className={input} />
+              </div>
+            </div>
+          </Field>
+
+          <Field label="Presentation Outcome" readOnly={readOnly}
+            value={PRESENTATION_OUTCOMES.find(o => o.value === presentationOutcome)?.label}>
+            <select value={presentationOutcome} onChange={e => setPresentationOutcome(e.target.value)} className={select}>
+              <option value="">—</option>
+              {PRESENTATION_OUTCOMES.map(o => <option key={o.value} value={o.value}>{o.label}</option>)}
+            </select>
+          </Field>
+        </Section>
+      )}
 
       {error && <p className="text-sm text-red-500 bg-red-50 px-4 py-3 rounded-lg">{error}</p>}
 

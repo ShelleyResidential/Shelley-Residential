@@ -3,17 +3,13 @@
 import { useEffect, useState } from 'react'
 import { supabase } from '@/lib/supabase'
 import Link from 'next/link'
+import { STATUS_ORDER, STATUS_LABELS } from '@/lib/pipeline'
 
 type Stats = {
   contacts: number
   properties: number
   evaluations: number
   evaluationsByStatus: Record<string, number>
-}
-
-const STATUS_LABELS: Record<string, string> = {
-  new: 'New', scheduled: 'Scheduled', completed: 'Prepared', presented: 'Presented',
-  follow_up: 'Follow-Up', won: 'Won', lost: 'Lost', cancelled: 'Cancelled',
 }
 
 export default function DashboardPage() {
@@ -88,13 +84,13 @@ export default function DashboardPage() {
         <div className="bg-white rounded-2xl border border-gray-100 shadow-sm p-6 mb-6">
           <p className="text-xs font-bold text-[#1a1a1a] uppercase tracking-wide mb-5">Evaluations by Status</p>
           <div className="grid grid-cols-2 sm:grid-cols-5 gap-3">
-            {Object.entries(STATUS_LABELS).map(([key, label]) => {
+            {STATUS_ORDER.map(key => {
               const count = stats.evaluationsByStatus[key] ?? 0
               return (
                 <Link key={key} href={`/dashboard/evaluations?status=${key}`}
                   className="flex flex-col items-center p-4 rounded-xl border border-gray-100 hover:border-gray-300 hover:shadow-sm transition-all">
                   <span className="text-2xl font-bold text-[#1a1a1a]">{count}</span>
-                  <span className="text-xs font-medium mt-1 text-gray-400">{label}</span>
+                  <span className="text-xs font-medium mt-1 text-gray-400">{STATUS_LABELS[key]}</span>
                 </Link>
               )
             })}
