@@ -133,8 +133,15 @@ export default function EvaluationDetailPage() {
     property_inspected: 'inspected', cma_approved: 'evaluated', presentation_completed: 'presented',
   }
 
+  // These three complete purely as a side effect of another action --
+  // creating the evaluation, a successful calendar sync, the required
+  // fields all being filled in -- never a direct click in the Pipeline
+  // tab, for anyone, regardless of role.
+  const AUTO_ONLY_STEPS = ['captured', 'scheduled', 'evaluation_form_completed']
+
   async function togglePipelineStep(stepId: string, stepKey: string, currentlyComplete: boolean) {
     if (!userId) return
+    if (AUTO_ONLY_STEPS.includes(stepKey)) return
     if (!canActOnRole(userDesignation, stepOwnerRole(stepKey))) return
 
     if (currentlyComplete) {
@@ -258,14 +265,17 @@ export default function EvaluationDetailPage() {
               // than the DB row's owner_role column -- evaluations created
               // before this pipeline rebuild have that column as null.
               const ownerRole      = stepOwnerRole(step.step_key)
-              const canAct         = canActOnRole(userDesignation, ownerRole)
+              const autoOnly       = AUTO_ONLY_STEPS.includes(step.step_key)
+              const canAct         = !autoOnly && canActOnRole(userDesignation, ownerRole)
               const overdue        = !complete && step.due_date && new Date(step.due_date) < new Date()
               return (
                 <div key={step.id} className="flex items-center gap-4 py-3 border-b border-gray-50 last:border-0">
                   <button
                     onClick={() => togglePipelineStep(step.id, step.step_key, complete)}
                     disabled={!canAct}
-                    title={!canAct ? `Only ${ownerRole === 'tc' ? 'a Transaction Coordinator' : ownerRole === 'cma_approver' ? 'a CMA Approver' : 'an Agent'} can toggle this step` : undefined}
+                    title={autoOnly
+                      ? 'Completes automatically -- not manually toggleable'
+                      : !canAct ? `Only ${ownerRole === 'tc' ? 'a Transaction Coordinator' : ownerRole === 'cma_approver' ? 'a CMA Approver' : 'an Agent'} can toggle this step` : undefined}
                     className={`w-6 h-6 rounded-full border-2 flex-shrink-0 flex items-center justify-center transition-all ${
                       complete
                         ? 'bg-[#1a1a1a] border-[#1a1a1a] text-white'
@@ -287,11 +297,11 @@ export default function EvaluationDetailPage() {
                       <p className="text-xs text-gray-400 mt-0.5">
                         Captured by {completedBy?.full_name ?? completedBy?.email ?? '—'}
                         {completedBy?.designation && ` | ${completedBy.designation}`}
-                        {' · '}{new Date(step.completed_at).toLocaleDateString('en-ZA', { day: 'numeric', month: 'short', year: 'numeric' })}
+                        {' · '}{new Date(step.completed_at).toLocaleString('en-ZA', { dateStyle: 'medium', timeStyle: 'short' })}
                       </p>
                     ) : step.due_date ? (
                       <p className={`text-xs mt-0.5 ${overdue ? 'text-red-500' : 'text-gray-400'}`}>
-                        Due {new Date(step.due_date).toLocaleDateString('en-ZA', { day: 'numeric', month: 'short', year: 'numeric' })}
+                        Due {new Date(step.due_date).toLocaleString('en-ZA', { dateStyle: 'medium', timeStyle: 'short' })}
                         {overdue ? ' (overdue)' : ''}
                       </p>
                     ) : null}
