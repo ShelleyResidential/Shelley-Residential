@@ -1,6 +1,7 @@
 import { supabaseAdmin } from '@/lib/supabase-admin'
 import { getValidAccessToken } from '@/lib/calendar-tokens'
 import { fetchGoogleContactsPage } from '@/lib/google-contacts'
+import { normalizeToE164 } from '@/lib/phone'
 
 type SyncPageResult = { ok: boolean; created: number; updated: number; nextPageToken?: string; error?: string }
 
@@ -47,7 +48,13 @@ export async function syncContactsPage(userId: string, pageToken?: string | null
       first_name:           gc.firstName ?? '',
       last_name:            gc.lastName ?? '',
       name:                 fullName || gc.phone || gc.email || 'Unnamed contact',
-      phone_number:         gc.phone,
+      // Google hands back whatever format the source phone/contact used --
+      // normalized to E.164 here so a sync can never violate the
+      // contacts.phone_number CHECK constraint (or hand the WhatsApp
+      // reminder workflow an unusable number). A contact with no usable
+      // number (ambiguous format, USSD code, etc.) just gets phone_number
+      // null rather than blocking the whole sync.
+      phone_number:         normalizeToE164(gc.phone),
       email_address:        gc.email,
       company_name:         gc.companyName,
       occupation:           gc.occupation,

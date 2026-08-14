@@ -3,6 +3,7 @@
 import { useState, useEffect, useCallback } from 'react'
 import { supabase } from '@/lib/supabase'
 import { btn, card, input } from '@/lib/styles'
+import { formatPhoneDisplay } from '@/lib/phone'
 import { Breadcrumbs } from '@/lib/Breadcrumbs'
 import { useRouter } from 'next/navigation'
 import Link from 'next/link'
@@ -303,7 +304,7 @@ export default function ContactsPage() {
                     </span>
                   </td>
                   <td className="px-3 py-3 text-[#1a1a1a] font-medium truncate" title={fullName(c)}>{fullName(c)}</td>
-                  <td className="px-3 py-3 text-gray-500 truncate">{c.phone_number || '—'}</td>
+                  <td className="px-3 py-3 text-gray-500 truncate">{formatPhoneDisplay(c.phone_number)}</td>
                   <td className="px-3 py-3 overflow-hidden">
                     {c.email_address ? (
                       <a

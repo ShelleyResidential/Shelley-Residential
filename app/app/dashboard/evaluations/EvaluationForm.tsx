@@ -4,6 +4,7 @@ import { useState, useEffect, useRef, useCallback } from 'react'
 import { supabase } from '@/lib/supabase'
 import { btn, card, input, select, sectionTitle, label as labelCls } from '@/lib/styles'
 import { WarningIcon } from '@/lib/icons'
+import { formatPhoneDisplay } from '@/lib/phone'
 import { useRouter, useSearchParams } from 'next/navigation'
 import Link from 'next/link'
 import { LEAD_SOURCES, REFERRAL_TYPES, MOTIVATIONS, TIMELINES, REASONS_LOST, CONTACT_TAGS } from '@/lib/evaluationOptions'
@@ -873,13 +874,15 @@ export function EvaluationForm({ evaluationId, readOnly = false, calendarEventLi
     const resolveTagId = (label: string) => tagOptions?.find(t => t.label === label)?.id ?? null
 
     if (evaluationId) {
-      const updatePayload = evaluationOutcome ? { ...payload, status: 'closed' } : payload
-      const { error: evErr } = await supabase.from('evaluations').update(updatePayload).eq('id', evaluationId)
-      if (evErr) { setError(evErr.message); setSaving(false); return }
-
+      // Contacts are written BEFORE the evaluations row itself, deliberately --
+      // the database enforces that an evaluation can't have its Evaluation
+      // Date and Time set without a Seller contact already attached, and it
+      // checks that at the moment scheduled_at changes. Updating evaluations
+      // first would have it check against contacts that haven't been
+      // (re)written yet and reject a perfectly valid save.
       await supabase.from('evaluation_contacts').delete().eq('evaluation_id', evaluationId)
       if (contacts.length > 0) {
-        await supabase.from('evaluation_contacts').insert(
+        const { error: contactsErr } = await supabase.from('evaluation_contacts').insert(
           contacts.map((c, i) => ({
             evaluation_id: evaluationId,
             contact_id: c.contact_id,
@@ -888,7 +891,12 @@ export function EvaluationForm({ evaluationId, readOnly = false, calendarEventLi
             tag_option_id: c.tag_option_id ? resolveTagId(c.tag_option_id) : null,
           }))
         )
+        if (contactsErr) { setError(contactsErr.message); setSaving(false); return }
       }
+
+      const updatePayload = evaluationOutcome ? { ...payload, status: 'closed' } : payload
+      const { error: evErr } = await supabase.from('evaluations').update(updatePayload).eq('id', evaluationId)
+      if (evErr) { setError(evErr.message); setSaving(false); return }
 
       // An Evaluation Date and Time captured on save automatically creates/
       // updates the Google Calendar event; the "Evaluation Scheduled" step
@@ -933,10 +941,17 @@ export function EvaluationForm({ evaluationId, readOnly = false, calendarEventLi
       return
     }
 
+    // scheduled_at is deliberately left out of this initial insert -- the
+    // database enforces that an evaluation's Evaluation Date and Time can
+    // only be set once a Seller contact is already attached to it, checked
+    // the moment scheduled_at changes. A brand-new row can't have that
+    // contact yet (evaluation_contacts needs this row's id to exist first),
+    // so it's set via a follow-up update below, right after the contacts go in.
     const { data: ev, error: evErr } = await supabase.from('evaluations').insert({
       ...payload,
-      status:               evaluationOutcome ? 'closed' : 'new',
-      captured_by_user_id:  userId,
+      scheduled_at:          null,
+      status:                evaluationOutcome ? 'closed' : 'new',
+      captured_by_user_id:   userId,
     }).select('id').single()
 
     if (evErr || !ev) { setError(evErr?.message ?? 'Failed to save.'); setSaving(false); return }
@@ -951,6 +966,10 @@ export function EvaluationForm({ evaluationId, readOnly = false, calendarEventLi
           tag_option_id: c.tag_option_id ? resolveTagId(c.tag_option_id) : null,
         }))
       )
+    }
+
+    if (scheduledAt) {
+      await supabase.from('evaluations').update({ scheduled_at: scheduledAt }).eq('id', ev.id)
     }
 
     // Seed the full pipeline task list, each stamped with its Owner Role so
@@ -1173,7 +1192,7 @@ export function EvaluationForm({ evaluationId, readOnly = false, calendarEventLi
                 )}
               </div>
               {(c.phone_number || c.email_address) && (
-                <p className="text-xs text-gray-400 mt-2">{[c.phone_number, c.email_address].filter(Boolean).join(' | ')}</p>
+                <p className="text-xs text-gray-400 mt-2">{[c.phone_number ? formatPhoneDisplay(c.phone_number) : null, c.email_address].filter(Boolean).join(' | ')}</p>
               )}
             </div>
             <Link href={`/dashboard/contacts/${c.contact_id}`} className={`${btn.primary} flex-shrink-0`}>

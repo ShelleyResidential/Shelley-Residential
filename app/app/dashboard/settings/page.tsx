@@ -3,6 +3,7 @@
 import { useState, useEffect } from 'react'
 import { supabase } from '@/lib/supabase'
 import { card, btn, input, select, sectionTitle, label as labelCls } from '@/lib/styles'
+import { normalizeToE164, formatPhoneDisplay } from '@/lib/phone'
 import { useRouter } from 'next/navigation'
 import Image from 'next/image'
 
@@ -42,7 +43,9 @@ export default function SettingsPage() {
       supabase.from('profiles')
         .select('phone_number, designation, property_practitioner_status, property_practitioner_qualification, ffc_number')
         .eq('id', data.user.id).single().then(({ data: profile }) => {
-          setPhoneNumber(profile?.phone_number ?? '')
+          // Stored as E.164, shown as the familiar local format -- typing
+          // it back in on save gets re-normalized either way.
+          setPhoneNumber(profile?.phone_number ? formatPhoneDisplay(profile.phone_number) : '')
           setDesignation(profile?.designation ?? '')
           setPpStatus(profile?.property_practitioner_status ?? '')
           setPpQualification(profile?.property_practitioner_qualification ?? '')
@@ -59,11 +62,16 @@ export default function SettingsPage() {
   async function saveProfile() {
     if (!userId) return
     if (!designation) { setSaveError('Designation is required'); return }
+    const normalizedPhone = phoneNumber.trim() ? normalizeToE164(phoneNumber.trim()) : null
+    if (phoneNumber.trim() && !normalizedPhone) {
+      setSaveError("That doesn't look like a valid phone number.")
+      return
+    }
     setSaving(true)
     setSaveError('')
     const { error } = await supabase.from('profiles')
       .update({
-        phone_number:                          phoneNumber.trim() || null,
+        phone_number:                          normalizedPhone,
         designation,
         property_practitioner_status:          ppStatus || null,
         property_practitioner_qualification:   ppQualification || null,

@@ -4,6 +4,7 @@ import { useState, useEffect, useCallback } from 'react'
 import { supabase } from '@/lib/supabase'
 import { btn, card, input, select, sectionTitle, label as labelCls } from '@/lib/styles'
 import { canDelete } from '@/lib/permissions'
+import { normalizeToE164, formatPhoneDisplay } from '@/lib/phone'
 import { Breadcrumbs } from '@/lib/Breadcrumbs'
 import { useRouter, useParams, useSearchParams } from 'next/navigation'
 import Link from 'next/link'
@@ -128,9 +129,15 @@ export default function ContactDetailPage() {
       setSaveError('A contact needs a phone number.')
       return
     }
+    const normalizedPhone = normalizeToE164(editForm.phone_number)
+    if (!normalizedPhone) {
+      setSaveError("That doesn't look like a valid phone number.")
+      return
+    }
     setSaving(true); setSaveError('')
     const updated = {
       ...editForm,
+      phone_number: normalizedPhone,
       name: [editForm.first_name, editForm.last_name].filter(Boolean).join(' '),
     }
     // Routed through an API route rather than a direct client update -- if
@@ -254,7 +261,7 @@ export default function ContactDetailPage() {
 
             <Section title="Contact Details">
               <div className="grid grid-cols-2 gap-3">
-                <Field label="Phone" editing={editing} value={contact.phone_number}>
+                <Field label="Phone" editing={editing} value={formatPhoneDisplay(contact.phone_number)}>
                   <input value={editForm.phone_number ?? ''} onChange={e => setField('phone_number', e.target.value || null)} className={input} />
                 </Field>
                 <Field label="Email" editing={editing} value={contact.email_address}>
