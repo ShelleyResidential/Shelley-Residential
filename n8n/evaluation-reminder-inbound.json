@@ -1,0 +1,407 @@
+{
+  "name": "Evaluation Reminder - Inbound (WhatsApp)",
+  "nodes": [
+    {
+      "parameters": {
+        "content": "## Before this will work\n1. Create a **Supabase** credential (same one as the outbound workflow) and attach it to both Supabase HTTP Request nodes.\n2. Create an **HTTP Header Auth** credential for Meta (same one as outbound) and attach it to \"Send WhatsApp Reply\".\n3. Activate this workflow once, then copy the **Production URL** shown on the \"Receive Inbound Message\" webhook node -- that's what goes into Meta's App Dashboard > WhatsApp > Configuration > Callback URL.\n4. Pick your own Verify Token (any random string) and put the EXACT SAME value in two places: the \"Verify Token Matches?\" IF node below, AND Meta's Callback URL config field.\n5. Open the CONFIG node and fill in your real Supabase URL, WhatsApp Phone Number ID, and general office number.\n6. Use \"Test Workflow\" (bottom of canvas) to send yourself a test payload via the Manual Trigger before relying on real Meta traffic.",
+        "height": 460,
+        "width": 400
+      },
+      "id": "sticky-setup-inbound",
+      "name": "Setup Notes",
+      "type": "n8n-nodes-base.stickyNote",
+      "typeVersion": 1,
+      "position": [-680, -160]
+    },
+    {
+      "parameters": {
+        "httpMethod": "GET",
+        "path": "whatsapp-inbound",
+        "responseMode": "responseNode",
+        "options": {}
+      },
+      "id": "webhook-verify",
+      "name": "Verify Webhook (Meta handshake)",
+      "type": "n8n-nodes-base.webhook",
+      "typeVersion": 2,
+      "position": [-680, 60],
+      "webhookId": "whatsapp-inbound-verify"
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "options": { "caseSensitive": true, "leftValue": "", "typeValidation": "loose" },
+          "conditions": [
+            {
+              "id": "cond-token",
+              "leftValue": "={{ $json.query['hub.verify_token'] }}",
+              "rightValue": "REPLACE_WITH_YOUR_VERIFY_TOKEN",
+              "operator": { "type": "string", "operation": "equals" }
+            }
+          ],
+          "combinator": "and"
+        },
+        "options": {}
+      },
+      "id": "if-verify-token",
+      "name": "Verify Token Matches?",
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2.2,
+      "position": [-440, 60]
+    },
+    {
+      "parameters": {
+        "respondWith": "text",
+        "responseBody": "={{ $json.query['hub.challenge'] }}",
+        "options": { "responseCode": 200 }
+      },
+      "id": "respond-verify-ok",
+      "name": "Respond: Challenge OK",
+      "type": "n8n-nodes-base.respondToWebhook",
+      "typeVersion": 1.4,
+      "position": [-220, -40]
+    },
+    {
+      "parameters": {
+        "respondWith": "text",
+        "responseBody": "Forbidden",
+        "options": { "responseCode": 403 }
+      },
+      "id": "respond-verify-fail",
+      "name": "Respond: Forbidden",
+      "type": "n8n-nodes-base.respondToWebhook",
+      "typeVersion": 1.4,
+      "position": [-220, 160]
+    },
+    {
+      "parameters": {
+        "httpMethod": "POST",
+        "path": "whatsapp-inbound",
+        "responseMode": "responseNode",
+        "options": {}
+      },
+      "id": "webhook-inbound",
+      "name": "Receive Inbound Message",
+      "type": "n8n-nodes-base.webhook",
+      "typeVersion": 2,
+      "position": [-680, 380],
+      "webhookId": "whatsapp-inbound-messages"
+    },
+    {
+      "parameters": {},
+      "id": "trigger-manual-inbound",
+      "name": "Manual Trigger (Testing)",
+      "type": "n8n-nodes-base.manualTrigger",
+      "typeVersion": 1,
+      "position": [-680, 560]
+    },
+    {
+      "parameters": {
+        "respondWith": "text",
+        "responseBody": "EVENT_RECEIVED",
+        "options": { "responseCode": 200 }
+      },
+      "id": "respond-inbound-ack",
+      "name": "Respond: 200 OK",
+      "type": "n8n-nodes-base.respondToWebhook",
+      "typeVersion": 1.4,
+      "position": [-440, 380]
+    },
+    {
+      "parameters": {
+        "jsCode": "// Meta sends the SAME webhook \"messages\" field for both real inbound\n// messages and delivery/read receipts -- receipts populate `statuses`\n// instead of `messages`, so requiring a non-empty messages array of\n// type \"text\" filters out both receipts and non-text message types\n// (images, locations, etc) in one check. Returns no items at all for\n// anything that doesn't qualify -- the rest of the workflow simply\n// doesn't run for that invocation.\nconst first = items[0].json;\n// The Manual Trigger has no real payload -- fall back to a sample\n// message so this can be test-run without a live Meta webhook.\nconst body = (first && first.body) ? first.body : {\n  entry: [{ changes: [{ value: {\n    messages: [{ from: '27821234567', type: 'text', text: { body: '(test message from Manual Trigger)' } }],\n    contacts: [{ profile: { name: 'Test User' } }],\n  } }] }],\n};\n\nconst entry  = (body.entry || [])[0];\nconst change = entry && (entry.changes || [])[0];\nconst value  = change && change.value;\n\nif (!value || !value.messages || value.messages.length === 0) {\n  return []; // receipt/status event, or nothing usable in the payload\n}\n\nconst message = value.messages[0];\nif (message.type !== 'text') {\n  return []; // out of scope for this redirect-only flow\n}\n\nreturn [{\n  json: {\n    sender_wa_id: message.from, // no leading '+' from Meta\n    sender_phone_e164: '+' + message.from,\n    message_text: message.text.body,\n    sender_profile_name: (value.contacts && value.contacts[0] && value.contacts[0].profile && value.contacts[0].profile.name) || null,\n  },\n}];"
+      },
+      "id": "extract-message",
+      "name": "Extract & Filter Message",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [-440, 560]
+    },
+    {
+      "parameters": {
+        "assignments": {
+          "assignments": [
+            { "id": "cfg-supabase-url", "name": "supabaseUrl", "value": "https://YOUR-PROJECT.supabase.co", "type": "string" },
+            { "id": "cfg-phone-id", "name": "whatsappPhoneNumberId", "value": "YOUR_WHATSAPP_PHONE_NUMBER_ID", "type": "string" },
+            { "id": "cfg-graph-version", "name": "whatsappGraphVersion", "value": "v21.0", "type": "string" },
+            { "id": "cfg-office-number", "name": "generalOfficeNumber", "value": "+27 31 000 0000", "type": "string" }
+          ]
+        },
+        "includeOtherFields": true,
+        "options": {}
+      },
+      "id": "config-node-inbound",
+      "name": "CONFIG",
+      "type": "n8n-nodes-base.set",
+      "typeVersion": 3.4,
+      "position": [-220, 560]
+    },
+    {
+      "parameters": {
+        "authentication": "predefinedCredentialType",
+        "nodeCredentialType": "supabaseApi",
+        "url": "={{ $json.supabaseUrl }}/rest/v1/contacts",
+        "sendQuery": true,
+        "queryParameters": {
+          "parameters": [
+            { "name": "phone_number", "value": "=eq.{{ $json.sender_phone_e164 }}" },
+            { "name": "select", "value": "id,first_name,last_name" },
+            { "name": "limit", "value": "1" }
+          ]
+        },
+        "options": {}
+      },
+      "id": "lookup-contact",
+      "name": "Look Up Contact By Phone",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [20, 560],
+      "credentials": {
+        "supabaseApi": { "id": "1", "name": "Supabase account" }
+      }
+    },
+    {
+      "parameters": {
+        "jsCode": "const raw = $input.all();\n// Supabase returns a JSON array -- normally kept as one item whose\n// .json IS that array; handled defensively either way.\nconst rows = Array.isArray(raw[0]?.json) ? raw[0].json : raw.map(i => i.json).filter(r => r && r.id);\nconst contact = rows[0] || null;\nreturn [{ json: { found: !!contact, contact_id: contact ? contact.id : null, contact_first_name: contact ? contact.first_name : null } }];"
+      },
+      "id": "parse-contact",
+      "name": "Parse Contact Result",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [240, 560]
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "options": { "caseSensitive": true, "leftValue": "", "typeValidation": "loose" },
+          "conditions": [
+            {
+              "id": "cond-contact-found",
+              "leftValue": "={{ $json.found }}",
+              "rightValue": true,
+              "operator": { "type": "boolean", "operation": "equals" }
+            }
+          ],
+          "combinator": "and"
+        },
+        "options": {}
+      },
+      "id": "if-contact-found",
+      "name": "Contact Found?",
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2.2,
+      "position": [460, 560]
+    },
+    {
+      "parameters": {
+        "authentication": "predefinedCredentialType",
+        "nodeCredentialType": "supabaseApi",
+        "url": "={{ $('CONFIG').item.json.supabaseUrl }}/rest/v1/evaluation_contacts",
+        "sendQuery": true,
+        "queryParameters": {
+          "parameters": [
+            { "name": "contact_id", "value": "=eq.{{ $json.contact_id }}" },
+            { "name": "select", "value": "evaluations(id,scheduled_at,date_captured,sellers_agent_user_id,agent:profiles!sellers_agent_user_id(full_name,phone_number))" }
+          ]
+        },
+        "options": {}
+      },
+      "id": "fetch-evaluations",
+      "name": "Fetch Contact's Evaluations",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [680, 460],
+      "credentials": {
+        "supabaseApi": { "id": "1", "name": "Supabase account" }
+      }
+    },
+    {
+      "parameters": {
+        "jsCode": "const raw = $input.all();\nconst rows = Array.isArray(raw[0]?.json) ? raw[0].json : raw.map(i => i.json);\n\n// Each row is { evaluations: {...} | null } -- PostgREST can't sort\n// evaluation_contacts by its embedded evaluation's column server-side\n// (ordering an embedded/referenced table only reorders items within\n// that nested relation, never the parent rows), so the \"most recent\"\n// pick happens here instead.\nconst evaluations = rows.map(r => r.evaluations).filter(Boolean);\n\nif (evaluations.length === 0) {\n  return [{ json: { found: false } }];\n}\n\nevaluations.sort((a, b) => {\n  const at = a.scheduled_at || a.date_captured;\n  const bt = b.scheduled_at || b.date_captured;\n  return new Date(bt) - new Date(at);\n});\n\nconst ev = evaluations[0];\nconst agent = ev.agent;\nconst found = !!(agent && agent.full_name && agent.phone_number);\n\nreturn [{\n  json: {\n    found,\n    evaluation_id: ev.id,\n    agent_name: agent ? agent.full_name : null,\n    agent_phone: agent ? agent.phone_number : null,\n  },\n}];"
+      },
+      "id": "pick-recent-evaluation",
+      "name": "Pick Most Recent Evaluation",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [900, 460]
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "options": { "caseSensitive": true, "leftValue": "", "typeValidation": "loose" },
+          "conditions": [
+            {
+              "id": "cond-eval-found",
+              "leftValue": "={{ $json.found }}",
+              "rightValue": true,
+              "operator": { "type": "boolean", "operation": "equals" }
+            }
+          ],
+          "combinator": "and"
+        },
+        "options": {}
+      },
+      "id": "if-evaluation-found",
+      "name": "Evaluation + Agent Found?",
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2.2,
+      "position": [1120, 460]
+    },
+    {
+      "parameters": {
+        "assignments": {
+          "assignments": [
+            {
+              "id": "reply-agent-1",
+              "name": "reply_text",
+              "value": "=Hi {{ $('Parse Contact Result').item.json.contact_first_name || 'there' }}, thanks for your message! For anything about your upcoming evaluation, please contact {{ $json.agent_name }} directly on {{ $json.agent_phone }}.",
+              "type": "string"
+            },
+            {
+              "id": "reply-agent-2",
+              "name": "recipient_phone_dial",
+              "value": "={{ $('Extract & Filter Message').item.json.sender_wa_id }}",
+              "type": "string"
+            }
+          ]
+        },
+        "options": {}
+      },
+      "id": "build-agent-reply",
+      "name": "Build Agent Redirect Reply",
+      "type": "n8n-nodes-base.set",
+      "typeVersion": 3.4,
+      "position": [1340, 380]
+    },
+    {
+      "parameters": {
+        "assignments": {
+          "assignments": [
+            {
+              "id": "reply-fallback-1",
+              "name": "reply_text",
+              "value": "=Hi! Thanks for your message. Please contact our office directly on {{ $('CONFIG').item.json.generalOfficeNumber }} for assistance.",
+              "type": "string"
+            },
+            {
+              "id": "reply-fallback-2",
+              "name": "recipient_phone_dial",
+              "value": "={{ $('Extract & Filter Message').item.json.sender_wa_id }}",
+              "type": "string"
+            }
+          ]
+        },
+        "options": {}
+      },
+      "id": "build-fallback-reply",
+      "name": "Build Fallback Reply (office number)",
+      "type": "n8n-nodes-base.set",
+      "typeVersion": 3.4,
+      "position": [900, 700]
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "=https://graph.facebook.com/{{ $('CONFIG').item.json.whatsappGraphVersion }}/{{ $('CONFIG').item.json.whatsappPhoneNumberId }}/messages",
+        "authentication": "genericCredentialType",
+        "genericAuthType": "httpHeaderAuth",
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "={{ {\n  \"messaging_product\": \"whatsapp\",\n  \"to\": $json.recipient_phone_dial,\n  \"type\": \"text\",\n  \"text\": { \"body\": $json.reply_text }\n} }}",
+        "options": {}
+      },
+      "id": "send-reply",
+      "name": "Send WhatsApp Reply",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [1560, 560],
+      "onError": "continueErrorOutput",
+      "credentials": {
+        "httpHeaderAuth": { "id": "2", "name": "Meta WhatsApp Access Token" }
+      }
+    },
+    {
+      "parameters": {
+        "assignments": {
+          "assignments": [
+            { "id": "err-1", "name": "status", "value": "REPLY_SEND_FAILED", "type": "string" },
+            { "id": "err-2", "name": "error", "value": "={{ $json.error?.message || $json.message || JSON.stringify($json) }}", "type": "string" }
+          ]
+        },
+        "options": {}
+      },
+      "id": "log-reply-failure",
+      "name": "Failed Replies (review these)",
+      "type": "n8n-nodes-base.set",
+      "typeVersion": 3.4,
+      "position": [1780, 700]
+    }
+  ],
+  "connections": {
+    "Verify Webhook (Meta handshake)": {
+      "main": [[{ "node": "Verify Token Matches?", "type": "main", "index": 0 }]]
+    },
+    "Verify Token Matches?": {
+      "main": [
+        [{ "node": "Respond: Challenge OK", "type": "main", "index": 0 }],
+        [{ "node": "Respond: Forbidden", "type": "main", "index": 0 }]
+      ]
+    },
+    "Receive Inbound Message": {
+      "main": [
+        [
+          { "node": "Respond: 200 OK", "type": "main", "index": 0 },
+          { "node": "Extract & Filter Message", "type": "main", "index": 0 }
+        ]
+      ]
+    },
+    "Manual Trigger (Testing)": {
+      "main": [[{ "node": "Extract & Filter Message", "type": "main", "index": 0 }]]
+    },
+    "Extract & Filter Message": {
+      "main": [[{ "node": "CONFIG", "type": "main", "index": 0 }]]
+    },
+    "CONFIG": {
+      "main": [[{ "node": "Look Up Contact By Phone", "type": "main", "index": 0 }]]
+    },
+    "Look Up Contact By Phone": {
+      "main": [[{ "node": "Parse Contact Result", "type": "main", "index": 0 }]]
+    },
+    "Parse Contact Result": {
+      "main": [[{ "node": "Contact Found?", "type": "main", "index": 0 }]]
+    },
+    "Contact Found?": {
+      "main": [
+        [{ "node": "Fetch Contact's Evaluations", "type": "main", "index": 0 }],
+        [{ "node": "Build Fallback Reply (office number)", "type": "main", "index": 0 }]
+      ]
+    },
+    "Fetch Contact's Evaluations": {
+      "main": [[{ "node": "Pick Most Recent Evaluation", "type": "main", "index": 0 }]]
+    },
+    "Pick Most Recent Evaluation": {
+      "main": [[{ "node": "Evaluation + Agent Found?", "type": "main", "index": 0 }]]
+    },
+    "Evaluation + Agent Found?": {
+      "main": [
+        [{ "node": "Build Agent Redirect Reply", "type": "main", "index": 0 }],
+        [{ "node": "Build Fallback Reply (office number)", "type": "main", "index": 0 }]
+      ]
+    },
+    "Build Agent Redirect Reply": {
+      "main": [[{ "node": "Send WhatsApp Reply", "type": "main", "index": 0 }]]
+    },
+    "Build Fallback Reply (office number)": {
+      "main": [[{ "node": "Send WhatsApp Reply", "type": "main", "index": 0 }]]
+    },
+    "Send WhatsApp Reply": {
+      "main": [
+        [],
+        [{ "node": "Failed Replies (review these)", "type": "main", "index": 0 }]
+      ]
+    }
+  },
+  "active": false,
+  "settings": { "executionOrder": "v1" },
+  "pinData": {}
+}
