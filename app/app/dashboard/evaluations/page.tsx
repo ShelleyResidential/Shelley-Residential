@@ -11,6 +11,20 @@ import Link from 'next/link'
 
 const PAGE_SIZE = 50
 
+type SortColumn =
+  | 'status' | 'address' | 'date_captured' | 'agent' | 'tc'
+  | 'contact' | 'lead_source' | 'evaluation_price' | 'marketing_price'
+type SortDirection = 'asc' | 'desc'
+
+// Resolved from a joined table (properties) or a separately-fetched
+// profiles/contacts lookup rather than a plain column -- PostgREST's
+// `referencedTable` order option only reorders items *within* a nested
+// array relation, never the parent rows themselves, so there's no
+// server-side way to sort evaluations by one of these. Sorting by one
+// fetches every matching row, resolves + sorts client-side instead, then
+// slices out the page.
+const CLIENT_SORT_COLUMNS: SortColumn[] = ['address', 'agent', 'tc', 'contact', 'lead_source']
+
 type Profile = { id: string; full_name: string | null; email: string | null }
 
 type Property = {
@@ -130,6 +144,22 @@ function sellerName(ev: Evaluation): string {
   return contact ? `${contact.first_name} ${contact.last_name}`.trim() : '—'
 }
 
+// The value to sort by for a given column -- a plain column for the
+// server-orderable ones, resolved lookups for the rest.
+function sortValue(ev: Evaluation, column: SortColumn, profiles: Record<string, Profile>): string | number {
+  switch (column) {
+    case 'status':           return STATUS_LABELS[ev.status] ?? ev.status
+    case 'address':          return formatAddress(ev.properties)
+    case 'date_captured':    return ev.date_captured
+    case 'agent':            { const p = ev.sellers_agent_user_id ? profiles[ev.sellers_agent_user_id] : null; return p?.full_name ?? p?.email ?? '' }
+    case 'tc':                { const p = ev.transaction_coordinator_user_id ? profiles[ev.transaction_coordinator_user_id] : null; return p?.full_name ?? p?.email ?? '' }
+    case 'contact':          return sellerName(ev)
+    case 'lead_source':      return ev.lead_source_picklist?.label ?? ev.lead_source_other_text ?? ''
+    case 'evaluation_price': return ev.evaluation_price ?? -Infinity
+    case 'marketing_price':  return ev.marketing_price ?? -Infinity
+  }
+}
+
 const STATUS_TABS = [
   { key: '',                   label: 'All' },
   { key: 'new',                label: 'New' },
@@ -154,72 +184,99 @@ export default function EvaluationsPage() {
   const [page, setPage]               = useState(1)
   const [totalCount, setTotalCount]   = useState(0)
   const [selectedId, setSelectedId] = useState<string | null>(null)
+  const [sortColumn, setSortColumn]       = useState<SortColumn>('date_captured')
+  const [sortDirection, setSortDirection] = useState<SortDirection>('desc')
 
   const totalPages = Math.max(1, Math.ceil(totalCount / PAGE_SIZE))
 
+  const SELECT_COLUMNS = `
+    id, status, date_captured, scheduled_at,
+    evaluation_price, marketing_price,
+    sellers_agent_user_id, transaction_coordinator_user_id,
+    motivation_for_selling_notes, selling_timeline_notes,
+    motivation_picklist:motivation_for_selling_option_id (label),
+    timeline_picklist:selling_timeline_option_id (label),
+    properties (id, unit_number, complex_or_building_name, street_number, street_name,
+      suburb, city, province, postal_code, country, property_type,
+      latitude, longitude, google_maps_url),
+    lead_generated_by, referral_type, lead_referral_notes,
+    lead_source_picklist:lead_source_option_id (label),
+    lead_source_other_text,
+    evaluation_contacts (
+      is_primary,
+      contacts (id, title, first_name, last_name, status, phone_number, email_address,
+        contact_preference, marital_status, occupation, company_name, division,
+        branch, address, birthday, wedding_anniversary, home_anniversary, id_number, date_added),
+      picklist_options:tag_option_id (label)
+    )
+  `
+
   const fetchEvaluations = useCallback(async () => {
     setLoading(true)
-    const isSearching = !!search.trim()
+    const isSearching     = !!search.trim()
+    const ascending        = sortDirection === 'asc'
+    const needsClientSort = CLIENT_SORT_COLUMNS.includes(sortColumn)
 
-    let query = supabase
-      .from('evaluations')
-      .select(`
-        id, status, date_captured, scheduled_at,
-        evaluation_price, marketing_price,
-        sellers_agent_user_id, transaction_coordinator_user_id,
-        motivation_for_selling_notes, selling_timeline_notes,
-        motivation_picklist:motivation_for_selling_option_id (label),
-        timeline_picklist:selling_timeline_option_id (label),
-        properties (id, unit_number, complex_or_building_name, street_number, street_name,
-          suburb, city, province, postal_code, country, property_type,
-          latitude, longitude, google_maps_url),
-        lead_generated_by, referral_type, lead_referral_notes,
-        lead_source_picklist:lead_source_option_id (label),
-        lead_source_other_text,
-        evaluation_contacts (
-          is_primary,
-          contacts (id, title, first_name, last_name, status, phone_number, email_address,
-            contact_preference, marital_status, occupation, company_name, division,
-            branch, address, birthday, wedding_anniversary, home_anniversary, id_number, date_added),
-          picklist_options:tag_option_id (label)
-        )
-      `, { count: isSearching ? undefined : 'exact' })
-      .order('date_captured', { ascending: false })
+    // Address/seller search, and sorting by a resolved value (a joined
+    // profile or contact name) rather than a plain column, both need the
+    // full matching set in hand before they can filter/sort -- fetch a
+    // bounded batch and do it client-side. Otherwise, page and sort the
+    // query itself so a database with thousands of records never loads
+    // more than one page's worth at a time.
+    if (isSearching || needsClientSort) {
+      let base = supabase.from('evaluations').select(SELECT_COLUMNS).limit(1000)
+      if (filterStatus) base = base.eq('status', filterStatus)
+      if (myOnly && userId) base = base.eq('sellers_agent_user_id', userId)
+
+      const { data } = await base
+      let results = (data ?? []) as unknown as Evaluation[]
+
+      if (isSearching) {
+        const q = search.toLowerCase()
+        results = results.filter(e => {
+          const addr = formatAddress(e.properties).toLowerCase()
+          const seller = sellerName(e).toLowerCase()
+          return addr.includes(q) || seller.includes(q)
+        })
+      }
+
+      results.sort((a, b) => {
+        const va = sortValue(a, sortColumn, profiles)
+        const vb = sortValue(b, sortColumn, profiles)
+        if (typeof va === 'number' && typeof vb === 'number') return (va - vb) * (ascending ? 1 : -1)
+        return String(va).localeCompare(String(vb)) * (ascending ? 1 : -1)
+      })
+
+      setTotalCount(results.length)
+      const from = (page - 1) * PAGE_SIZE
+      setEvaluations(results.slice(from, from + PAGE_SIZE))
+      setLoading(false)
+      return
+    }
+
+    // Only 'status', 'date_captured', 'evaluation_price', and
+    // 'marketing_price' ever reach here -- every column that needs a
+    // joined value is in CLIENT_SORT_COLUMNS and already returned above.
+    let query = supabase.from('evaluations').select(SELECT_COLUMNS, { count: 'exact' })
+      .order(sortColumn, { ascending })
 
     if (filterStatus) query = query.eq('status', filterStatus)
     if (myOnly && userId) query = query.eq('sellers_agent_user_id', userId)
 
-    // Address/seller search spans a joined table PostgREST can't filter on
-    // directly, so fetch a bounded batch and filter/paginate it client-side.
-    // Otherwise, page the query itself so a database with thousands of
-    // records never loads more than one page's worth at a time.
-    if (isSearching) {
-      query = query.limit(1000)
-    } else {
-      const from = (page - 1) * PAGE_SIZE
-      query = query.range(from, from + PAGE_SIZE - 1)
-    }
+    const from = (page - 1) * PAGE_SIZE
+    query = query.range(from, from + PAGE_SIZE - 1)
 
     const { data, count } = await query
-    let results = (data ?? []) as unknown as Evaluation[]
-
-    if (isSearching) {
-      const q = search.toLowerCase()
-      results = results.filter(e => {
-        const addr = formatAddress(e.properties).toLowerCase()
-        const seller = sellerName(e).toLowerCase()
-        return addr.includes(q) || seller.includes(q)
-      })
-      setTotalCount(results.length)
-      const from = (page - 1) * PAGE_SIZE
-      results = results.slice(from, from + PAGE_SIZE)
-    } else {
-      setTotalCount(count ?? 0)
-    }
-
-    setEvaluations(results)
+    setEvaluations((data ?? []) as unknown as Evaluation[])
+    setTotalCount(count ?? 0)
     setLoading(false)
-  }, [search, filterStatus, myOnly, userId, page])
+  }, [search, filterStatus, myOnly, userId, page, sortColumn, sortDirection, profiles])
+
+  function handleSort(column: SortColumn, direction: SortDirection) {
+    setSortColumn(column)
+    setSortDirection(direction)
+    setPage(1)
+  }
 
   useEffect(() => {
     supabase.auth.getUser().then(({ data }) => {
@@ -358,7 +415,7 @@ export default function EvaluationsPage() {
         <div className={`${card} overflow-x-auto`}>
           <table className="w-full text-sm table-fixed">
             <thead>
-              <TableHeaderRow />
+              <TableHeaderRow sortColumn={sortColumn} sortDirection={sortDirection} onSort={handleSort} />
             </thead>
             <tbody>
               {evaluations.map((ev, i) => {
@@ -436,7 +493,7 @@ export default function EvaluationsPage() {
               })}
             </tbody>
             <tfoot>
-              <TableHeaderRow />
+              <TableHeaderRow sortColumn={sortColumn} sortDirection={sortDirection} onSort={handleSort} />
             </tfoot>
           </table>
         </div>
@@ -449,21 +506,57 @@ export default function EvaluationsPage() {
   )
 }
 
+// ── Sort arrows: one for ascending, one for descending, each clickable on
+// its own so an agent can jump straight to the direction they want instead
+// of toggling through a single button. Mirrors the Contacts table's.
+function SortArrows({ column, sortColumn, sortDirection, onSort }: {
+  column: SortColumn
+  sortColumn: SortColumn
+  sortDirection: SortDirection
+  onSort: (column: SortColumn, direction: SortDirection) => void
+}) {
+  const isAsc  = sortColumn === column && sortDirection === 'asc'
+  const isDesc = sortColumn === column && sortDirection === 'desc'
+  return (
+    <span className="inline-flex flex-col ml-1 -space-y-0.5 align-middle normal-case">
+      <button type="button" onClick={() => onSort(column, 'asc')}
+        className={`leading-none text-[8px] cursor-pointer transition-colors ${isAsc ? 'text-[#E8266F]' : 'text-gray-300 hover:text-gray-500'}`}
+        aria-label="Sort ascending">▲</button>
+      <button type="button" onClick={() => onSort(column, 'desc')}
+        className={`leading-none text-[8px] cursor-pointer transition-colors ${isDesc ? 'text-[#E8266F]' : 'text-gray-300 hover:text-gray-500'}`}
+        aria-label="Sort descending">▼</button>
+    </span>
+  )
+}
+
+const HEADER_COLUMNS: { key: SortColumn; label: string; width: string }[] = [
+  { key: 'status',            label: 'Status',       width: 'w-[8%]' },
+  { key: 'address',           label: 'Address',      width: 'w-[16%]' },
+  { key: 'date_captured',     label: 'Date',         width: 'w-[9%]' },
+  { key: 'agent',             label: 'Agent',        width: 'w-[12%]' },
+  { key: 'tc',                label: 'TC',           width: 'w-[10%]' },
+  { key: 'contact',           label: 'Contact',      width: 'w-[12%]' },
+  { key: 'lead_source',       label: 'Lead Source',  width: 'w-[11%]' },
+  { key: 'evaluation_price',  label: 'Evaluation',   width: 'w-[9%]' },
+  { key: 'marketing_price',   label: 'Marketing',    width: 'w-[9%]' },
+]
+
 // ── Table header row, repeated at both the top (thead) and bottom (tfoot)
 // of the evaluations table so the column labels stay visible either way.
-function TableHeaderRow() {
+function TableHeaderRow({ sortColumn, sortDirection, onSort }: {
+  sortColumn: SortColumn
+  sortDirection: SortDirection
+  onSort: (column: SortColumn, direction: SortDirection) => void
+}) {
   return (
     <tr className="border-b border-gray-100 text-left">
       <th className="px-3 py-3 whitespace-nowrap w-[4%]" />
-      <th className="px-3 py-3 font-semibold text-[#1a1a1a] whitespace-nowrap text-xs uppercase tracking-wide w-[8%]">Status</th>
-      <th className="px-3 py-3 font-semibold text-[#1a1a1a] whitespace-nowrap text-xs uppercase tracking-wide w-[16%]">Address</th>
-      <th className="px-3 py-3 font-semibold text-[#1a1a1a] whitespace-nowrap text-xs uppercase tracking-wide w-[9%]">Date</th>
-      <th className="px-3 py-3 font-semibold text-[#1a1a1a] whitespace-nowrap text-xs uppercase tracking-wide w-[12%]">Agent</th>
-      <th className="px-3 py-3 font-semibold text-[#1a1a1a] whitespace-nowrap text-xs uppercase tracking-wide w-[10%]">TC</th>
-      <th className="px-3 py-3 font-semibold text-[#1a1a1a] whitespace-nowrap text-xs uppercase tracking-wide w-[12%]">Contact</th>
-      <th className="px-3 py-3 font-semibold text-[#1a1a1a] whitespace-nowrap text-xs uppercase tracking-wide w-[11%]">Lead Source</th>
-      <th className="px-3 py-3 font-semibold text-[#1a1a1a] truncate overflow-hidden text-xs uppercase tracking-wide w-[9%]">Evaluation</th>
-      <th className="px-3 py-3 font-semibold text-[#1a1a1a] truncate overflow-hidden text-xs uppercase tracking-wide w-[9%]">Marketing</th>
+      {HEADER_COLUMNS.map(col => (
+        <th key={col.key} className={`px-3 py-3 font-semibold text-[#1a1a1a] whitespace-nowrap text-xs uppercase tracking-wide ${col.width}`}>
+          {col.label}
+          <SortArrows column={col.key} sortColumn={sortColumn} sortDirection={sortDirection} onSort={onSort} />
+        </th>
+      ))}
     </tr>
   )
 }
