@@ -840,12 +840,16 @@ export function EvaluationForm({ evaluationId, readOnly = false, calendarEventLi
       contacts.length > 0 && scheduledAt && agentId && tcId
     )
 
+    // Status is deliberately left OUT of the shared payload below -- the
+    // `status` state only reflects whatever was true at the moment this
+    // form last loaded, and blindly re-sending it on every save would
+    // silently overwrite any status change the pipeline gates (or anyone
+    // else) made server-side in the meantime, since a save here doesn't
+    // re-fetch first. Closing is the one deliberate exception: recording
+    // an Evaluation Outcome always sets status explicitly, right where
+    // each path below applies the rest of the payload.
     const payload = {
       property_id:                      selectedProperty.id,
-      // Status is never set directly by the form -- it's either whatever
-      // the pipeline gates have already derived it to be, or "closed" the
-      // moment an Evaluation Outcome gets recorded.
-      status:                           evaluationOutcome ? 'closed' : status,
       reason_lost:                      reasonLostLabel,
       sellers_agent_user_id:            agentId || null,
       transaction_coordinator_user_id:  tcId || null,
@@ -869,7 +873,8 @@ export function EvaluationForm({ evaluationId, readOnly = false, calendarEventLi
     const resolveTagId = (label: string) => tagOptions?.find(t => t.label === label)?.id ?? null
 
     if (evaluationId) {
-      const { error: evErr } = await supabase.from('evaluations').update(payload).eq('id', evaluationId)
+      const updatePayload = evaluationOutcome ? { ...payload, status: 'closed' } : payload
+      const { error: evErr } = await supabase.from('evaluations').update(updatePayload).eq('id', evaluationId)
       if (evErr) { setError(evErr.message); setSaving(false); return }
 
       await supabase.from('evaluation_contacts').delete().eq('evaluation_id', evaluationId)
@@ -930,7 +935,8 @@ export function EvaluationForm({ evaluationId, readOnly = false, calendarEventLi
 
     const { data: ev, error: evErr } = await supabase.from('evaluations').insert({
       ...payload,
-      captured_by_user_id: userId,
+      status:               evaluationOutcome ? 'closed' : 'new',
+      captured_by_user_id:  userId,
     }).select('id').single()
 
     if (evErr || !ev) { setError(evErr?.message ?? 'Failed to save.'); setSaving(false); return }
