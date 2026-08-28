@@ -3,9 +3,9 @@
   "nodes": [
     {
       "parameters": {
-        "content": "## Before this will work\n1. Create a **Supabase** credential (Host = your project URL, Service Role Secret = your service_role key) and attach it to both Supabase HTTP Request nodes.\n2. Create an **HTTP Header Auth** credential named e.g. \"Meta WhatsApp Access Token\" -- Name: `Authorization`, Value: `Bearer YOUR_LONG_LIVED_TOKEN`. Attach it to the \"Send WhatsApp Template\" node.\n3. Open the CONFIG node below and replace the two placeholder values with your real Supabase URL and WhatsApp Phone Number ID.\n4. Run once manually (the Manual Trigger) before turning on the schedule, to confirm it all works end to end.",
-        "height": 400,
-        "width": 380
+        "content": "## Before this will work\n1. Create a **Supabase** credential (Host = your project URL, Service Role Secret = your service_role key) and attach it to both Supabase HTTP Request nodes.\n2. Create an **HTTP Header Auth** credential named e.g. \"Meta WhatsApp Access Token\" -- Name: `Authorization`, Value: `Bearer YOUR_LONG_LIVED_TOKEN`. Attach it to the \"Send WhatsApp Template\" node.\n3. Open the CONFIG node below and replace the two placeholder values with your real Supabase URL and WhatsApp Phone Number ID.\n4. Run once manually (the Manual Trigger) before turning on the schedule, to confirm it all works end to end.\n\n## Why \"Compute Reminder Window\" looks the way it does\nThe Shelley Residential app stores `scheduled_at` as the literal Johannesburg wall-clock digits with a UTC label attached (e.g. \"16:00 SAST\" is stored as `...T16:00:00+00:00`, NOT converted to real UTC) -- deliberate, so the app never has to do timezone math anywhere. `windowStart`/`windowEnd` are built to match that same convention (SAST digits, relabeled as UTC via a trailing \"Z\") rather than a truthful offset -- otherwise every comparison against `scheduled_at` would be off by exactly the SAST/UTC gap (2 hours). Don't \"fix\" this to use a real offset; it would break the comparison against real data.",
+        "height": 460,
+        "width": 420
       },
       "id": "sticky-setup",
       "name": "Setup Notes",
@@ -74,13 +74,13 @@
             {
               "id": "win-1",
               "name": "windowStart",
-              "value": "={{ $now.plus({ minutes: 110 }).toISO() }}",
+              "value": "={{ $now.setZone('Africa/Johannesburg').plus({ minutes: 110 }).toFormat(\"yyyy-MM-dd'T'HH:mm:ss\") + 'Z' }}",
               "type": "string"
             },
             {
               "id": "win-2",
               "name": "windowEnd",
-              "value": "={{ $now.plus({ minutes: 125 }).toISO() }}",
+              "value": "={{ $now.setZone('Africa/Johannesburg').plus({ minutes: 125 }).toFormat(\"yyyy-MM-dd'T'HH:mm:ss\") + 'Z' }}",
               "type": "string"
             }
           ]
