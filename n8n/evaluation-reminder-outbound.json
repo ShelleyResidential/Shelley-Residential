@@ -69,12 +69,29 @@
     },
     {
       "parameters": {
-        "jsCode": "// Window sized to comfortably straddle the 15-minute poll interval --\n// wide enough that no evaluation ever falls through the gap between two\n// consecutive runs, without so wide a window that reminder_sent alone\n// isn't enough to prevent a duplicate send.\nconst now = Date.now();\nconst windowStart = new Date(now + 110 * 60 * 1000).toISOString(); // now + 1h50m\nconst windowEnd   = new Date(now + 125 * 60 * 1000).toISOString(); // now + 2h05m\n\nreturn [{\n  json: {\n    ...items[0].json,\n    windowStart,\n    windowEnd,\n  },\n}];"
+        "assignments": {
+          "assignments": [
+            {
+              "id": "win-1",
+              "name": "windowStart",
+              "value": "={{ $now.plus({ minutes: 110 }).toISO() }}",
+              "type": "string"
+            },
+            {
+              "id": "win-2",
+              "name": "windowEnd",
+              "value": "={{ $now.plus({ minutes: 125 }).toISO() }}",
+              "type": "string"
+            }
+          ]
+        },
+        "includeOtherFields": true,
+        "options": {}
       },
       "id": "compute-window",
       "name": "Compute Reminder Window",
-      "type": "n8n-nodes-base.code",
-      "typeVersion": 2,
+      "type": "n8n-nodes-base.set",
+      "typeVersion": 3.4,
       "position": [-20, 240]
     },
     {
@@ -90,8 +107,7 @@
               "value": "id,scheduled_at,property_id,sellers_agent_user_id,properties(street_number,street_name,suburb,city),agent:profiles!sellers_agent_user_id(full_name,phone_number),evaluation_contacts(is_primary,tag_option_id,contacts(first_name,last_name,phone_number),picklist_options:tag_option_id(label))"
             },
             { "name": "reminder_sent", "value": "eq.false" },
-            { "name": "scheduled_at", "value": "=gte.{{ $json.windowStart }}" },
-            { "name": "scheduled_at", "value": "=lte.{{ $json.windowEnd }}" },
+            { "name": "and", "value": "=(scheduled_at.gte.{{ $json.windowStart }},scheduled_at.lte.{{ $json.windowEnd }})" },
             { "name": "order", "value": "scheduled_at.asc" }
           ]
         },
@@ -108,13 +124,69 @@
     },
     {
       "parameters": {
-        "jsCode": "// One item per due evaluation, with every WhatsApp template variable\n// pre-filled -- or a skip_reason if something needed to send it is\n// missing (no seller, no seller phone, no agent phone). Nothing here\n// ever silently drops an evaluation: it either sends or is explicitly\n// logged as skipped by the IF node right after this.\nconst results = [];\n\nfor (const item of items) {\n  const ev = item.json;\n  const contacts = ev.evaluation_contacts || [];\n\n  // Same fallback order the app itself uses: Seller-tagged contact,\n  // else whichever contact is marked primary, else the first one.\n  const sellerLink = contacts.find(c => c.picklist_options && c.picklist_options.label === 'Seller')\n    || contacts.find(c => c.is_primary)\n    || contacts[0];\n  const seller = sellerLink ? sellerLink.contacts : null;\n\n  const agent = ev.agent;\n  const prop  = ev.properties;\n  const address = [prop && prop.street_number, prop && prop.street_name, prop && prop.suburb, prop && prop.city]\n    .filter(Boolean).join(', ');\n\n  const sellerName  = seller ? [seller.first_name, seller.last_name].filter(Boolean).join(' ').trim() : null;\n  const sellerPhone = seller ? seller.phone_number : null;\n  const agentName   = agent && agent.full_name ? agent.full_name : null;\n  const agentPhone  = agent ? agent.phone_number : null;\n\n  const time = new Date(ev.scheduled_at).toLocaleString('en-ZA', {\n    timeZone: 'Africa/Johannesburg',\n    weekday: 'short', day: 'numeric', month: 'short',\n    hour: '2-digit', minute: '2-digit', hour12: false,\n  });\n\n  let skipReason = null;\n  if (!seller) skipReason = 'No contact attached to this evaluation';\n  else if (!sellerName) skipReason = 'Seller contact has no name on file';\n  else if (!sellerPhone) skipReason = 'Seller contact has no phone number on file';\n  else if (!agentPhone) skipReason = 'Assigned agent has no phone number on file';\n  else if (!agentName) skipReason = 'Evaluation has no assigned agent';\n\n  results.push({\n    json: {\n      evaluation_id: ev.id,\n      seller_name: sellerName,\n      agent_name: agentName,\n      evaluation_time: time,\n      property_address: address || 'the property',\n      agent_phone_display: agentPhone,\n      seller_phone_e164: sellerPhone,\n      seller_phone_dial: sellerPhone ? sellerPhone.replace('+', '') : null,\n      skip_reason: skipReason,\n    },\n  });\n}\n\nreturn results;"
+        "assignments": {
+          "assignments": [
+            {
+              "id": "seller-1",
+              "name": "seller_first_name",
+              "value": "={{ ($json.evaluation_contacts.find(c => c.picklist_options?.label === 'Seller') || $json.evaluation_contacts.find(c => c.is_primary) || $json.evaluation_contacts[0])?.contacts?.first_name || null }}",
+              "type": "string"
+            },
+            {
+              "id": "seller-2",
+              "name": "seller_last_name",
+              "value": "={{ ($json.evaluation_contacts.find(c => c.picklist_options?.label === 'Seller') || $json.evaluation_contacts.find(c => c.is_primary) || $json.evaluation_contacts[0])?.contacts?.last_name || null }}",
+              "type": "string"
+            },
+            {
+              "id": "seller-3",
+              "name": "seller_phone",
+              "value": "={{ ($json.evaluation_contacts.find(c => c.picklist_options?.label === 'Seller') || $json.evaluation_contacts.find(c => c.is_primary) || $json.evaluation_contacts[0])?.contacts?.phone_number || null }}",
+              "type": "string"
+            }
+          ]
+        },
+        "includeOtherFields": true,
+        "options": {}
+      },
+      "id": "extract-seller",
+      "name": "Extract Seller",
+      "type": "n8n-nodes-base.set",
+      "typeVersion": 3.4,
+      "position": [340, 240]
+    },
+    {
+      "parameters": {
+        "assignments": {
+          "assignments": [
+            { "id": "bsl-1", "name": "evaluation_id", "value": "={{ $json.id }}", "type": "string" },
+            { "id": "bsl-2", "name": "seller_name", "value": "={{ [$json.seller_first_name, $json.seller_last_name].filter(v => v).join(' ') || null }}", "type": "string" },
+            { "id": "bsl-3", "name": "agent_name", "value": "={{ $json.agent?.full_name || null }}", "type": "string" },
+            {
+              "id": "bsl-4",
+              "name": "evaluation_time",
+              "value": "={{ (() => { const d = $json.scheduled_at; const months = ['Jan','Feb','Mar','Apr','May','Jun','Jul','Aug','Sep','Oct','Nov','Dec']; const mo = months[parseInt(d.slice(5,7),10)-1]; const day = parseInt(d.slice(8,10),10); return day + ' ' + mo + ' at ' + d.slice(11,16); })() }}",
+              "type": "string"
+            },
+            { "id": "bsl-5", "name": "property_address", "value": "={{ [$json.properties?.street_number, $json.properties?.street_name, $json.properties?.suburb, $json.properties?.city].filter(v => v).join(', ') || 'the property' }}", "type": "string" },
+            { "id": "bsl-6", "name": "agent_phone_display", "value": "={{ $json.agent?.phone_number || null }}", "type": "string" },
+            { "id": "bsl-7", "name": "seller_phone_e164", "value": "={{ $json.seller_phone || null }}", "type": "string" },
+            { "id": "bsl-8", "name": "seller_phone_dial", "value": "={{ $json.seller_phone ? $json.seller_phone.replace('+', '') : null }}", "type": "string" },
+            {
+              "id": "bsl-9",
+              "name": "skip_reason",
+              "value": "={{ !$json.seller_phone ? 'No seller phone number on file' : (!$json.agent?.phone_number) ? 'Assigned agent has no phone number on file' : (!$json.agent?.full_name) ? 'Evaluation has no assigned agent' : (!$json.seller_first_name && !$json.seller_last_name) ? 'Seller contact has no name on file' : null }}",
+              "type": "string"
+            }
+          ]
+        },
+        "options": {}
       },
       "id": "build-send-list",
       "name": "Build Send List",
-      "type": "n8n-nodes-base.code",
-      "typeVersion": 2,
-      "position": [420, 240]
+      "type": "n8n-nodes-base.set",
+      "typeVersion": 3.4,
+      "position": [560, 240]
     },
     {
       "parameters": {
@@ -241,6 +313,9 @@
       "main": [[{ "node": "Fetch Due Evaluations", "type": "main", "index": 0 }]]
     },
     "Fetch Due Evaluations": {
+      "main": [[{ "node": "Extract Seller", "type": "main", "index": 0 }]]
+    },
+    "Extract Seller": {
       "main": [[{ "node": "Build Send List", "type": "main", "index": 0 }]]
     },
     "Build Send List": {
