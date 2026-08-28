@@ -3,9 +3,9 @@
   "nodes": [
     {
       "parameters": {
-        "content": "## Before this will work\n1. Create a **Supabase** credential (same one as the outbound workflow) and attach it to both Supabase HTTP Request nodes.\n2. Create an **HTTP Header Auth** credential for Meta (same one as outbound) and attach it to \"Send WhatsApp Reply\".\n3. Activate this workflow once, then copy the **Production URL** shown on the \"Receive Inbound Message\" webhook node -- that's what goes into Meta's App Dashboard > WhatsApp > Configuration > Callback URL.\n4. Pick your own Verify Token (any random string) and put the EXACT SAME value in two places: the \"Verify Token Matches?\" IF node below, AND Meta's Callback URL config field.\n5. Open the CONFIG node and fill in your real Supabase URL, WhatsApp Phone Number ID, and general office number.\n6. Use \"Test Workflow\" (bottom of canvas) to send yourself a test payload via the Manual Trigger before relying on real Meta traffic.",
-        "height": 460,
-        "width": 400
+        "content": "## Before this will work\n1. Create a **Supabase** credential (same one as the outbound workflow) and attach it to both Supabase HTTP Request nodes.\n2. Create an **HTTP Header Auth** credential for Meta (same one as outbound) and attach it to \"Send WhatsApp Reply\".\n3. Activate this workflow once, then copy the **Production URL** shown on the \"Receive Inbound Message\" webhook node -- that's what goes into Meta's App Dashboard > WhatsApp > Configuration > Callback URL.\n4. Pick your own Verify Token (any random string) and put the EXACT SAME value in two places: the \"Verify Token Matches?\" IF node below, AND Meta's Callback URL config field.\n5. Open the CONFIG node and fill in your real Supabase URL, WhatsApp Phone Number ID, and general office number.\n6. Use \"Test Workflow\" (bottom of canvas) to send yourself a test payload via the Manual Trigger before relying on real Meta traffic.\n\n## Why there are no Code nodes\nThis workflow originally used 3 Code nodes (Extract & Filter Message, Parse Contact Result, Pick Most Recent Evaluation). They're rebuilt here as Set/Edit Fields nodes instead, because Code nodes run through n8n Cloud's separate sandboxed \"task runner\" process, which failed 100% of the time on this account during testing of the outbound workflow. Set nodes use a different, non-sandboxed expression evaluator and aren't affected. \"Extract & Filter Message\" can no longer return zero items the way Code could (Set always outputs exactly one item), so a new \"Message Qualifies?\" IF node does that filtering instead -- non-text messages and delivery receipts route to \"Ignored (non-text or receipt)\" and stop there, same net effect as before.",
+        "height": 560,
+        "width": 440
       },
       "id": "sticky-setup-inbound",
       "name": "Setup Notes",
@@ -109,13 +109,82 @@
     },
     {
       "parameters": {
-        "jsCode": "// Meta sends the SAME webhook \"messages\" field for both real inbound\n// messages and delivery/read receipts -- receipts populate `statuses`\n// instead of `messages`, so requiring a non-empty messages array of\n// type \"text\" filters out both receipts and non-text message types\n// (images, locations, etc) in one check. Returns no items at all for\n// anything that doesn't qualify -- the rest of the workflow simply\n// doesn't run for that invocation.\nconst first = items[0].json;\n// The Manual Trigger has no real payload -- fall back to a sample\n// message so this can be test-run without a live Meta webhook.\nconst body = (first && first.body) ? first.body : {\n  entry: [{ changes: [{ value: {\n    messages: [{ from: '27821234567', type: 'text', text: { body: '(test message from Manual Trigger)' } }],\n    contacts: [{ profile: { name: 'Test User' } }],\n  } }] }],\n};\n\nconst entry  = (body.entry || [])[0];\nconst change = entry && (entry.changes || [])[0];\nconst value  = change && change.value;\n\nif (!value || !value.messages || value.messages.length === 0) {\n  return []; // receipt/status event, or nothing usable in the payload\n}\n\nconst message = value.messages[0];\nif (message.type !== 'text') {\n  return []; // out of scope for this redirect-only flow\n}\n\nreturn [{\n  json: {\n    sender_wa_id: message.from, // no leading '+' from Meta\n    sender_phone_e164: '+' + message.from,\n    message_text: message.text.body,\n    sender_profile_name: (value.contacts && value.contacts[0] && value.contacts[0].profile && value.contacts[0].profile.name) || null,\n  },\n}];"
+        "assignments": {
+          "assignments": [
+            {
+              "id": "extract-1",
+              "name": "qualifies",
+              "value": "={{ (() => { const body = $json.body; const value = body ? (body.entry?.[0]?.changes?.[0]?.value) : { messages: [{ from: '27821234567', type: 'text', text: { body: '(test message from Manual Trigger)' } }], contacts: [{ profile: { name: 'Test User' } }] }; if (!value || !value.messages || value.messages.length === 0) return false; return value.messages[0].type === 'text'; })() }}",
+              "type": "boolean"
+            },
+            {
+              "id": "extract-2",
+              "name": "sender_wa_id",
+              "value": "={{ (() => { const body = $json.body; const value = body ? (body.entry?.[0]?.changes?.[0]?.value) : { messages: [{ from: '27821234567', type: 'text', text: { body: '(test message from Manual Trigger)' } }], contacts: [{ profile: { name: 'Test User' } }] }; const m = value?.messages?.[0]; return (m && m.type === 'text') ? m.from : null; })() }}",
+              "type": "string"
+            },
+            {
+              "id": "extract-3",
+              "name": "sender_phone_e164",
+              "value": "={{ (() => { const body = $json.body; const value = body ? (body.entry?.[0]?.changes?.[0]?.value) : { messages: [{ from: '27821234567', type: 'text', text: { body: '(test message from Manual Trigger)' } }], contacts: [{ profile: { name: 'Test User' } }] }; const m = value?.messages?.[0]; return (m && m.type === 'text') ? ('+' + m.from) : null; })() }}",
+              "type": "string"
+            },
+            {
+              "id": "extract-4",
+              "name": "message_text",
+              "value": "={{ (() => { const body = $json.body; const value = body ? (body.entry?.[0]?.changes?.[0]?.value) : { messages: [{ from: '27821234567', type: 'text', text: { body: '(test message from Manual Trigger)' } }], contacts: [{ profile: { name: 'Test User' } }] }; const m = value?.messages?.[0]; return (m && m.type === 'text') ? m.text.body : null; })() }}",
+              "type": "string"
+            },
+            {
+              "id": "extract-5",
+              "name": "sender_profile_name",
+              "value": "={{ (() => { const body = $json.body; const value = body ? (body.entry?.[0]?.changes?.[0]?.value) : { messages: [{ from: '27821234567', type: 'text', text: { body: '(test message from Manual Trigger)' } }], contacts: [{ profile: { name: 'Test User' } }] }; return (value?.contacts?.[0]?.profile?.name) || null; })() }}",
+              "type": "string"
+            }
+          ]
+        },
+        "includeOtherFields": false,
+        "options": {}
       },
       "id": "extract-message",
       "name": "Extract & Filter Message",
-      "type": "n8n-nodes-base.code",
-      "typeVersion": 2,
+      "type": "n8n-nodes-base.set",
+      "typeVersion": 3.4,
       "position": [-440, 560]
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "options": { "caseSensitive": true, "leftValue": "", "typeValidation": "loose" },
+          "conditions": [
+            {
+              "id": "cond-qualifies",
+              "leftValue": "={{ $json.qualifies }}",
+              "rightValue": true,
+              "operator": { "type": "boolean", "operation": "equals" }
+            }
+          ],
+          "combinator": "and"
+        },
+        "options": {}
+      },
+      "id": "if-qualifies",
+      "name": "Message Qualifies?",
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2.2,
+      "position": [-220, 560]
+    },
+    {
+      "parameters": {
+        "assignments": { "assignments": [] },
+        "includeOtherFields": true,
+        "options": {}
+      },
+      "id": "ignored-message",
+      "name": "Ignored (non-text or receipt)",
+      "type": "n8n-nodes-base.set",
+      "typeVersion": 3.4,
+      "position": [-220, 760]
     },
     {
       "parameters": {
@@ -162,12 +231,35 @@
     },
     {
       "parameters": {
-        "jsCode": "const raw = $input.all();\n// Supabase returns a JSON array -- normally kept as one item whose\n// .json IS that array; handled defensively either way.\nconst rows = Array.isArray(raw[0]?.json) ? raw[0].json : raw.map(i => i.json).filter(r => r && r.id);\nconst contact = rows[0] || null;\nreturn [{ json: { found: !!contact, contact_id: contact ? contact.id : null, contact_first_name: contact ? contact.first_name : null } }];"
+        "assignments": {
+          "assignments": [
+            {
+              "id": "parse-contact-1",
+              "name": "found",
+              "value": "={{ (() => { const raw = $input.all(); const rows = Array.isArray(raw[0]?.json) ? raw[0].json : raw.map(i => i.json).filter(r => r && r.id); return rows.length > 0; })() }}",
+              "type": "boolean"
+            },
+            {
+              "id": "parse-contact-2",
+              "name": "contact_id",
+              "value": "={{ (() => { const raw = $input.all(); const rows = Array.isArray(raw[0]?.json) ? raw[0].json : raw.map(i => i.json).filter(r => r && r.id); const contact = rows[0] || null; return contact ? contact.id : null; })() }}",
+              "type": "string"
+            },
+            {
+              "id": "parse-contact-3",
+              "name": "contact_first_name",
+              "value": "={{ (() => { const raw = $input.all(); const rows = Array.isArray(raw[0]?.json) ? raw[0].json : raw.map(i => i.json).filter(r => r && r.id); const contact = rows[0] || null; return contact ? contact.first_name : null; })() }}",
+              "type": "string"
+            }
+          ]
+        },
+        "includeOtherFields": false,
+        "options": {}
       },
       "id": "parse-contact",
       "name": "Parse Contact Result",
-      "type": "n8n-nodes-base.code",
-      "typeVersion": 2,
+      "type": "n8n-nodes-base.set",
+      "typeVersion": 3.4,
       "position": [240, 560]
     },
     {
@@ -217,12 +309,41 @@
     },
     {
       "parameters": {
-        "jsCode": "const raw = $input.all();\nconst rows = Array.isArray(raw[0]?.json) ? raw[0].json : raw.map(i => i.json);\n\n// Each row is { evaluations: {...} | null } -- PostgREST can't sort\n// evaluation_contacts by its embedded evaluation's column server-side\n// (ordering an embedded/referenced table only reorders items within\n// that nested relation, never the parent rows), so the \"most recent\"\n// pick happens here instead.\nconst evaluations = rows.map(r => r.evaluations).filter(Boolean);\n\nif (evaluations.length === 0) {\n  return [{ json: { found: false } }];\n}\n\nevaluations.sort((a, b) => {\n  const at = a.scheduled_at || a.date_captured;\n  const bt = b.scheduled_at || b.date_captured;\n  return new Date(bt) - new Date(at);\n});\n\nconst ev = evaluations[0];\nconst agent = ev.agent;\nconst found = !!(agent && agent.full_name && agent.phone_number);\n\nreturn [{\n  json: {\n    found,\n    evaluation_id: ev.id,\n    agent_name: agent ? agent.full_name : null,\n    agent_phone: agent ? agent.phone_number : null,\n  },\n}];"
+        "assignments": {
+          "assignments": [
+            {
+              "id": "pick-eval-1",
+              "name": "found",
+              "value": "={{ (() => { const raw = $input.all(); const rows = Array.isArray(raw[0]?.json) ? raw[0].json : raw.map(i => i.json); const evaluations = rows.map(r => r.evaluations).filter(Boolean); if (evaluations.length === 0) return false; evaluations.sort((a, b) => { const at = a.scheduled_at || a.date_captured; const bt = b.scheduled_at || b.date_captured; return new Date(bt) - new Date(at); }); const agent = evaluations[0].agent; return !!(agent && agent.full_name && agent.phone_number); })() }}",
+              "type": "boolean"
+            },
+            {
+              "id": "pick-eval-2",
+              "name": "evaluation_id",
+              "value": "={{ (() => { const raw = $input.all(); const rows = Array.isArray(raw[0]?.json) ? raw[0].json : raw.map(i => i.json); const evaluations = rows.map(r => r.evaluations).filter(Boolean); if (evaluations.length === 0) return null; evaluations.sort((a, b) => { const at = a.scheduled_at || a.date_captured; const bt = b.scheduled_at || b.date_captured; return new Date(bt) - new Date(at); }); return evaluations[0].id; })() }}",
+              "type": "string"
+            },
+            {
+              "id": "pick-eval-3",
+              "name": "agent_name",
+              "value": "={{ (() => { const raw = $input.all(); const rows = Array.isArray(raw[0]?.json) ? raw[0].json : raw.map(i => i.json); const evaluations = rows.map(r => r.evaluations).filter(Boolean); if (evaluations.length === 0) return null; evaluations.sort((a, b) => { const at = a.scheduled_at || a.date_captured; const bt = b.scheduled_at || b.date_captured; return new Date(bt) - new Date(at); }); return evaluations[0].agent?.full_name || null; })() }}",
+              "type": "string"
+            },
+            {
+              "id": "pick-eval-4",
+              "name": "agent_phone",
+              "value": "={{ (() => { const raw = $input.all(); const rows = Array.isArray(raw[0]?.json) ? raw[0].json : raw.map(i => i.json); const evaluations = rows.map(r => r.evaluations).filter(Boolean); if (evaluations.length === 0) return null; evaluations.sort((a, b) => { const at = a.scheduled_at || a.date_captured; const bt = b.scheduled_at || b.date_captured; return new Date(bt) - new Date(at); }); return evaluations[0].agent?.phone_number || null; })() }}",
+              "type": "string"
+            }
+          ]
+        },
+        "includeOtherFields": false,
+        "options": {}
       },
       "id": "pick-recent-evaluation",
       "name": "Pick Most Recent Evaluation",
-      "type": "n8n-nodes-base.code",
-      "typeVersion": 2,
+      "type": "n8n-nodes-base.set",
+      "typeVersion": 3.4,
       "position": [900, 460]
     },
     {
@@ -359,7 +480,13 @@
       "main": [[{ "node": "Extract & Filter Message", "type": "main", "index": 0 }]]
     },
     "Extract & Filter Message": {
-      "main": [[{ "node": "CONFIG", "type": "main", "index": 0 }]]
+      "main": [[{ "node": "Message Qualifies?", "type": "main", "index": 0 }]]
+    },
+    "Message Qualifies?": {
+      "main": [
+        [{ "node": "CONFIG", "type": "main", "index": 0 }],
+        [{ "node": "Ignored (non-text or receipt)", "type": "main", "index": 0 }]
+      ]
     },
     "CONFIG": {
       "main": [[{ "node": "Look Up Contact By Phone", "type": "main", "index": 0 }]]
