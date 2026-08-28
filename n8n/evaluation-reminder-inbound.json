@@ -114,31 +114,31 @@
             {
               "id": "extract-1",
               "name": "qualifies",
-              "value": "={{ (() => { const body = $json.body; const value = body ? (body.entry?.[0]?.changes?.[0]?.value) : { messages: [{ from: '27821234567', type: 'text', text: { body: '(test message from Manual Trigger)' } }], contacts: [{ profile: { name: 'Test User' } }] }; if (!value || !value.messages || value.messages.length === 0) return false; return value.messages[0].type === 'text'; })() }}",
+              "value": "={{ (() => { const body = $json.body; const value = body ? (body.entry?.[0]?.changes?.[0]?.value) : { messages: [{ from: '27640736726', type: 'text', text: { body: '(test message from Manual Trigger)' } }], contacts: [{ profile: { name: 'Test User' } }] }; if (!value || !value.messages || value.messages.length === 0) return false; return value.messages[0].type === 'text'; })() }}",
               "type": "boolean"
             },
             {
               "id": "extract-2",
               "name": "sender_wa_id",
-              "value": "={{ (() => { const body = $json.body; const value = body ? (body.entry?.[0]?.changes?.[0]?.value) : { messages: [{ from: '27821234567', type: 'text', text: { body: '(test message from Manual Trigger)' } }], contacts: [{ profile: { name: 'Test User' } }] }; const m = value?.messages?.[0]; return (m && m.type === 'text') ? m.from : null; })() }}",
+              "value": "={{ (() => { const body = $json.body; const value = body ? (body.entry?.[0]?.changes?.[0]?.value) : { messages: [{ from: '27640736726', type: 'text', text: { body: '(test message from Manual Trigger)' } }], contacts: [{ profile: { name: 'Test User' } }] }; const m = value?.messages?.[0]; return (m && m.type === 'text') ? m.from : null; })() }}",
               "type": "string"
             },
             {
               "id": "extract-3",
               "name": "sender_phone_e164",
-              "value": "={{ (() => { const body = $json.body; const value = body ? (body.entry?.[0]?.changes?.[0]?.value) : { messages: [{ from: '27821234567', type: 'text', text: { body: '(test message from Manual Trigger)' } }], contacts: [{ profile: { name: 'Test User' } }] }; const m = value?.messages?.[0]; return (m && m.type === 'text') ? ('+' + m.from) : null; })() }}",
+              "value": "={{ (() => { const body = $json.body; const value = body ? (body.entry?.[0]?.changes?.[0]?.value) : { messages: [{ from: '27640736726', type: 'text', text: { body: '(test message from Manual Trigger)' } }], contacts: [{ profile: { name: 'Test User' } }] }; const m = value?.messages?.[0]; return (m && m.type === 'text') ? ('+' + m.from) : null; })() }}",
               "type": "string"
             },
             {
               "id": "extract-4",
               "name": "message_text",
-              "value": "={{ (() => { const body = $json.body; const value = body ? (body.entry?.[0]?.changes?.[0]?.value) : { messages: [{ from: '27821234567', type: 'text', text: { body: '(test message from Manual Trigger)' } }], contacts: [{ profile: { name: 'Test User' } }] }; const m = value?.messages?.[0]; return (m && m.type === 'text') ? m.text.body : null; })() }}",
+              "value": "={{ (() => { const body = $json.body; const value = body ? (body.entry?.[0]?.changes?.[0]?.value) : { messages: [{ from: '27640736726', type: 'text', text: { body: '(test message from Manual Trigger)' } }], contacts: [{ profile: { name: 'Test User' } }] }; const m = value?.messages?.[0]; return (m && m.type === 'text') ? m.text.body : null; })() }}",
               "type": "string"
             },
             {
               "id": "extract-5",
               "name": "sender_profile_name",
-              "value": "={{ (() => { const body = $json.body; const value = body ? (body.entry?.[0]?.changes?.[0]?.value) : { messages: [{ from: '27821234567', type: 'text', text: { body: '(test message from Manual Trigger)' } }], contacts: [{ profile: { name: 'Test User' } }] }; return (value?.contacts?.[0]?.profile?.name) || null; })() }}",
+              "value": "={{ (() => { const body = $json.body; const value = body ? (body.entry?.[0]?.changes?.[0]?.value) : { messages: [{ from: '27640736726', type: 'text', text: { body: '(test message from Manual Trigger)' } }], contacts: [{ profile: { name: 'Test User' } }] }; return (value?.contacts?.[0]?.profile?.name) || null; })() }}",
               "type": "string"
             }
           ]
