@@ -1169,13 +1169,13 @@ function InspectionTab({ evaluationId, userDesignation, onSaved }: { evaluationI
       )}
 
       <div className="flex gap-3">
-        <button type="button" onClick={handleCancel} disabled={saving}
-          className={`${btn.secondary} flex-1 py-4 disabled:opacity-40 disabled:cursor-not-allowed`}>
-          Cancel
-        </button>
         <button onClick={handleSave} disabled={saving || !canActOnRole(userDesignation, 'agent')}
           className={`${btn.primary} flex-1 py-4 disabled:opacity-40 disabled:cursor-not-allowed`}>
           {saving ? 'Saving…' : saved ? '✓ Inspection Saved' : inspectionId ? 'Update Inspection' : 'Save Inspection'}
+        </button>
+        <button type="button" onClick={handleCancel} disabled={saving}
+          className={`${btn.secondary} flex-1 py-4 disabled:opacity-40 disabled:cursor-not-allowed`}>
+          Cancel
         </button>
       </div>
     </div>
