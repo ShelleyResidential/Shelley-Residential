@@ -969,7 +969,13 @@ export function EvaluationForm({ evaluationId, readOnly = false, calendarEventLi
     }
 
     if (scheduledAt) {
-      await supabase.from('evaluations').update({ scheduled_at: scheduledAt }).eq('id', ev.id)
+      const { error: scheduleErr } = await supabase.from('evaluations').update({ scheduled_at: scheduledAt }).eq('id', ev.id)
+      // The DB enforces both "a Seller contact must exist" and "that Seller
+      // contact needs an email address" at the moment scheduled_at changes
+      // -- surface a rejection here instead of silently leaving the
+      // evaluation unscheduled with no explanation (the evaluation row
+      // itself was already created above either way).
+      if (scheduleErr) { setError(scheduleErr.message); setSaving(false); return }
     }
 
     // Seed the full pipeline task list, each stamped with its Owner Role so
