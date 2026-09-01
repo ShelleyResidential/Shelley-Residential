@@ -176,13 +176,18 @@ export async function POST(request: NextRequest) {
 
   if (sellerEmail) {
     try {
-      const agentContactLine = [agentProfile?.phone_number, agentProfile?.email].filter(Boolean).join(' | ')
       const sellerDescription = [
-        `Hi ${sellerFirstName || 'there'}, this is ${agentName || 'your agent'} confirming our property evaluation appointment.`,
-        agentProfile?.phone_number
-          ? `If you have any questions before then, please contact me directly on ${agentProfile.phone_number}.`
-          : `If you have any questions before then, please contact me directly.`,
-        agentContactLine ? `<b>Agent Contact Details</b>\n${agentContactLine}` : '',
+        `Hi ${sellerFirstName || 'there'},`,
+        `Thank you for asking us to look at your home. Whether you're ready to sell or just want to know its market value, the visit works the same either way. And we're looking forward to it.`,
+        `Nothing to do beforehand. No tidying, no paperwork. Plans, additions and compliance are ours to work through, not yours to have ready.`,
+        `So it isn't a surprise at the gate: we come as a team, usually three or four of us. Because an accurate assessment needs more than one person's opinion.`,
+        `We won't leave you with a number on the day. It would be a guess if we did. Once the comparable sales are worked through, I'll come back and talk you through the valuation with the evidence in front of you.`,
+        `If the time no longer suits, a call or a message is all it takes to move it.`,
+        `Warm regards,\n${agentName || 'Your agent'}\nShelley Residential`,
+        [
+          agentProfile?.phone_number ? `Call: ${agentProfile.phone_number}` : null,
+          agentProfile?.email ? `Email: ${agentProfile.email}` : null,
+        ].filter(Boolean).join('\n'),
       ].filter(Boolean).join('\n\n')
 
       const sellerCalEvent = await upsertCalendarEvent(
