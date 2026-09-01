@@ -653,6 +653,69 @@ function InspectionTab({ evaluationId, userDesignation, onSaved }: { evaluationI
   const [userId, setUserId]             = useState<string | null>(null)
   const [picklists, setPicklists]       = useState<Record<string, { id: string; label: string }[]>>({})
 
+  // Pulled out of the mount effect so "Cancel" can call it again to discard
+  // any unsaved edits, reverting the form back to whatever's actually saved
+  // (or the blank template, if nothing's been saved yet) -- there's no
+  // separate read-only view for this tab to fall back to like Details has.
+  const loadInspection = useCallback(async () => {
+    setLoading(true)
+    const { data } = await supabase.from('property_inspections')
+      .select('*, inspection_feature_selections(feature_key, picklist_option_id, picklist_options(label))')
+      .eq('evaluation_id', evaluationId)
+      .maybeSingle()
+
+    if (data) {
+      setInspectionId(data.id)
+      const sels = (data.inspection_feature_selections ?? []) as { feature_key: string; picklist_options: { label: string } | null }[]
+      let gc: ConditionItem[] = []
+      try { gc = data.general_condition ? JSON.parse(data.general_condition) : [] } catch { gc = [] }
+      setForm({
+        appointment_outcome:           data.appointment_outcome ?? '',
+        land_size:                     data.land_size ?? '',
+        gate_type:                     data.gate_type ?? '',
+        fencing_type:                  data.fencing_type ?? '',
+        views_present:                 data.views_present ?? null,
+        garages_quantity:              data.garages_quantity ?? 0,
+        garages_descriptor:            data.garages_descriptor ?? '',
+        carports_quantity:             data.carports_quantity ?? 0,
+        garden_present:                data.garden_present ?? null,
+        garden_selections:             sels.filter(s => s.feature_key === 'garden_description').map(s => s.picklist_options?.label ?? '').filter(Boolean),
+        patio_quantity:                data.patio_quantity ?? 0,
+        patio_selections:              sels.filter(s => s.feature_key === 'patio_description').map(s => s.picklist_options?.label ?? '').filter(Boolean),
+        pool_present:                  data.pool_present ?? null,
+        pool_condition:                data.pool_condition ?? '',
+        jacuzzi_present:               data.jacuzzi_present ?? null,
+        jacuzzi_status:                data.jacuzzi_status ?? '',
+        tennis_court_present:          data.tennis_court_present ?? null,
+        bedrooms_quantity:             data.bedrooms_quantity ?? 0,
+        bedroom_sizes:                 data.bedroom_sizes ? data.bedroom_sizes.split(',') : [],
+        bathrooms_quantity:            data.bathrooms_quantity ?? 0,
+        bathroom_conditions:           data.bathroom_conditions ? data.bathroom_conditions.split(',') : [],
+        kitchen_quantity:              data.kitchen_quantity ?? 0,
+        lounges_quantity:              data.lounges_quantity ?? 0,
+        dining_room_quantity:          data.dining_room_quantity ?? 0,
+        other_reception_quantity:      data.other_reception_quantity ?? 0,
+        study_quantity:                data.study_quantity ?? 0,
+        study_types:                   data.study_types ? data.study_types.split(',') : [],
+        domestic_quarters_quantity:    data.domestic_quarters_quantity ?? 0,
+        domestic_quarters_toilet_only: data.domestic_quarters_toilet_only ?? false,
+        flatlet_quantity:              data.flatlet_quantity ?? 0,
+        flatlet_bedroom_types:         data.flatlet_bedroom_type ? data.flatlet_bedroom_type.split(',') : [],
+        flatlet_notes:                 data.flatlet_notes ?? '',
+        scullery_laundry_present:      data.scullery_laundry_present ?? null,
+        scullery_laundry_type:         data.scullery_laundry_type ?? '',
+        security_present:              data.security_present ?? null,
+        security_features:             data.security_features ? data.security_features.split(',') : [],
+        general_condition:             gc,
+        additional_features:           data.additional_features ? data.additional_features.split(',') : [],
+      })
+    } else {
+      setInspectionId(null)
+      setForm(EMPTY_INSPECTION)
+    }
+    setLoading(false)
+  }, [evaluationId])
+
   useEffect(() => {
     supabase.auth.getUser().then(({ data }) => setUserId(data.user?.id ?? null))
 
@@ -669,60 +732,14 @@ function InspectionTab({ evaluationId, userDesignation, onSaved }: { evaluationI
         setPicklists(map)
       })
 
-    supabase.from('property_inspections')
-      .select('*, inspection_feature_selections(feature_key, picklist_option_id, picklist_options(label))')
-      .eq('evaluation_id', evaluationId)
-      .maybeSingle()
-      .then(({ data }) => {
-        if (data) {
-          setInspectionId(data.id)
-          const sels = (data.inspection_feature_selections ?? []) as { feature_key: string; picklist_options: { label: string } | null }[]
-          let gc: ConditionItem[] = []
-          try { gc = data.general_condition ? JSON.parse(data.general_condition) : [] } catch { gc = [] }
-          setForm({
-            appointment_outcome:           data.appointment_outcome ?? '',
-            land_size:                     data.land_size ?? '',
-            gate_type:                     data.gate_type ?? '',
-            fencing_type:                  data.fencing_type ?? '',
-            views_present:                 data.views_present ?? null,
-            garages_quantity:              data.garages_quantity ?? 0,
-            garages_descriptor:            data.garages_descriptor ?? '',
-            carports_quantity:             data.carports_quantity ?? 0,
-            garden_present:                data.garden_present ?? null,
-            garden_selections:             sels.filter(s => s.feature_key === 'garden_description').map(s => s.picklist_options?.label ?? '').filter(Boolean),
-            patio_quantity:                data.patio_quantity ?? 0,
-            patio_selections:              sels.filter(s => s.feature_key === 'patio_description').map(s => s.picklist_options?.label ?? '').filter(Boolean),
-            pool_present:                  data.pool_present ?? null,
-            pool_condition:                data.pool_condition ?? '',
-            jacuzzi_present:               data.jacuzzi_present ?? null,
-            jacuzzi_status:                data.jacuzzi_status ?? '',
-            tennis_court_present:          data.tennis_court_present ?? null,
-            bedrooms_quantity:             data.bedrooms_quantity ?? 0,
-            bedroom_sizes:                 data.bedroom_sizes ? data.bedroom_sizes.split(',') : [],
-            bathrooms_quantity:            data.bathrooms_quantity ?? 0,
-            bathroom_conditions:           data.bathroom_conditions ? data.bathroom_conditions.split(',') : [],
-            kitchen_quantity:              data.kitchen_quantity ?? 0,
-            lounges_quantity:              data.lounges_quantity ?? 0,
-            dining_room_quantity:          data.dining_room_quantity ?? 0,
-            other_reception_quantity:      data.other_reception_quantity ?? 0,
-            study_quantity:                data.study_quantity ?? 0,
-            study_types:                   data.study_types ? data.study_types.split(',') : [],
-            domestic_quarters_quantity:    data.domestic_quarters_quantity ?? 0,
-            domestic_quarters_toilet_only: data.domestic_quarters_toilet_only ?? false,
-            flatlet_quantity:              data.flatlet_quantity ?? 0,
-            flatlet_bedroom_types:         data.flatlet_bedroom_type ? data.flatlet_bedroom_type.split(',') : [],
-            flatlet_notes:                 data.flatlet_notes ?? '',
-            scullery_laundry_present:      data.scullery_laundry_present ?? null,
-            scullery_laundry_type:         data.scullery_laundry_type ?? '',
-            security_present:              data.security_present ?? null,
-            security_features:             data.security_features ? data.security_features.split(',') : [],
-            general_condition:             gc,
-            additional_features:           data.additional_features ? data.additional_features.split(',') : [],
-          })
-        }
-        setLoading(false)
-      })
-  }, [evaluationId])
+    loadInspection()
+  }, [evaluationId, loadInspection])
+
+  function handleCancel() {
+    setError('')
+    setSaved(false)
+    loadInspection()
+  }
 
   function set<K extends keyof InspectionForm>(field: K, value: InspectionForm[K]) {
     setForm(f => ({ ...f, [field]: value }))
@@ -1151,10 +1168,16 @@ function InspectionTab({ evaluationId, userDesignation, onSaved }: { evaluationI
         <p className="text-xs text-gray-400 text-center">Only an Agent can save the Property Inspection.</p>
       )}
 
-      <button onClick={handleSave} disabled={saving || !canActOnRole(userDesignation, 'agent')}
-        className={`${btn.primary} w-full py-4 disabled:opacity-40 disabled:cursor-not-allowed`}>
-        {saving ? 'Saving…' : saved ? '✓ Inspection Saved' : inspectionId ? 'Update Inspection' : 'Save Inspection'}
-      </button>
+      <div className="flex gap-3">
+        <button type="button" onClick={handleCancel} disabled={saving}
+          className={`${btn.secondary} flex-1 py-4 disabled:opacity-40 disabled:cursor-not-allowed`}>
+          Cancel
+        </button>
+        <button onClick={handleSave} disabled={saving || !canActOnRole(userDesignation, 'agent')}
+          className={`${btn.primary} flex-1 py-4 disabled:opacity-40 disabled:cursor-not-allowed`}>
+          {saving ? 'Saving…' : saved ? '✓ Inspection Saved' : inspectionId ? 'Update Inspection' : 'Save Inspection'}
+        </button>
+      </div>
     </div>
   )
 }
