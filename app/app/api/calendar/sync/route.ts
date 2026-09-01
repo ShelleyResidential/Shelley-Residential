@@ -176,17 +176,19 @@ export async function POST(request: NextRequest) {
 
   if (sellerEmail) {
     try {
+      const agentContactLine = [agentProfile?.phone_number, agentProfile?.email].filter(Boolean).join(' | ')
       const sellerDescription = [
         `Hi ${sellerFirstName || 'there'}, this is ${agentName || 'your agent'} confirming our property evaluation appointment.`,
         agentProfile?.phone_number
           ? `If you have any questions before then, please contact me directly on ${agentProfile.phone_number}.`
           : `If you have any questions before then, please contact me directly.`,
-      ].join('\n\n')
+        agentContactLine ? `<b>Agent Contact Details</b>\n${agentContactLine}` : '',
+      ].filter(Boolean).join('\n\n')
 
       const sellerCalEvent = await upsertCalendarEvent(
         accessToken,
         {
-          summary:     `Property Evaluation | ${title}`,
+          summary:     `Shelley Residential Evaluation | ${title}`,
           description: sellerDescription,
           location:    mapsLink ?? (mapAddress || title),
           start,
