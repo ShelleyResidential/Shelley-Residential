@@ -25,7 +25,7 @@ export async function POST(request: NextRequest) {
   const { data: ev } = await supabaseAdmin
     .from('evaluations')
     .select(`
-      scheduled_at, google_calendar_event_id,
+      scheduled_at, google_calendar_event_id, seller_google_calendar_event_id,
       motivation_for_selling_notes, selling_timeline_notes,
       lead_generated_by, lead_source_other_text, sellers_agent_user_id,
       properties (property_type, unit_number, complex_or_building_name, street_number, street_name, suburb, city, google_maps_url),
@@ -112,7 +112,7 @@ export async function POST(request: NextRequest) {
   })
 
   const { data: agentProfile } = ev.sellers_agent_user_id
-    ? await supabaseAdmin.from('profiles').select('full_name, email').eq('id', ev.sellers_agent_user_id).single()
+    ? await supabaseAdmin.from('profiles').select('full_name, email, phone_number').eq('id', ev.sellers_agent_user_id).single()
     : { data: null }
   const agentName = agentProfile?.full_name ?? agentProfile?.email ?? ''
 
@@ -158,6 +158,59 @@ export async function POST(request: NextRequest) {
     calendar_event_link:      calEvent.htmlLink,
   }).eq('id', evaluationId)
 
+  // ── Separate, client-facing invite sent directly to the seller ─────────
+  // Distinct from the internal PARTNERS_EMAIL event above: different
+  // (shorter, external-safe) description with none of the internal notes
+  // -- motivation for selling, lead source, other contacts -- and its own
+  // event id/link so updates don't clobber the internal invite or vice
+  // versa. Best-effort: a missing/invalid seller email should never block
+  // scheduling (the internal invite above already gates the "Scheduled"
+  // step), so failures here are swallowed and reported back, not thrown.
+  const seller = contactRows.find(row => row.picklist_options?.label === 'Seller')
+    ?? contactRows.find(row => row.is_primary)
+    ?? contactRows[0]
+  const sellerEmail = seller?.contacts?.email_address ?? null
+  const sellerFirstName = seller?.contacts?.first_name ?? ''
+
+  let sellerInvite: { ok: boolean; skipped?: string; error?: string } = { ok: false, skipped: 'no_seller_email' }
+
+  if (sellerEmail) {
+    try {
+      const sellerDescription = [
+        `Hi ${sellerFirstName || 'there'}, this is ${agentName || 'your agent'} confirming our property evaluation appointment.`,
+        agentProfile?.phone_number
+          ? `If you have any questions before then, please contact me directly on ${agentProfile.phone_number}.`
+          : `If you have any questions before then, please contact me directly.`,
+      ].join('\n\n')
+
+      const sellerCalEvent = await upsertCalendarEvent(
+        accessToken,
+        {
+          summary:     `Property Evaluation | ${title}`,
+          description: sellerDescription,
+          location:    mapsLink ?? (mapAddress || title),
+          start,
+          end,
+          attendees: [sellerEmail],
+        },
+        (ev as Record<string, unknown>).seller_google_calendar_event_id as string | null,
+      )
+
+      if (sellerCalEvent.error) {
+        sellerInvite = { ok: false, error: sellerCalEvent.error.message }
+      } else {
+        await supabaseAdmin.from('evaluations').update({
+          seller_google_calendar_event_id: sellerCalEvent.id,
+          seller_calendar_event_link:      sellerCalEvent.htmlLink,
+        }).eq('id', evaluationId)
+        sellerInvite = { ok: true }
+      }
+    } catch (err) {
+      console.error('Failed to send seller calendar invite:', err)
+      sellerInvite = { ok: false, error: err instanceof Error ? err.message : 'Unknown error' }
+    }
+  }
+
   // The "Scheduled" status only fires once the calendar event has actually
   // been sent -- never override a manually-chosen or already-progressed
   // status, so this only ever promotes from 'new'.
@@ -193,5 +246,5 @@ export async function POST(request: NextRequest) {
     }
   }
 
-  return NextResponse.json({ link: calEvent.htmlLink, eventId: calEvent.id })
+  return NextResponse.json({ link: calEvent.htmlLink, eventId: calEvent.id, sellerInvite })
 }
