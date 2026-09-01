@@ -260,7 +260,8 @@
       "name": "Parse Contact Result",
       "type": "n8n-nodes-base.set",
       "typeVersion": 3.4,
-      "position": [240, 560]
+      "position": [240, 560],
+      "executeOnce": true
     },
     {
       "parameters": {
@@ -344,7 +345,8 @@
       "name": "Pick Most Recent Evaluation",
       "type": "n8n-nodes-base.set",
       "typeVersion": 3.4,
-      "position": [900, 460]
+      "position": [900, 460],
+      "executeOnce": true
     },
     {
       "parameters": {
