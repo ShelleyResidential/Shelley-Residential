@@ -765,7 +765,11 @@ export function EvaluationForm({ evaluationId, readOnly = false, calendarEventLi
 
   // ── Contacts ─────────────────────────────────────────────
   function addContact(contact_id: string, contact_name: string, phone_number: string | null, email_address: string | null) {
-    setContacts(prev => [...prev, { contact_id, contact_name, tag_option_id: '', phone_number, email_address }])
+    // Most contacts added to an evaluation are the seller -- default the tag
+    // to "Seller" so the common case needs no extra click, while still
+    // letting the agent pick a different tag (or clear it) from the
+    // dropdown when it's actually an attorney, managing agent, etc.
+    setContacts(prev => [...prev, { contact_id, contact_name, tag_option_id: 'Seller', phone_number, email_address }])
   }
 
   function removeContact(idx: number) {
