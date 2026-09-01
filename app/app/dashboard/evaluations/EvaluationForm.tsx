@@ -1211,16 +1211,25 @@ export function EvaluationForm({ evaluationId, readOnly = false, calendarEventLi
           </div>
         ) : (
           <div key={i} className="flex items-center gap-3 mb-2">
-            <div className="flex-1 px-4 py-2.5 rounded-lg border border-gray-200 bg-gray-50 text-sm text-[#1a1a1a] flex items-center gap-2 flex-wrap">
-              {i === 0 && (
-                <span className="text-xs bg-[#1a1a1a] text-white rounded-full px-2 py-0.5 flex-shrink-0">Primary</span>
+            <div className="flex-1 px-4 py-2.5 rounded-lg border border-gray-200 bg-gray-50 text-sm text-[#1a1a1a]">
+              <div className="flex items-center gap-2 flex-wrap">
+                {i === 0 && (
+                  <span className="text-xs bg-[#1a1a1a] text-white rounded-full px-2 py-0.5 flex-shrink-0">Primary</span>
+                )}
+                <span className="flex-1 min-w-0 truncate">{c.contact_name}</span>
+                <select value={c.tag_option_id} onChange={e => setContactTag(i, e.target.value)}
+                  className="text-xs border border-gray-200 rounded-md px-2 py-1 bg-white focus:outline-none cursor-pointer flex-shrink-0 text-gray-600">
+                  <option value="">No tag</option>
+                  {CONTACT_TAGS.map(t => <option key={t} value={t}>{t}</option>)}
+                </select>
+              </div>
+              {/* Shows immediately once a contact is picked from search --
+                  no need to save first to see whether they have a phone/email
+                  on file (relevant now that scheduling requires the seller
+                  to have an email). */}
+              {(c.phone_number || c.email_address) && (
+                <p className="text-xs text-gray-400 mt-2">{[c.phone_number ? formatPhoneDisplay(c.phone_number) : null, c.email_address].filter(Boolean).join(' | ')}</p>
               )}
-              <span className="flex-1 min-w-0 truncate">{c.contact_name}</span>
-              <select value={c.tag_option_id} onChange={e => setContactTag(i, e.target.value)}
-                className="text-xs border border-gray-200 rounded-md px-2 py-1 bg-white focus:outline-none cursor-pointer flex-shrink-0 text-gray-600">
-                <option value="">No tag</option>
-                {CONTACT_TAGS.map(t => <option key={t} value={t}>{t}</option>)}
-              </select>
             </div>
             <button type="button" onClick={() => removeContact(i)}
               className="text-gray-300 hover:text-red-400 text-xl transition-colors flex-shrink-0 cursor-pointer">×</button>
