@@ -1273,7 +1273,10 @@ function InspSection({ title, children }: { title: string; children: React.React
 }
 
 function SubHeading({ children }: { children: React.ReactNode }) {
-  return <p className="text-xs font-bold text-[#1a1a1a] uppercase tracking-wide pt-1">{children}</p>
+  // Only Exterior/Interior/Other (InspSection's title) should stand out as
+  // big and bold -- everything else in the Inspection tab, including these
+  // sub-headings, shares the same plain field-label styling.
+  return <p className={labelCls}>{children}</p>
 }
 
 function Divider() {
