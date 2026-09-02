@@ -2,7 +2,7 @@
 
 import { useState, useEffect, useCallback } from 'react'
 import { supabase } from '@/lib/supabase'
-import { btn, card, select, sectionTitle, label as labelCls } from '@/lib/styles'
+import { btn, card, input, select, sectionTitle, label as labelCls } from '@/lib/styles'
 import { canDelete } from '@/lib/permissions'
 import { Breadcrumbs } from '@/lib/Breadcrumbs'
 import { useRouter, useParams, useSearchParams } from 'next/navigation'
@@ -598,10 +598,15 @@ type InspectionForm = {
   bedroom_sizes: string[]
   bathrooms_quantity: number
   bathroom_conditions: string[]
-  kitchen_quantity: number
+  kitchen_present: boolean | null
+  kitchen_size: string
+  kitchen_finish: string
+  kitchen_position: string
   lounges_quantity: number
   dining_room_quantity: number
-  other_reception_quantity: number
+  other_reception_present: boolean | null
+  other_reception_type: string
+  other_reception_type_other: string
   study_quantity: number
   study_types: string[]
   domestic_quarters_quantity: number
@@ -609,7 +614,6 @@ type InspectionForm = {
   flatlet_quantity: number
   flatlet_bedroom_types: string[]
   scullery_laundry_present: boolean | null
-  scullery_laundry_type: string
   security_present: boolean | null
   security_features: string[]
   general_condition: ConditionItem[]
@@ -629,11 +633,13 @@ const EMPTY_INSPECTION: InspectionForm = {
   tennis_court_present: null, tennis_court_condition: '',
   bedrooms_quantity: 0, bedroom_sizes: [],
   bathrooms_quantity: 0, bathroom_conditions: [],
-  kitchen_quantity: 0, lounges_quantity: 0, dining_room_quantity: 0, other_reception_quantity: 0,
+  kitchen_present: null, kitchen_size: '', kitchen_finish: '', kitchen_position: '',
+  lounges_quantity: 0, dining_room_quantity: 0,
+  other_reception_present: null, other_reception_type: '', other_reception_type_other: '',
   study_quantity: 0, study_types: [],
   domestic_quarters_quantity: 0, domestic_quarters_toilet_only: false,
   flatlet_quantity: 0, flatlet_bedroom_types: [],
-  scullery_laundry_present: null, scullery_laundry_type: '',
+  scullery_laundry_present: null,
   security_present: null, security_features: [],
   general_condition: [],
   additional_features: [],
@@ -696,10 +702,15 @@ function InspectionTab({ evaluationId, userDesignation, onSaved }: { evaluationI
         bedroom_sizes:                 data.bedroom_sizes ? data.bedroom_sizes.split(',') : [],
         bathrooms_quantity:            data.bathrooms_quantity ?? 0,
         bathroom_conditions:           data.bathroom_conditions ? data.bathroom_conditions.split(',') : [],
-        kitchen_quantity:              data.kitchen_quantity ?? 0,
+        kitchen_present:               data.kitchen_present ?? null,
+        kitchen_size:                  data.kitchen_size ?? '',
+        kitchen_finish:                data.kitchen_finish ?? '',
+        kitchen_position:              data.kitchen_position ?? '',
         lounges_quantity:              data.lounges_quantity ?? 0,
         dining_room_quantity:          data.dining_room_quantity ?? 0,
-        other_reception_quantity:      data.other_reception_quantity ?? 0,
+        other_reception_present:      data.other_reception_present ?? null,
+        other_reception_type:         data.other_reception_type ?? '',
+        other_reception_type_other:   data.other_reception_type_other ?? '',
         study_quantity:                data.study_quantity ?? 0,
         study_types:                   data.study_types ? data.study_types.split(',') : [],
         domestic_quarters_quantity:    data.domestic_quarters_quantity ?? 0,
@@ -707,7 +718,6 @@ function InspectionTab({ evaluationId, userDesignation, onSaved }: { evaluationI
         flatlet_quantity:              data.flatlet_quantity ?? 0,
         flatlet_bedroom_types:         data.flatlet_bedroom_type ? data.flatlet_bedroom_type.split(',') : [],
         scullery_laundry_present:      data.scullery_laundry_present ?? null,
-        scullery_laundry_type:         data.scullery_laundry_type ?? '',
         security_present:              data.security_present ?? null,
         security_features:             data.security_features ? data.security_features.split(',') : [],
         general_condition:             gc,
@@ -815,10 +825,15 @@ function InspectionTab({ evaluationId, userDesignation, onSaved }: { evaluationI
       bedroom_sizes:                 form.bedrooms_quantity > 0 ? form.bedroom_sizes.join(',') : null,
       bathrooms_quantity:            form.bathrooms_quantity,
       bathroom_conditions:           form.bathrooms_quantity > 0 ? form.bathroom_conditions.join(',') : null,
-      kitchen_quantity:              form.kitchen_quantity,
+      kitchen_present:               form.kitchen_present,
+      kitchen_size:                  form.kitchen_present ? (form.kitchen_size || null) : null,
+      kitchen_finish:                form.kitchen_present ? (form.kitchen_finish || null) : null,
+      kitchen_position:              form.kitchen_present ? (form.kitchen_position || null) : null,
       lounges_quantity:              form.lounges_quantity,
       dining_room_quantity:          form.dining_room_quantity,
-      other_reception_quantity:      form.other_reception_quantity,
+      other_reception_present:       form.other_reception_present,
+      other_reception_type:          form.other_reception_present ? (form.other_reception_type || null) : null,
+      other_reception_type_other:    form.other_reception_present && form.other_reception_type === 'other' ? (form.other_reception_type_other || null) : null,
       study_quantity:                form.study_quantity,
       study_types:                   form.study_quantity > 0 ? form.study_types.join(',') : null,
       domestic_quarters_quantity:    form.domestic_quarters_quantity,
@@ -826,7 +841,6 @@ function InspectionTab({ evaluationId, userDesignation, onSaved }: { evaluationI
       flatlet_quantity:              form.flatlet_quantity,
       flatlet_bedroom_type:          form.flatlet_quantity > 0 ? form.flatlet_bedroom_types.join(',') : null,
       scullery_laundry_present:      form.scullery_laundry_present,
-      scullery_laundry_type:         form.scullery_laundry_present ? (form.scullery_laundry_type || null) : null,
       security_present:              form.security_present,
       security_features:             form.security_present && form.security_features.length > 0 ? form.security_features.join(',') : null,
       general_condition:             form.general_condition.length > 0 ? JSON.stringify(form.general_condition) : null,
@@ -1053,7 +1067,7 @@ function InspectionTab({ evaluationId, userDesignation, onSaved }: { evaluationI
                 <span className="text-sm text-gray-500 w-24 flex-shrink-0">Bathroom {i + 1}</span>
                 <select value={form.bathroom_conditions[i] ?? ''} onChange={e => { const n = [...form.bathroom_conditions]; n[i] = e.target.value; set('bathroom_conditions', n) }} className={`${select} flex-1`}>
                   <option value="">Condition…</option>
-                  <option value="modern">Modern</option><option value="needs_work">Needs Work</option><option value="outdated">Outdated</option>
+                  <option value="modern">Modern</option><option value="neat">Neat</option><option value="outdated">Outdated</option>
                 </select>
               </div>
             ))}
@@ -1061,14 +1075,67 @@ function InspectionTab({ evaluationId, userDesignation, onSaved }: { evaluationI
         )}
 
         <Divider />
+        <YesNo label="Kitchen" value={form.kitchen_present} onChange={v => set('kitchen_present', v)} />
+        {form.kitchen_present && (
+          <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
+            <div>
+              <label className={labelCls}>Kitchen Size</label>
+              <select value={form.kitchen_size} onChange={e => set('kitchen_size', e.target.value)} className={select}>
+                <option value="">—</option>
+                <option value="large">Large</option>
+                <option value="medium">Medium</option>
+                <option value="small">Small</option>
+              </select>
+            </div>
+            <div>
+              <label className={labelCls}>Kitchen Finish</label>
+              <select value={form.kitchen_finish} onChange={e => set('kitchen_finish', e.target.value)} className={select}>
+                <option value="">—</option>
+                <option value="modern">Modern</option>
+                <option value="neat">Neat</option>
+                <option value="outdated">Outdated</option>
+              </select>
+            </div>
+            <div>
+              <label className={labelCls}>Kitchen Position</label>
+              <select value={form.kitchen_position} onChange={e => set('kitchen_position', e.target.value)} className={select}>
+                <option value="">—</option>
+                <option value="open_plan">Open Plan</option>
+                <option value="down_passage">Down Passage</option>
+                <option value="separate">Separate</option>
+              </select>
+            </div>
+          </div>
+        )}
+
+        <Divider />
         <div className="grid grid-cols-2 gap-4">
-          {([['kitchen_quantity','Kitchens'],['lounges_quantity','Lounges'],['dining_room_quantity','Dining Rooms'],['other_reception_quantity','Other Reception']] as const).map(([field, lbl]) => (
+          {([['lounges_quantity','Lounges'],['dining_room_quantity','Dining Rooms']] as const).map(([field, lbl]) => (
             <div key={field}>
               <label className={labelCls}>{lbl}</label>
               <Counter value={form[field]} onChange={v => set(field, v)} />
             </div>
           ))}
         </div>
+
+        <Divider />
+        <YesNo label="Other Reception" value={form.other_reception_present} onChange={v => set('other_reception_present', v)} />
+        {form.other_reception_present && (
+          <div>
+            <label className={labelCls}>Reception Type</label>
+            <select value={form.other_reception_type} onChange={e => set('other_reception_type', e.target.value)} className={select}>
+              <option value="">—</option>
+              <option value="pub">Pub</option>
+              <option value="gym">Gym</option>
+              <option value="library">Library</option>
+              <option value="other">Other</option>
+            </select>
+            {form.other_reception_type === 'other' && (
+              <input type="text" value={form.other_reception_type_other} onChange={e => set('other_reception_type_other', e.target.value)}
+                placeholder="Describe the reception…" className={`${input} mt-2`} />
+            )}
+          </div>
+        )}
 
         <Divider />
         <SubHeading>Study</SubHeading>
@@ -1124,14 +1191,6 @@ function InspectionTab({ evaluationId, userDesignation, onSaved }: { evaluationI
 
         <Divider />
         <YesNo label="Scullery / Laundry" value={form.scullery_laundry_present} onChange={v => set('scullery_laundry_present', v)} />
-        {form.scullery_laundry_present && (
-          <div>
-            <label className={labelCls}>Type</label>
-            <select value={form.scullery_laundry_type} onChange={e => set('scullery_laundry_type', e.target.value)} className={select}>
-              <option value="">—</option><option value="separated">Separated</option><option value="adjoined">Adjoined</option>
-            </select>
-          </div>
-        )}
 
         <Divider />
         <YesNo label="Security" value={form.security_present} onChange={v => set('security_present', v)} />
