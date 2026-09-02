@@ -575,6 +575,7 @@ type InspectionForm = {
   // Appointment Outcome -- the Status Model's gate for "Inspected"
   appointment_outcome: string
   // Exterior
+  road_level_position: string
   land_size: string
   gate_type: string
   fencing_type: string
@@ -618,6 +619,7 @@ type InspectionForm = {
 
 const EMPTY_INSPECTION: InspectionForm = {
   appointment_outcome: '',
+  road_level_position: '',
   land_size: '', gate_type: '', fencing_type: '', views_present: null,
   garages_quantity: 0, garages_descriptor: '', carports_quantity: 0,
   garden_present: null, garden_selections: [],
@@ -671,6 +673,7 @@ function InspectionTab({ evaluationId, userDesignation, onSaved }: { evaluationI
       try { gc = data.general_condition ? JSON.parse(data.general_condition) : [] } catch { gc = [] }
       setForm({
         appointment_outcome:           data.appointment_outcome ?? '',
+        road_level_position:           data.road_level_position ?? '',
         land_size:                     data.land_size ?? '',
         gate_type:                     data.gate_type ?? '',
         fencing_type:                  data.fencing_type ?? '',
@@ -789,6 +792,7 @@ function InspectionTab({ evaluationId, userDesignation, onSaved }: { evaluationI
       evaluation_id:                 evaluationId,
       captured_by_user_id:           userId,
       appointment_outcome:           form.appointment_outcome || null,
+      road_level_position:           form.road_level_position || null,
       land_size:                     form.land_size || null,
       gate_type:                     form.gate_type || null,
       fencing_type:                  form.fencing_type || null,
@@ -893,7 +897,15 @@ function InspectionTab({ evaluationId, userDesignation, onSaved }: { evaluationI
       {/* ══ EXTERIOR ══ */}
       <InspSection title="Exterior">
 
-        <SubHeading>Land & Access</SubHeading>
+        <SubHeading>Road Level Position</SubHeading>
+        <select value={form.road_level_position} onChange={e => set('road_level_position', e.target.value)} className={select}>
+          <option value="">—</option>
+          <option value="above_road_level">Above Road Level</option>
+          <option value="on_road_level">On Road Level</option>
+          <option value="below_road_level">Below Road Level</option>
+        </select>
+
+        <Divider />
         <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
           <div>
             <label className={labelCls}>Land Size</label>
@@ -926,7 +938,6 @@ function InspectionTab({ evaluationId, userDesignation, onSaved }: { evaluationI
         <YesNo label="Views" value={form.views_present} onChange={v => set('views_present', v)} />
 
         <Divider />
-        <SubHeading>Parking</SubHeading>
         <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
           <div>
             <label className={labelCls}>Garages</label>
@@ -948,7 +959,6 @@ function InspectionTab({ evaluationId, userDesignation, onSaved }: { evaluationI
         </div>
 
         <Divider />
-        <SubHeading>Garden & Outdoor</SubHeading>
         <YesNo label="Garden" value={form.garden_present} onChange={v => set('garden_present', v)} />
         {form.garden_present && (
           <div>
@@ -968,7 +978,6 @@ function InspectionTab({ evaluationId, userDesignation, onSaved }: { evaluationI
         </div>
 
         <Divider />
-        <SubHeading>Pool & Extras</SubHeading>
         <YesNo label="Pool" value={form.pool_present} onChange={v => set('pool_present', v)} />
         {form.pool_present && (
           <div>
@@ -1033,7 +1042,6 @@ function InspectionTab({ evaluationId, userDesignation, onSaved }: { evaluationI
         )}
 
         <Divider />
-        <SubHeading>Reception Rooms</SubHeading>
         <div className="grid grid-cols-2 gap-4">
           {([['kitchen_quantity','Kitchens'],['lounges_quantity','Lounges'],['dining_room_quantity','Dining Rooms'],['other_reception_quantity','Other Reception']] as const).map(([field, lbl]) => (
             <div key={field}>
@@ -1064,7 +1072,6 @@ function InspectionTab({ evaluationId, userDesignation, onSaved }: { evaluationI
         )}
 
         <Divider />
-        <SubHeading>Domestic & Flatlet</SubHeading>
         <div>
           <label className={labelCls}>Domestic Quarters</label>
           <Counter value={form.domestic_quarters_quantity} onChange={v => set('domestic_quarters_quantity', v)} />
@@ -1101,7 +1108,6 @@ function InspectionTab({ evaluationId, userDesignation, onSaved }: { evaluationI
         </div>
 
         <Divider />
-        <SubHeading>Scullery / Laundry</SubHeading>
         <YesNo label="Scullery / Laundry" value={form.scullery_laundry_present} onChange={v => set('scullery_laundry_present', v)} />
         {form.scullery_laundry_present && (
           <div>
@@ -1113,7 +1119,6 @@ function InspectionTab({ evaluationId, userDesignation, onSaved }: { evaluationI
         )}
 
         <Divider />
-        <SubHeading>Security</SubHeading>
         <YesNo label="Security" value={form.security_present} onChange={v => set('security_present', v)} />
         {form.security_present && (
           <div>
