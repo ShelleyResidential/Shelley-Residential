@@ -2,7 +2,7 @@
 
 import { useState, useEffect, useCallback } from 'react'
 import { supabase } from '@/lib/supabase'
-import { btn, card, input, select, sectionTitle, label as labelCls } from '@/lib/styles'
+import { btn, card, select, sectionTitle, label as labelCls } from '@/lib/styles'
 import { canDelete } from '@/lib/permissions'
 import { Breadcrumbs } from '@/lib/Breadcrumbs'
 import { useRouter, useParams, useSearchParams } from 'next/navigation'
@@ -563,7 +563,6 @@ function CoverLetterCard({ evaluationId, userId, doc, onGenerated }: {
 }
 
 // ── InspectionTab ─────────────────────────────────────────────
-const GARDEN_OPTIONS    = ['Level', 'Slope / Terrace', 'Large', 'Medium', 'Small']
 const PATIO_OPTIONS     = ['Covered', 'Open', 'Sundeck', 'Fully Enclosed']
 const SECURITY_OPTIONS  = ['Standard', 'CCTV', 'Electric Fencing']
 const CONDITION_ITEMS   = ['Flooring', 'Windows / Doors', 'Architecture']
@@ -577,14 +576,15 @@ type InspectionForm = {
   // Exterior
   road_level_position: string
   land_size: string
-  gate_type: string
-  fencing_type: string
+  gate_fencing_type: string
   views_present: boolean | null
   garages_quantity: number
   garages_descriptor: string
   carports_quantity: number
+  parking_capacity: string
   garden_present: boolean | null
-  garden_selections: string[]
+  garden_size: string
+  garden_description: string
   patio_quantity: number
   patio_selections: string[]
   pool_present: boolean | null
@@ -592,6 +592,7 @@ type InspectionForm = {
   jacuzzi_present: boolean | null
   jacuzzi_status: string
   tennis_court_present: boolean | null
+  tennis_court_condition: string
   // Interior
   bedrooms_quantity: number
   bedroom_sizes: string[]
@@ -607,7 +608,6 @@ type InspectionForm = {
   domestic_quarters_toilet_only: boolean
   flatlet_quantity: number
   flatlet_bedroom_types: string[]
-  flatlet_notes: string
   scullery_laundry_present: boolean | null
   scullery_laundry_type: string
   security_present: boolean | null
@@ -620,19 +620,19 @@ type InspectionForm = {
 const EMPTY_INSPECTION: InspectionForm = {
   appointment_outcome: '',
   road_level_position: '',
-  land_size: '', gate_type: '', fencing_type: '', views_present: null,
-  garages_quantity: 0, garages_descriptor: '', carports_quantity: 0,
-  garden_present: null, garden_selections: [],
+  land_size: '', gate_fencing_type: '', views_present: null,
+  garages_quantity: 0, garages_descriptor: '', carports_quantity: 0, parking_capacity: '',
+  garden_present: null, garden_size: '', garden_description: '',
   patio_quantity: 0, patio_selections: [],
   pool_present: null, pool_condition: '',
   jacuzzi_present: null, jacuzzi_status: '',
-  tennis_court_present: null,
+  tennis_court_present: null, tennis_court_condition: '',
   bedrooms_quantity: 0, bedroom_sizes: [],
   bathrooms_quantity: 0, bathroom_conditions: [],
   kitchen_quantity: 0, lounges_quantity: 0, dining_room_quantity: 0, other_reception_quantity: 0,
   study_quantity: 0, study_types: [],
   domestic_quarters_quantity: 0, domestic_quarters_toilet_only: false,
-  flatlet_quantity: 0, flatlet_bedroom_types: [], flatlet_notes: '',
+  flatlet_quantity: 0, flatlet_bedroom_types: [],
   scullery_laundry_present: null, scullery_laundry_type: '',
   security_present: null, security_features: [],
   general_condition: [],
@@ -675,14 +675,15 @@ function InspectionTab({ evaluationId, userDesignation, onSaved }: { evaluationI
         appointment_outcome:           data.appointment_outcome ?? '',
         road_level_position:           data.road_level_position ?? '',
         land_size:                     data.land_size ?? '',
-        gate_type:                     data.gate_type ?? '',
-        fencing_type:                  data.fencing_type ?? '',
+        gate_fencing_type:             data.gate_fencing_type ?? '',
         views_present:                 data.views_present ?? null,
         garages_quantity:              data.garages_quantity ?? 0,
         garages_descriptor:            data.garages_descriptor ?? '',
         carports_quantity:             data.carports_quantity ?? 0,
+        parking_capacity:              data.parking_capacity ?? '',
         garden_present:                data.garden_present ?? null,
-        garden_selections:             sels.filter(s => s.feature_key === 'garden_description').map(s => s.picklist_options?.label ?? '').filter(Boolean),
+        garden_size:                   data.garden_size ?? '',
+        garden_description:            data.garden_description ?? '',
         patio_quantity:                data.patio_quantity ?? 0,
         patio_selections:              sels.filter(s => s.feature_key === 'patio_description').map(s => s.picklist_options?.label ?? '').filter(Boolean),
         pool_present:                  data.pool_present ?? null,
@@ -690,6 +691,7 @@ function InspectionTab({ evaluationId, userDesignation, onSaved }: { evaluationI
         jacuzzi_present:               data.jacuzzi_present ?? null,
         jacuzzi_status:                data.jacuzzi_status ?? '',
         tennis_court_present:          data.tennis_court_present ?? null,
+        tennis_court_condition:        data.tennis_court_condition ?? '',
         bedrooms_quantity:             data.bedrooms_quantity ?? 0,
         bedroom_sizes:                 data.bedroom_sizes ? data.bedroom_sizes.split(',') : [],
         bathrooms_quantity:            data.bathrooms_quantity ?? 0,
@@ -704,7 +706,6 @@ function InspectionTab({ evaluationId, userDesignation, onSaved }: { evaluationI
         domestic_quarters_toilet_only: data.domestic_quarters_toilet_only ?? false,
         flatlet_quantity:              data.flatlet_quantity ?? 0,
         flatlet_bedroom_types:         data.flatlet_bedroom_type ? data.flatlet_bedroom_type.split(',') : [],
-        flatlet_notes:                 data.flatlet_notes ?? '',
         scullery_laundry_present:      data.scullery_laundry_present ?? null,
         scullery_laundry_type:         data.scullery_laundry_type ?? '',
         security_present:              data.security_present ?? null,
@@ -724,7 +725,7 @@ function InspectionTab({ evaluationId, userDesignation, onSaved }: { evaluationI
 
     supabase.from('picklist_options')
       .select('id, list_name, label')
-      .in('list_name', ['garden_description', 'patio_description'])
+      .in('list_name', ['patio_description'])
       .order('sort_order')
       .then(({ data }) => {
         const map: Record<string, { id: string; label: string }[]> = {}
@@ -748,7 +749,7 @@ function InspectionTab({ evaluationId, userDesignation, onSaved }: { evaluationI
     setForm(f => ({ ...f, [field]: value }))
   }
 
-  function toggleStr(field: 'garden_selections' | 'patio_selections' | 'security_features' | 'additional_features', label: string) {
+  function toggleStr(field: 'patio_selections' | 'security_features' | 'additional_features', label: string) {
     setForm(f => {
       const cur = f[field] as string[]
       return { ...f, [field]: cur.includes(label) ? cur.filter(v => v !== label) : [...cur, label] }
@@ -794,19 +795,22 @@ function InspectionTab({ evaluationId, userDesignation, onSaved }: { evaluationI
       appointment_outcome:           form.appointment_outcome || null,
       road_level_position:           form.road_level_position || null,
       land_size:                     form.land_size || null,
-      gate_type:                     form.gate_type || null,
-      fencing_type:                  form.fencing_type || null,
+      gate_fencing_type:             form.gate_fencing_type || null,
       views_present:                 form.views_present,
       garages_quantity:              form.garages_quantity,
       garages_descriptor:            form.garages_descriptor || null,
       carports_quantity:             form.carports_quantity,
+      parking_capacity:              form.parking_capacity || null,
       garden_present:                form.garden_present,
+      garden_size:                   form.garden_present ? (form.garden_size || null) : null,
+      garden_description:            form.garden_present ? (form.garden_description || null) : null,
       patio_quantity:                form.patio_quantity,
       pool_present:                  form.pool_present,
       pool_condition:                form.pool_present ? (form.pool_condition || null) : null,
       jacuzzi_present:               form.jacuzzi_present,
       jacuzzi_status:                form.jacuzzi_present ? (form.jacuzzi_status || null) : null,
       tennis_court_present:          form.tennis_court_present,
+      tennis_court_condition:        form.tennis_court_present ? (form.tennis_court_condition || null) : null,
       bedrooms_quantity:             form.bedrooms_quantity,
       bedroom_sizes:                 form.bedrooms_quantity > 0 ? form.bedroom_sizes.join(',') : null,
       bathrooms_quantity:            form.bathrooms_quantity,
@@ -821,7 +825,6 @@ function InspectionTab({ evaluationId, userDesignation, onSaved }: { evaluationI
       domestic_quarters_toilet_only: form.domestic_quarters_toilet_only,
       flatlet_quantity:              form.flatlet_quantity,
       flatlet_bedroom_type:          form.flatlet_quantity > 0 ? form.flatlet_bedroom_types.join(',') : null,
-      flatlet_notes:                 form.flatlet_quantity > 0 ? (form.flatlet_notes || null) : null,
       scullery_laundry_present:      form.scullery_laundry_present,
       scullery_laundry_type:         form.scullery_laundry_present ? (form.scullery_laundry_type || null) : null,
       security_present:              form.security_present,
@@ -843,13 +846,8 @@ function InspectionTab({ evaluationId, userDesignation, onSaved }: { evaluationI
 
     if (newInspectionId) {
       await supabase.from('inspection_feature_selections').delete().eq('property_inspection_id', newInspectionId)
-      const gardenOpts = picklists['garden_description'] ?? []
       const patioOpts  = picklists['patio_description'] ?? []
       const selections = [
-        ...(form.garden_present ? form.garden_selections.map(label => {
-          const opt = gardenOpts.find(o => o.label === label)
-          return opt ? { property_inspection_id: newInspectionId!, feature_key: 'garden_description', picklist_option_id: opt.id } : null
-        }).filter(Boolean) : []),
         ...(form.patio_quantity > 0 ? form.patio_selections.map(label => {
           const opt = patioOpts.find(o => o.label === label)
           return opt ? { property_inspection_id: newInspectionId!, feature_key: 'patio_description', picklist_option_id: opt.id } : null
@@ -906,7 +904,7 @@ function InspectionTab({ evaluationId, userDesignation, onSaved }: { evaluationI
         </select>
 
         <Divider />
-        <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
+        <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
           <div>
             <label className={labelCls}>Land Size</label>
             <select value={form.land_size} onChange={e => set('land_size', e.target.value)} className={select}>
@@ -916,21 +914,11 @@ function InspectionTab({ evaluationId, userDesignation, onSaved }: { evaluationI
             </select>
           </div>
           <div>
-            <label className={labelCls}>Gate</label>
-            <select value={form.gate_type} onChange={e => set('gate_type', e.target.value)} className={select}>
+            <label className={labelCls}>Gate / Fencing</label>
+            <select value={form.gate_fencing_type} onChange={e => set('gate_fencing_type', e.target.value)} className={select}>
               <option value="">—</option>
               <option value="auto_gate">Auto Gate</option>
-              <option value="manual">Manual</option>
-              <option value="none">None</option>
-            </select>
-          </div>
-          <div>
-            <label className={labelCls}>Fencing</label>
-            <select value={form.fencing_type} onChange={e => set('fencing_type', e.target.value)} className={select}>
-              <option value="">—</option>
-              <option value="fully_fenced">Fully Fenced</option>
-              <option value="walls">Walls</option>
-              <option value="partial">Partial</option>
+              <option value="fully_fenced_walled">Fully Fenced/Walled</option>
               <option value="none">None</option>
             </select>
           </div>
@@ -938,15 +926,14 @@ function InspectionTab({ evaluationId, userDesignation, onSaved }: { evaluationI
         <YesNo label="Views" value={form.views_present} onChange={v => set('views_present', v)} />
 
         <Divider />
-        <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+        <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
           <div>
             <label className={labelCls}>Garages</label>
             <div className="flex gap-2 items-center">
               <Counter value={form.garages_quantity} onChange={v => set('garages_quantity', v)} />
               {form.garages_quantity > 0 && (
                 <select value={form.garages_descriptor} onChange={e => set('garages_descriptor', e.target.value)} className={`${select} flex-1`}>
-                  <option value="">Type…</option>
-                  <option value="auto">Auto</option>
+                  <option value="">—</option>
                   <option value="tandem">Tandem</option>
                 </select>
               )}
@@ -956,18 +943,42 @@ function InspectionTab({ evaluationId, userDesignation, onSaved }: { evaluationI
             <label className={labelCls}>Carports</label>
             <Counter value={form.carports_quantity} onChange={v => set('carports_quantity', v)} />
           </div>
+          <div>
+            <label className={labelCls}>Parking</label>
+            <select value={form.parking_capacity} onChange={e => set('parking_capacity', e.target.value)} className={select}>
+              <option value="">—</option>
+              <option value="2_cars">2 Cars</option>
+              <option value="3_9_cars">3-9 Cars</option>
+              <option value="10_plus_cars">10+ Cars</option>
+            </select>
+          </div>
         </div>
 
         <Divider />
         <YesNo label="Garden" value={form.garden_present} onChange={v => set('garden_present', v)} />
         {form.garden_present && (
-          <div>
-            <label className={labelCls}>Garden Description</label>
-            <MultiSelect options={GARDEN_OPTIONS} selected={form.garden_selections} onToggle={l => toggleStr('garden_selections', l)} />
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+            <div>
+              <label className={labelCls}>Garden Size</label>
+              <select value={form.garden_size} onChange={e => set('garden_size', e.target.value)} className={select}>
+                <option value="">—</option>
+                <option value="large">Large</option>
+                <option value="medium">Medium</option>
+                <option value="small">Small</option>
+              </select>
+            </div>
+            <div>
+              <label className={labelCls}>Garden Description</label>
+              <select value={form.garden_description} onChange={e => set('garden_description', e.target.value)} className={select}>
+                <option value="">—</option>
+                <option value="level">Level</option>
+                <option value="slope_terrace">Slope/Terrace</option>
+              </select>
+            </div>
           </div>
         )}
         <div>
-          <label className={labelCls}>Patios / Braai Areas</label>
+          <label className={labelCls}>Entertainment Patio</label>
           <Counter value={form.patio_quantity} onChange={v => set('patio_quantity', v)} />
           {form.patio_quantity > 0 && (
             <div className="mt-3">
@@ -990,13 +1001,21 @@ function InspectionTab({ evaluationId, userDesignation, onSaved }: { evaluationI
         <YesNo label="Jacuzzi" value={form.jacuzzi_present} onChange={v => set('jacuzzi_present', v)} />
         {form.jacuzzi_present && (
           <div>
-            <label className={labelCls}>Jacuzzi Status</label>
+            <label className={labelCls}>Jacuzzi Condition</label>
             <select value={form.jacuzzi_status} onChange={e => set('jacuzzi_status', e.target.value)} className={select}>
-              <option value="">—</option><option value="working">Working</option><option value="needs_repair">Needs Repair</option>
+              <option value="">—</option><option value="good">Good</option><option value="poor">Poor</option>
             </select>
           </div>
         )}
         <YesNo label="Tennis Court" value={form.tennis_court_present} onChange={v => set('tennis_court_present', v)} />
+        {form.tennis_court_present && (
+          <div>
+            <label className={labelCls}>Tennis Court Condition</label>
+            <select value={form.tennis_court_condition} onChange={e => set('tennis_court_condition', e.target.value)} className={select}>
+              <option value="">—</option><option value="good">Good</option><option value="poor">Poor</option>
+            </select>
+          </div>
+        )}
       </InspSection>
 
       {/* ══ INTERIOR ══ */}
@@ -1073,7 +1092,7 @@ function InspectionTab({ evaluationId, userDesignation, onSaved }: { evaluationI
 
         <Divider />
         <div>
-          <label className={labelCls}>Domestic Quarters</label>
+          <label className={labelCls}>Domestic Accommodation</label>
           <Counter value={form.domestic_quarters_quantity} onChange={v => set('domestic_quarters_quantity', v)} />
           {form.domestic_quarters_quantity > 0 && (
             <label className="flex items-center gap-2 mt-3 cursor-pointer select-none">
@@ -1099,10 +1118,6 @@ function InspectionTab({ evaluationId, userDesignation, onSaved }: { evaluationI
                   </select>
                 </div>
               ))}
-              <div>
-                <label className={labelCls}>Flatlet Notes</label>
-                <textarea value={form.flatlet_notes} onChange={e => set('flatlet_notes', e.target.value)} rows={2} className={`${input} resize-none`} />
-              </div>
             </div>
           )}
         </div>
