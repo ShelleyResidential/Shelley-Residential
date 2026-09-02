@@ -937,7 +937,6 @@ function InspectionTab({ evaluationId, userDesignation, onSaved }: { evaluationI
             </select>
           </div>
         </div>
-        <YesNo label="Views" value={form.views_present} onChange={v => set('views_present', v)} />
 
         <Divider />
         <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
@@ -991,6 +990,41 @@ function InspectionTab({ evaluationId, userDesignation, onSaved }: { evaluationI
             </div>
           </div>
         )}
+
+        <Divider />
+        <YesNo label="Tennis Court" value={form.tennis_court_present} onChange={v => set('tennis_court_present', v)} />
+        {form.tennis_court_present && (
+          <div>
+            <label className={labelCls}>Tennis Court Condition</label>
+            <select value={form.tennis_court_condition} onChange={e => set('tennis_court_condition', e.target.value)} className={select}>
+              <option value="">—</option><option value="good">Good</option><option value="poor">Poor</option>
+            </select>
+          </div>
+        )}
+
+        <Divider />
+        <YesNo label="Pool" value={form.pool_present} onChange={v => set('pool_present', v)} />
+        {form.pool_present && (
+          <div>
+            <label className={labelCls}>Pool Condition</label>
+            <select value={form.pool_condition} onChange={e => set('pool_condition', e.target.value)} className={select}>
+              <option value="">—</option><option value="good">Good</option><option value="poor">Poor</option>
+            </select>
+          </div>
+        )}
+
+        <Divider />
+        <YesNo label="Jacuzzi" value={form.jacuzzi_present} onChange={v => set('jacuzzi_present', v)} />
+        {form.jacuzzi_present && (
+          <div>
+            <label className={labelCls}>Jacuzzi Condition</label>
+            <select value={form.jacuzzi_status} onChange={e => set('jacuzzi_status', e.target.value)} className={select}>
+              <option value="">—</option><option value="good">Good</option><option value="poor">Poor</option>
+            </select>
+          </div>
+        )}
+
+        <Divider />
         <div>
           <label className={labelCls}>Entertainment Patio</label>
           <Counter value={form.patio_quantity} onChange={v => set('patio_quantity', v)} />
@@ -1003,33 +1037,39 @@ function InspectionTab({ evaluationId, userDesignation, onSaved }: { evaluationI
         </div>
 
         <Divider />
-        <YesNo label="Pool" value={form.pool_present} onChange={v => set('pool_present', v)} />
-        {form.pool_present && (
-          <div>
-            <label className={labelCls}>Pool Condition</label>
-            <select value={form.pool_condition} onChange={e => set('pool_condition', e.target.value)} className={select}>
-              <option value="">—</option><option value="good">Good</option><option value="poor">Poor</option>
-            </select>
-          </div>
-        )}
-        <YesNo label="Jacuzzi" value={form.jacuzzi_present} onChange={v => set('jacuzzi_present', v)} />
-        {form.jacuzzi_present && (
-          <div>
-            <label className={labelCls}>Jacuzzi Condition</label>
-            <select value={form.jacuzzi_status} onChange={e => set('jacuzzi_status', e.target.value)} className={select}>
-              <option value="">—</option><option value="good">Good</option><option value="poor">Poor</option>
-            </select>
-          </div>
-        )}
-        <YesNo label="Tennis Court" value={form.tennis_court_present} onChange={v => set('tennis_court_present', v)} />
-        {form.tennis_court_present && (
-          <div>
-            <label className={labelCls}>Tennis Court Condition</label>
-            <select value={form.tennis_court_condition} onChange={e => set('tennis_court_condition', e.target.value)} className={select}>
-              <option value="">—</option><option value="good">Good</option><option value="poor">Poor</option>
-            </select>
-          </div>
-        )}
+        <YesNo label="Views" value={form.views_present} onChange={v => set('views_present', v)} />
+
+        <Divider />
+        <div>
+          <label className={labelCls}>Domestic Accommodation</label>
+          <Counter value={form.domestic_quarters_quantity} onChange={v => set('domestic_quarters_quantity', v)} />
+          {form.domestic_quarters_quantity > 0 && (
+            <label className="flex items-center gap-2 mt-3 cursor-pointer select-none">
+              <input type="checkbox" checked={form.domestic_quarters_toilet_only} onChange={e => set('domestic_quarters_toilet_only', e.target.checked)} className="w-4 h-4 rounded border-gray-300 accent-[#1a1a1a]" />
+              <span className="text-sm text-gray-600">Toilet only (not a full room)</span>
+            </label>
+          )}
+        </div>
+        <div>
+          <label className={labelCls}>Flatlet</label>
+          <Counter
+            value={form.flatlet_quantity}
+            onChange={v => { set('flatlet_quantity', v); set('flatlet_bedroom_types', resizeArr(form.flatlet_bedroom_types, v)) }}
+          />
+          {form.flatlet_quantity > 0 && (
+            <div className="mt-3 space-y-3">
+              {Array.from({ length: form.flatlet_quantity }).map((_, i) => (
+                <div key={i} className="flex items-center gap-3">
+                  <span className="text-sm text-gray-500 w-24 flex-shrink-0">Flatlet {form.flatlet_quantity > 1 ? i + 1 : ''}</span>
+                  <select value={form.flatlet_bedroom_types[i] ?? ''} onChange={e => { const n = [...form.flatlet_bedroom_types]; n[i] = e.target.value; set('flatlet_bedroom_types', n) }} className={`${select} flex-1`}>
+                    <option value="">Bedrooms…</option>
+                    <option value="one_bed">1 Bedroom</option><option value="two_bed">2 Bedroom</option><option value="three_bed">3 Bedroom</option>
+                  </select>
+                </div>
+              ))}
+            </div>
+          )}
+        </div>
       </InspSection>
 
       {/* ══ INTERIOR ══ */}
@@ -1156,38 +1196,6 @@ function InspectionTab({ evaluationId, userDesignation, onSaved }: { evaluationI
             ))}
           </div>
         )}
-
-        <Divider />
-        <div>
-          <label className={labelCls}>Domestic Accommodation</label>
-          <Counter value={form.domestic_quarters_quantity} onChange={v => set('domestic_quarters_quantity', v)} />
-          {form.domestic_quarters_quantity > 0 && (
-            <label className="flex items-center gap-2 mt-3 cursor-pointer select-none">
-              <input type="checkbox" checked={form.domestic_quarters_toilet_only} onChange={e => set('domestic_quarters_toilet_only', e.target.checked)} className="w-4 h-4 rounded border-gray-300 accent-[#1a1a1a]" />
-              <span className="text-sm text-gray-600">Toilet only (not a full room)</span>
-            </label>
-          )}
-        </div>
-        <div>
-          <label className={labelCls}>Flatlet</label>
-          <Counter
-            value={form.flatlet_quantity}
-            onChange={v => { set('flatlet_quantity', v); set('flatlet_bedroom_types', resizeArr(form.flatlet_bedroom_types, v)) }}
-          />
-          {form.flatlet_quantity > 0 && (
-            <div className="mt-3 space-y-3">
-              {Array.from({ length: form.flatlet_quantity }).map((_, i) => (
-                <div key={i} className="flex items-center gap-3">
-                  <span className="text-sm text-gray-500 w-24 flex-shrink-0">Flatlet {form.flatlet_quantity > 1 ? i + 1 : ''}</span>
-                  <select value={form.flatlet_bedroom_types[i] ?? ''} onChange={e => { const n = [...form.flatlet_bedroom_types]; n[i] = e.target.value; set('flatlet_bedroom_types', n) }} className={`${select} flex-1`}>
-                    <option value="">Bedrooms…</option>
-                    <option value="one_bed">1 Bedroom</option><option value="two_bed">2 Bedroom</option><option value="three_bed">3 Bedroom</option>
-                  </select>
-                </div>
-              ))}
-            </div>
-          )}
-        </div>
 
         <Divider />
         <YesNo label="Scullery / Laundry" value={form.scullery_laundry_present} onChange={v => set('scullery_laundry_present', v)} />
