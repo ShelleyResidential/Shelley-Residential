@@ -1075,42 +1075,31 @@ function InspectionTab({ evaluationId, userDesignation, onSaved }: { evaluationI
       {/* ══ INTERIOR ══ */}
       <InspSection title="Interior">
 
-        <SubHeading>Bedrooms</SubHeading>
-        <Counter
-          value={form.bedrooms_quantity}
-          onChange={v => { set('bedrooms_quantity', v); set('bedroom_sizes', resizeArr(form.bedroom_sizes, v)) }}
-        />
-        {form.bedrooms_quantity > 0 && (
-          <div className="space-y-2 mt-2">
-            {Array.from({ length: form.bedrooms_quantity }).map((_, i) => (
-              <div key={i} className="flex items-center gap-3">
-                <span className="text-sm text-gray-500 w-24 flex-shrink-0">Bedroom {i + 1}</span>
-                <select value={form.bedroom_sizes[i] ?? ''} onChange={e => { const n = [...form.bedroom_sizes]; n[i] = e.target.value; set('bedroom_sizes', n) }} className={`${select} flex-1`}>
-                  <option value="">Size…</option>
-                  <option value="large">Large</option><option value="medium">Medium</option><option value="small">Small</option>
-                </select>
-              </div>
-            ))}
-          </div>
-        )}
+        <div className="grid grid-cols-2 gap-4">
+          {([['lounges_quantity','Lounges'],['dining_room_quantity','Dining Rooms']] as const).map(([field, lbl]) => (
+            <div key={field}>
+              <label className={labelCls}>{lbl}</label>
+              <Counter value={form[field]} onChange={v => set(field, v)} />
+            </div>
+          ))}
+        </div>
 
         <Divider />
-        <SubHeading>Bathrooms</SubHeading>
-        <Counter
-          value={form.bathrooms_quantity}
-          onChange={v => { set('bathrooms_quantity', v); set('bathroom_conditions', resizeArr(form.bathroom_conditions, v)) }}
-        />
-        {form.bathrooms_quantity > 0 && (
-          <div className="space-y-2 mt-2">
-            {Array.from({ length: form.bathrooms_quantity }).map((_, i) => (
-              <div key={i} className="flex items-center gap-3">
-                <span className="text-sm text-gray-500 w-24 flex-shrink-0">Bathroom {i + 1}</span>
-                <select value={form.bathroom_conditions[i] ?? ''} onChange={e => { const n = [...form.bathroom_conditions]; n[i] = e.target.value; set('bathroom_conditions', n) }} className={`${select} flex-1`}>
-                  <option value="">Condition…</option>
-                  <option value="modern">Modern</option><option value="neat">Neat</option><option value="outdated">Outdated</option>
-                </select>
-              </div>
-            ))}
+        <YesNo label="Other Reception" value={form.other_reception_present} onChange={v => set('other_reception_present', v)} />
+        {form.other_reception_present && (
+          <div>
+            <label className={labelCls}>Reception Type</label>
+            <select value={form.other_reception_type} onChange={e => set('other_reception_type', e.target.value)} className={select}>
+              <option value="">—</option>
+              <option value="pub">Pub</option>
+              <option value="gym">Gym</option>
+              <option value="library">Library</option>
+              <option value="other">Other</option>
+            </select>
+            {form.other_reception_type === 'other' && (
+              <input type="text" value={form.other_reception_type_other} onChange={e => set('other_reception_type_other', e.target.value)}
+                placeholder="Describe the reception…" className={`${input} mt-2`} />
+            )}
           </div>
         )}
 
@@ -1149,31 +1138,25 @@ function InspectionTab({ evaluationId, userDesignation, onSaved }: { evaluationI
         )}
 
         <Divider />
-        <div className="grid grid-cols-2 gap-4">
-          {([['lounges_quantity','Lounges'],['dining_room_quantity','Dining Rooms']] as const).map(([field, lbl]) => (
-            <div key={field}>
-              <label className={labelCls}>{lbl}</label>
-              <Counter value={form[field]} onChange={v => set(field, v)} />
-            </div>
-          ))}
-        </div>
+        <YesNo label="Scullery / Laundry" value={form.scullery_laundry_present} onChange={v => set('scullery_laundry_present', v)} />
 
         <Divider />
-        <YesNo label="Other Reception" value={form.other_reception_present} onChange={v => set('other_reception_present', v)} />
-        {form.other_reception_present && (
-          <div>
-            <label className={labelCls}>Reception Type</label>
-            <select value={form.other_reception_type} onChange={e => set('other_reception_type', e.target.value)} className={select}>
-              <option value="">—</option>
-              <option value="pub">Pub</option>
-              <option value="gym">Gym</option>
-              <option value="library">Library</option>
-              <option value="other">Other</option>
-            </select>
-            {form.other_reception_type === 'other' && (
-              <input type="text" value={form.other_reception_type_other} onChange={e => set('other_reception_type_other', e.target.value)}
-                placeholder="Describe the reception…" className={`${input} mt-2`} />
-            )}
+        <SubHeading>Bedrooms</SubHeading>
+        <Counter
+          value={form.bedrooms_quantity}
+          onChange={v => { set('bedrooms_quantity', v); set('bedroom_sizes', resizeArr(form.bedroom_sizes, v)) }}
+        />
+        {form.bedrooms_quantity > 0 && (
+          <div className="space-y-2 mt-2">
+            {Array.from({ length: form.bedrooms_quantity }).map((_, i) => (
+              <div key={i} className="flex items-center gap-3">
+                <span className="text-sm text-gray-500 w-24 flex-shrink-0">Bedroom {i + 1}</span>
+                <select value={form.bedroom_sizes[i] ?? ''} onChange={e => { const n = [...form.bedroom_sizes]; n[i] = e.target.value; set('bedroom_sizes', n) }} className={`${select} flex-1`}>
+                  <option value="">Size…</option>
+                  <option value="large">Large</option><option value="medium">Medium</option><option value="small">Small</option>
+                </select>
+              </div>
+            ))}
           </div>
         )}
 
@@ -1198,7 +1181,24 @@ function InspectionTab({ evaluationId, userDesignation, onSaved }: { evaluationI
         )}
 
         <Divider />
-        <YesNo label="Scullery / Laundry" value={form.scullery_laundry_present} onChange={v => set('scullery_laundry_present', v)} />
+        <SubHeading>Bathrooms</SubHeading>
+        <Counter
+          value={form.bathrooms_quantity}
+          onChange={v => { set('bathrooms_quantity', v); set('bathroom_conditions', resizeArr(form.bathroom_conditions, v)) }}
+        />
+        {form.bathrooms_quantity > 0 && (
+          <div className="space-y-2 mt-2">
+            {Array.from({ length: form.bathrooms_quantity }).map((_, i) => (
+              <div key={i} className="flex items-center gap-3">
+                <span className="text-sm text-gray-500 w-24 flex-shrink-0">Bathroom {i + 1}</span>
+                <select value={form.bathroom_conditions[i] ?? ''} onChange={e => { const n = [...form.bathroom_conditions]; n[i] = e.target.value; set('bathroom_conditions', n) }} className={`${select} flex-1`}>
+                  <option value="">Condition…</option>
+                  <option value="modern">Modern</option><option value="neat">Neat</option><option value="outdated">Outdated</option>
+                </select>
+              </div>
+            ))}
+          </div>
+        )}
 
         <Divider />
         <YesNo label="Security" value={form.security_present} onChange={v => set('security_present', v)} />
