@@ -1283,8 +1283,11 @@ function InspSection({ title, children }: { title: string; children: React.React
 function SubHeading({ children }: { children: React.ReactNode }) {
   // Only Exterior/Interior/Other (InspSection's title) should stand out as
   // big and bold -- everything else in the Inspection tab, including these
-  // sub-headings, shares the same plain field-label styling.
-  return <p className={labelCls}>{children}</p>
+  // sub-headings, shares one plain style. Matches YesNo's label exactly
+  // (text-sm font-medium text-[#1a1a1a]) rather than the gray labelCls, so
+  // e.g. "Bedrooms" is the same darkness as "Garden" -- labelCls's
+  // text-gray-500 reads visibly lighter side by side.
+  return <p className="text-sm font-medium text-[#1a1a1a] mb-1">{children}</p>
 }
 
 function Divider() {
