@@ -281,6 +281,9 @@ type RawEvaluationRow = {
   evaluation_outcome: string | null
   cma_approved_by_user_id: string | null
   cma_approved_at: string | null
+  cma_rejected_by_user_id: string | null
+  cma_rejected_at: string | null
+  cma_rejection_reason: string | null
   presentation_scheduled_at: string | null
   presentation_calendar_event_link: string | null
   presentation_outcome: string | null
@@ -338,10 +341,16 @@ export function EvaluationForm({ evaluationId, readOnly = false, calendarEventLi
   const [marketingPrice, setMarketingPrice]   = useState('')
   const [ownership, setOwnership]             = useState('')
 
-  // CMA approval -- read-only display, set only via the Approve CMA action
+  // CMA approval -- read-only display, set only via the Approve/Reject CMA actions
   const [cmaApprovedByUserId, setCmaApprovedByUserId] = useState<string | null>(null)
   const [cmaApprovedAt, setCmaApprovedAt]             = useState<string | null>(null)
   const [approvingCma, setApprovingCma]               = useState(false)
+  const [cmaRejectedByUserId, setCmaRejectedByUserId] = useState<string | null>(null)
+  const [cmaRejectedAt, setCmaRejectedAt]             = useState<string | null>(null)
+  const [cmaRejectionReason, setCmaRejectionReason]   = useState<string | null>(null)
+  const [rejectingCma, setRejectingCma]               = useState(false)
+  const [showRejectCmaInput, setShowRejectCmaInput]   = useState(false)
+  const [rejectCmaReasonDraft, setRejectCmaReasonDraft] = useState('')
 
   // Presentation
   const [presentationDate, setPresentationDate]       = useState('')
@@ -409,6 +418,9 @@ export function EvaluationForm({ evaluationId, readOnly = false, calendarEventLi
     setEvaluationOutcome(row.evaluation_outcome ?? '')
     setCmaApprovedByUserId(row.cma_approved_by_user_id)
     setCmaApprovedAt(row.cma_approved_at)
+    setCmaRejectedByUserId(row.cma_rejected_by_user_id)
+    setCmaRejectedAt(row.cma_rejected_at)
+    setCmaRejectionReason(row.cma_rejection_reason)
     setPresentationCalendarLink(row.presentation_calendar_event_link)
     setPresentationOutcome(row.presentation_outcome ?? '')
 
@@ -459,6 +471,7 @@ export function EvaluationForm({ evaluationId, readOnly = false, calendarEventLi
         sellers_agent_user_id, transaction_coordinator_user_id, evaluation_price, marketing_price,
         date_captured, captured_by_user_id, ownership, evaluation_outcome,
         cma_approved_by_user_id, cma_approved_at,
+        cma_rejected_by_user_id, cma_rejected_at, cma_rejection_reason,
         presentation_scheduled_at, presentation_calendar_event_link, presentation_outcome,
         properties (id, property_type, unit_number, complex_or_building_name, street_number, street_name, suburb, city),
         evaluation_contacts (
@@ -791,19 +804,49 @@ export function EvaluationForm({ evaluationId, readOnly = false, calendarEventLi
   }
 
   // ── CMA approval — Co-Founders only, once Evaluation Price and Marketing
-  // Price are both captured. Advances status straight to Evaluated.
+  // Price are both captured. Advances status straight to Evaluated. Clears
+  // any earlier rejection -- approving supersedes it, so the rejection
+  // banner shouldn't linger next to an approved CMA.
   async function approveCma() {
     if (!evaluationId || !userId) return
     setApprovingCma(true)
     const nowIso = new Date().toISOString()
     await supabase.from('evaluations').update({
       cma_approved_by_user_id: userId, cma_approved_at: nowIso,
+      cma_rejected_by_user_id: null, cma_rejected_at: null, cma_rejection_reason: null,
     }).eq('id', evaluationId)
     await markStepComplete(evaluationId, 'cma_approved', userId)
     await promoteStatus(evaluationId, 'evaluated')
     setCmaApprovedByUserId(userId)
     setCmaApprovedAt(nowIso)
+    setCmaRejectedByUserId(null)
+    setCmaRejectedAt(null)
+    setCmaRejectionReason(null)
     setApprovingCma(false)
+    await fetchEvaluation()
+  }
+
+  // ── CMA rejection — same Co-Founder-only permission as approval. Per the
+  // implementation brief (EV-09): "If rejected, capture reason and return
+  // to Agent for revision." Rejecting does NOT change evaluations.status --
+  // the evaluation simply stays wherever it already is until a CMA is
+  // eventually approved. The Approve button stays available right alongside
+  // the rejection banner, so the Approver can act again once the Agent has
+  // revised the pricing, without needing separate "resubmit" plumbing.
+  async function rejectCma() {
+    if (!evaluationId || !userId || !rejectCmaReasonDraft.trim()) return
+    setRejectingCma(true)
+    const nowIso = new Date().toISOString()
+    const reason = rejectCmaReasonDraft.trim()
+    await supabase.from('evaluations').update({
+      cma_rejected_by_user_id: userId, cma_rejected_at: nowIso, cma_rejection_reason: reason,
+    }).eq('id', evaluationId)
+    setCmaRejectedByUserId(userId)
+    setCmaRejectedAt(nowIso)
+    setCmaRejectionReason(reason)
+    setRejectingCma(false)
+    setShowRejectCmaInput(false)
+    setRejectCmaReasonDraft('')
     await fetchEvaluation()
   }
 
@@ -1063,6 +1106,7 @@ export function EvaluationForm({ evaluationId, readOnly = false, calendarEventLi
   const currentUserDesignation = profiles.find(p => p.id === userId)?.designation ?? null
   const currentUserRoles       = getPipelineRoles(currentUserDesignation)
   const cmaApprovedByProfile   = profiles.find(p => p.id === cmaApprovedByUserId)
+  const cmaRejectedByProfile   = profiles.find(p => p.id === cmaRejectedByUserId)
 
   if (initialLoading) {
     return <div className="p-10 text-gray-400 text-sm">Loading…</div>
@@ -1557,18 +1601,51 @@ export function EvaluationForm({ evaluationId, readOnly = false, calendarEventLi
             </p>
           ) : (
             <>
+              {cmaRejectedByUserId && (
+                <p className="text-sm text-red-600 bg-red-50 px-3 py-2 rounded-lg mb-3">
+                  Rejected by {cmaRejectedByProfile?.full_name ?? cmaRejectedByProfile?.email ?? '—'}
+                  {cmaRejectedAt && <span> on {new Date(cmaRejectedAt).toLocaleDateString('en-ZA', { day: 'numeric', month: 'long', year: 'numeric' })}</span>}
+                  {cmaRejectionReason && <>: {cmaRejectionReason}</>}
+                  <span className="block text-red-400 mt-1">Revise the pricing above, then Approve once it&apos;s ready.</span>
+                </p>
+              )}
               <p className="text-sm text-gray-400">
                 {!evaluationPrice || !marketingPrice
                   ? 'Capture the Evaluation Price and Marketing Price above before a CMA can be approved.'
                   : currentUserRoles.isCmaApprover
                     ? 'Pricing is ready for CMA approval.'
-                    : 'Only a Co-Founder can approve a CMA.'}
+                    : 'Only a Co-Founder can approve or reject a CMA.'}
               </p>
-              <button type="button" onClick={approveCma}
-                disabled={approvingCma || !evaluationPrice || !marketingPrice || !currentUserRoles.isCmaApprover}
-                className={`${btn.primary} disabled:opacity-40 disabled:cursor-not-allowed`}>
-                {approvingCma ? 'Approving…' : 'Approve CMA'}
-              </button>
+              {showRejectCmaInput ? (
+                <div className="space-y-2 mt-2">
+                  <textarea value={rejectCmaReasonDraft} onChange={e => setRejectCmaReasonDraft(e.target.value)}
+                    placeholder="Reason for rejecting this CMA…" rows={2} className={`${input} resize-none`} />
+                  <div className="flex gap-2">
+                    <button type="button" onClick={rejectCma}
+                      disabled={rejectingCma || !rejectCmaReasonDraft.trim()}
+                      className={`${btn.danger} disabled:opacity-40 disabled:cursor-not-allowed`}>
+                      {rejectingCma ? 'Rejecting…' : 'Confirm Rejection'}
+                    </button>
+                    <button type="button" onClick={() => { setShowRejectCmaInput(false); setRejectCmaReasonDraft('') }}
+                      className={btn.secondary}>
+                      Cancel
+                    </button>
+                  </div>
+                </div>
+              ) : (
+                <div className="flex gap-2 mt-2">
+                  <button type="button" onClick={approveCma}
+                    disabled={approvingCma || !evaluationPrice || !marketingPrice || !currentUserRoles.isCmaApprover}
+                    className={`${btn.primary} disabled:opacity-40 disabled:cursor-not-allowed`}>
+                    {approvingCma ? 'Approving…' : 'Approve CMA'}
+                  </button>
+                  <button type="button" onClick={() => setShowRejectCmaInput(true)}
+                    disabled={!evaluationPrice || !marketingPrice || !currentUserRoles.isCmaApprover}
+                    className={`${btn.danger} disabled:opacity-40 disabled:cursor-not-allowed`}>
+                    Reject CMA
+                  </button>
+                </div>
+              )}
             </>
           )}
         </Section>
