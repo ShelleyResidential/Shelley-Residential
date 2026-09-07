@@ -2,7 +2,7 @@
 
 import { useState, useEffect, useCallback } from 'react'
 import { supabase } from '@/lib/supabase'
-import { btn, card, input, select, sectionTitle, label as labelCls } from '@/lib/styles'
+import { btn, card, input, select, sectionTitle } from '@/lib/styles'
 import { canDelete } from '@/lib/permissions'
 import { Breadcrumbs } from '@/lib/Breadcrumbs'
 import { useRouter, useParams, useSearchParams } from 'next/navigation'
@@ -568,6 +568,12 @@ const SECURITY_OPTIONS  = ['Standard', 'CCTV', 'Electric Fencing']
 const CONDITION_ITEMS   = ['Flooring', 'Windows / Doors', 'Architecture']
 const ADDITIONAL_OPTS   = ['Jungle Gym', 'Jojo Tank', 'Storeroom', 'Solar Panels', 'Inverter', 'Batteries']
 
+// The shared `label` style from lib/styles is gray-500 -- too light next
+// to YesNo's dark labels (Garden, Security, etc.), which is what stood out
+// on the Inspection tab. This is scoped to this tab only, not changing the
+// shared style used by every other page/tab in the app.
+const fieldLabelCls = 'block text-sm font-medium text-[#1a1a1a] mb-1'
+
 type ConditionItem = { feature: string; condition: string }
 
 type InspectionForm = {
@@ -895,7 +901,7 @@ function InspectionTab({ evaluationId, userDesignation, onSaved }: { evaluationI
       {/* ══ APPOINTMENT OUTCOME -- gates the "Inspected" status ══ */}
       <InspSection title="Appointment Outcome">
         <div>
-          <label className={labelCls}>Outcome</label>
+          <label className={fieldLabelCls}>Outcome</label>
           <select value={form.appointment_outcome} onChange={e => set('appointment_outcome', e.target.value)} className={select}>
             <option value="">—</option>
             {APPOINTMENT_OUTCOMES.map(o => <option key={o.value} value={o.value}>{o.label}</option>)}
@@ -920,7 +926,7 @@ function InspectionTab({ evaluationId, userDesignation, onSaved }: { evaluationI
         <Divider />
         <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
           <div>
-            <label className={labelCls}>Land Size</label>
+            <label className={fieldLabelCls}>Land Size</label>
             <select value={form.land_size} onChange={e => set('land_size', e.target.value)} className={select}>
               <option value="">—</option>
               <option value="subdivisible">Subdivisible</option>
@@ -928,7 +934,7 @@ function InspectionTab({ evaluationId, userDesignation, onSaved }: { evaluationI
             </select>
           </div>
           <div>
-            <label className={labelCls}>Gate / Fencing</label>
+            <label className={fieldLabelCls}>Gate / Fencing</label>
             <select value={form.gate_fencing_type} onChange={e => set('gate_fencing_type', e.target.value)} className={select}>
               <option value="">—</option>
               <option value="auto_gate">Auto Gate</option>
@@ -941,7 +947,7 @@ function InspectionTab({ evaluationId, userDesignation, onSaved }: { evaluationI
         <Divider />
         <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
           <div>
-            <label className={labelCls}>Garages</label>
+            <label className={fieldLabelCls}>Garages</label>
             <div className="flex gap-2 items-center">
               <Counter value={form.garages_quantity} onChange={v => set('garages_quantity', v)} />
               {form.garages_quantity > 0 && (
@@ -953,11 +959,11 @@ function InspectionTab({ evaluationId, userDesignation, onSaved }: { evaluationI
             </div>
           </div>
           <div>
-            <label className={labelCls}>Carports</label>
+            <label className={fieldLabelCls}>Carports</label>
             <Counter value={form.carports_quantity} onChange={v => set('carports_quantity', v)} />
           </div>
           <div>
-            <label className={labelCls}>Parking</label>
+            <label className={fieldLabelCls}>Parking</label>
             <select value={form.parking_capacity} onChange={e => set('parking_capacity', e.target.value)} className={select}>
               <option value="">—</option>
               <option value="2_cars">2 Cars</option>
@@ -972,7 +978,7 @@ function InspectionTab({ evaluationId, userDesignation, onSaved }: { evaluationI
         {form.garden_present && (
           <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
             <div>
-              <label className={labelCls}>Garden Size</label>
+              <label className={fieldLabelCls}>Garden Size</label>
               <select value={form.garden_size} onChange={e => set('garden_size', e.target.value)} className={select}>
                 <option value="">—</option>
                 <option value="large">Large</option>
@@ -981,7 +987,7 @@ function InspectionTab({ evaluationId, userDesignation, onSaved }: { evaluationI
               </select>
             </div>
             <div>
-              <label className={labelCls}>Garden Description</label>
+              <label className={fieldLabelCls}>Garden Description</label>
               <select value={form.garden_description} onChange={e => set('garden_description', e.target.value)} className={select}>
                 <option value="">—</option>
                 <option value="level">Level</option>
@@ -995,7 +1001,7 @@ function InspectionTab({ evaluationId, userDesignation, onSaved }: { evaluationI
         <YesNo label="Tennis Court" value={form.tennis_court_present} onChange={v => set('tennis_court_present', v)} />
         {form.tennis_court_present && (
           <div>
-            <label className={labelCls}>Tennis Court Condition</label>
+            <label className={fieldLabelCls}>Tennis Court Condition</label>
             <select value={form.tennis_court_condition} onChange={e => set('tennis_court_condition', e.target.value)} className={select}>
               <option value="">—</option><option value="good">Good</option><option value="poor">Poor</option>
             </select>
@@ -1006,7 +1012,7 @@ function InspectionTab({ evaluationId, userDesignation, onSaved }: { evaluationI
         <YesNo label="Pool" value={form.pool_present} onChange={v => set('pool_present', v)} />
         {form.pool_present && (
           <div>
-            <label className={labelCls}>Pool Condition</label>
+            <label className={fieldLabelCls}>Pool Condition</label>
             <select value={form.pool_condition} onChange={e => set('pool_condition', e.target.value)} className={select}>
               <option value="">—</option><option value="good">Good</option><option value="poor">Poor</option>
             </select>
@@ -1017,7 +1023,7 @@ function InspectionTab({ evaluationId, userDesignation, onSaved }: { evaluationI
         <YesNo label="Jacuzzi" value={form.jacuzzi_present} onChange={v => set('jacuzzi_present', v)} />
         {form.jacuzzi_present && (
           <div>
-            <label className={labelCls}>Jacuzzi Condition</label>
+            <label className={fieldLabelCls}>Jacuzzi Condition</label>
             <select value={form.jacuzzi_status} onChange={e => set('jacuzzi_status', e.target.value)} className={select}>
               <option value="">—</option><option value="good">Good</option><option value="poor">Poor</option>
             </select>
@@ -1026,11 +1032,11 @@ function InspectionTab({ evaluationId, userDesignation, onSaved }: { evaluationI
 
         <Divider />
         <div>
-          <label className={labelCls}>Entertainment Patio</label>
+          <label className={fieldLabelCls}>Entertainment Patio</label>
           <Counter value={form.patio_quantity} onChange={v => set('patio_quantity', v)} />
           {form.patio_quantity > 0 && (
             <div className="mt-3">
-              <label className={labelCls}>Patio Description</label>
+              <label className={fieldLabelCls}>Patio Description</label>
               <MultiSelect options={PATIO_OPTIONS} selected={form.patio_selections} onToggle={l => toggleStr('patio_selections', l)} />
             </div>
           )}
@@ -1041,7 +1047,7 @@ function InspectionTab({ evaluationId, userDesignation, onSaved }: { evaluationI
 
         <Divider />
         <div>
-          <label className={labelCls}>Domestic Accommodation</label>
+          <label className={fieldLabelCls}>Domestic Accommodation</label>
           <Counter value={form.domestic_quarters_quantity} onChange={v => set('domestic_quarters_quantity', v)} />
           {form.domestic_quarters_quantity > 0 && (
             <label className="flex items-center gap-2 mt-3 cursor-pointer select-none">
@@ -1051,7 +1057,7 @@ function InspectionTab({ evaluationId, userDesignation, onSaved }: { evaluationI
           )}
         </div>
         <div>
-          <label className={labelCls}>Flatlet</label>
+          <label className={fieldLabelCls}>Flatlet</label>
           <Counter
             value={form.flatlet_quantity}
             onChange={v => { set('flatlet_quantity', v); set('flatlet_bedroom_types', resizeArr(form.flatlet_bedroom_types, v)) }}
@@ -1078,7 +1084,7 @@ function InspectionTab({ evaluationId, userDesignation, onSaved }: { evaluationI
         <div className="grid grid-cols-2 gap-4">
           {([['lounges_quantity','Lounges'],['dining_room_quantity','Dining Rooms']] as const).map(([field, lbl]) => (
             <div key={field}>
-              <label className={labelCls}>{lbl}</label>
+              <label className={fieldLabelCls}>{lbl}</label>
               <Counter value={form[field]} onChange={v => set(field, v)} />
             </div>
           ))}
@@ -1088,7 +1094,7 @@ function InspectionTab({ evaluationId, userDesignation, onSaved }: { evaluationI
         <YesNo label="Other Reception" value={form.other_reception_present} onChange={v => set('other_reception_present', v)} />
         {form.other_reception_present && (
           <div>
-            <label className={labelCls}>Reception Type</label>
+            <label className={fieldLabelCls}>Reception Type</label>
             <select value={form.other_reception_type} onChange={e => set('other_reception_type', e.target.value)} className={select}>
               <option value="">—</option>
               <option value="pub">Pub</option>
@@ -1108,7 +1114,7 @@ function InspectionTab({ evaluationId, userDesignation, onSaved }: { evaluationI
         {form.kitchen_present && (
           <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
             <div>
-              <label className={labelCls}>Kitchen Size</label>
+              <label className={fieldLabelCls}>Kitchen Size</label>
               <select value={form.kitchen_size} onChange={e => set('kitchen_size', e.target.value)} className={select}>
                 <option value="">—</option>
                 <option value="large">Large</option>
@@ -1117,7 +1123,7 @@ function InspectionTab({ evaluationId, userDesignation, onSaved }: { evaluationI
               </select>
             </div>
             <div>
-              <label className={labelCls}>Kitchen Finish</label>
+              <label className={fieldLabelCls}>Kitchen Finish</label>
               <select value={form.kitchen_finish} onChange={e => set('kitchen_finish', e.target.value)} className={select}>
                 <option value="">—</option>
                 <option value="modern">Modern</option>
@@ -1126,7 +1132,7 @@ function InspectionTab({ evaluationId, userDesignation, onSaved }: { evaluationI
               </select>
             </div>
             <div>
-              <label className={labelCls}>Kitchen Position</label>
+              <label className={fieldLabelCls}>Kitchen Position</label>
               <select value={form.kitchen_position} onChange={e => set('kitchen_position', e.target.value)} className={select}>
                 <option value="">—</option>
                 <option value="open_plan">Open Plan</option>
@@ -1204,7 +1210,7 @@ function InspectionTab({ evaluationId, userDesignation, onSaved }: { evaluationI
         <YesNo label="Security" value={form.security_present} onChange={v => set('security_present', v)} />
         {form.security_present && (
           <div>
-            <label className={labelCls}>Security Features</label>
+            <label className={fieldLabelCls}>Security Features</label>
             <MultiSelect options={SECURITY_OPTIONS} selected={form.security_features} onToggle={l => toggleStr('security_features', l)} />
           </div>
         )}
@@ -1283,11 +1289,8 @@ function InspSection({ title, children }: { title: string; children: React.React
 function SubHeading({ children }: { children: React.ReactNode }) {
   // Only Exterior/Interior/Other (InspSection's title) should stand out as
   // big and bold -- everything else in the Inspection tab, including these
-  // sub-headings, shares one plain style. Matches YesNo's label exactly
-  // (text-sm font-medium text-[#1a1a1a]) rather than the gray labelCls, so
-  // e.g. "Bedrooms" is the same darkness as "Garden" -- labelCls's
-  // text-gray-500 reads visibly lighter side by side.
-  return <p className="text-sm font-medium text-[#1a1a1a] mb-1">{children}</p>
+  // sub-headings and every field label, shares fieldLabelCls's darkness.
+  return <p className={fieldLabelCls}>{children}</p>
 }
 
 function Divider() {
