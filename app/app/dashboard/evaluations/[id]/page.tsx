@@ -268,6 +268,17 @@ export default function EvaluationDetailPage() {
               const autoOnly       = AUTO_ONLY_STEPS.includes(step.step_key)
               const canAct         = !autoOnly && canActOnRole(userDesignation, ownerRole)
               const overdue        = !complete && step.due_date && new Date(step.due_date) < new Date()
+
+              // Not Started / Pending / Completed -- purely a display label,
+              // derived from sequence position rather than stored on the
+              // row. A step reads "Pending" once the one directly before it
+              // is complete (i.e. it's actually next up); until then it's
+              // "Not Started". Blocked/Not Applicable are deliberately not
+              // part of this yet -- shelved until the rest of the brief's
+              // gaps are closed, per Luke's steer.
+              const previousStep    = i > 0 ? sortedSteps[i - 1] : null
+              const previousComplete = i === 0 || (previousStep ? (previousStep.status === 'complete' || previousStep.is_complete) : true)
+              const stepState = complete ? 'completed' : previousComplete ? 'pending' : 'not_started'
               return (
                 <div key={step.id} className="flex items-center gap-4 py-3 border-b border-gray-50 last:border-0">
                   <button
@@ -290,8 +301,15 @@ export default function EvaluationDetailPage() {
                   </button>
 
                   <div className="flex-1">
-                    <p className={`text-sm font-medium ${complete ? 'text-[#1a1a1a]' : 'text-gray-400'}`}>
+                    <p className={`text-sm font-medium flex items-center gap-2 flex-wrap ${complete ? 'text-[#1a1a1a]' : 'text-gray-400'}`}>
                       {i + 1}. {stepLabel(step.step_key)}
+                      <span className={`text-xs font-medium px-2 py-0.5 rounded-full flex-shrink-0 ${
+                        stepState === 'completed' ? 'bg-[#1a1a1a] text-white'
+                          : stepState === 'pending' ? 'bg-amber-50 text-amber-600 border border-amber-200'
+                          : 'bg-gray-100 text-gray-400'
+                      }`}>
+                        {stepState === 'completed' ? 'Completed' : stepState === 'pending' ? 'Pending' : 'Not Started'}
+                      </span>
                     </p>
                     {complete && step.completed_at ? (
                       <p className="text-xs text-gray-400 mt-0.5">
