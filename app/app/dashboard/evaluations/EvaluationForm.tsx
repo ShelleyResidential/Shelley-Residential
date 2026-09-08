@@ -10,7 +10,7 @@ import Link from 'next/link'
 import { LEAD_SOURCES, REFERRAL_TYPES, MOTIVATIONS, TIMELINES, REASONS_LOST, REASONS_CANCELLED, CONTACT_TAGS } from '@/lib/evaluationOptions'
 import {
   STATUS_LABELS, PIPELINE_STEPS, getPipelineRoles,
-  checkEvaluationFormGate, markStepComplete, promoteStatus,
+  checkEvaluationFormGate, checkCmaConductedGate, markStepComplete, promoteStatus,
 } from '@/lib/pipeline'
 
 const DRAFT_STORAGE_KEY = 'evaluationFormDraft'
@@ -986,6 +986,7 @@ export function EvaluationForm({ evaluationId, readOnly = false, calendarEventLi
       }
 
       await checkEvaluationFormGate(evaluationId, userId, evaluationFormComplete)
+      await checkCmaConductedGate(evaluationId, userId, evaluationPrice, marketingPrice)
 
       if (presentationOutcome === 'completed') {
         await markStepComplete(evaluationId, 'presentation_completed', userId)
@@ -1093,6 +1094,7 @@ export function EvaluationForm({ evaluationId, readOnly = false, calendarEventLi
     // Completed field filled in on this very first save -- same check the
     // update path runs on every subsequent save.
     await checkEvaluationFormGate(ev.id, userId, evaluationFormComplete)
+    await checkCmaConductedGate(ev.id, userId, evaluationPrice, marketingPrice)
 
     // The Cover Letter only generates once, right here, if a contact was
     // captured -- there's no seller to address it to otherwise. Best-effort:

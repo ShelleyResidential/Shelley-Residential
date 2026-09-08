@@ -137,7 +137,7 @@ export default function EvaluationDetailPage() {
   // creating the evaluation, a successful calendar sync, the required
   // fields all being filled in -- never a direct click in the Pipeline
   // tab, for anyone, regardless of role.
-  const AUTO_ONLY_STEPS = ['captured', 'scheduled', 'evaluation_form_completed']
+  const AUTO_ONLY_STEPS = ['captured', 'scheduled', 'evaluation_form_completed', 'cma_conducted']
 
   async function togglePipelineStep(stepId: string, stepKey: string, currentlyComplete: boolean) {
     if (!userId) return

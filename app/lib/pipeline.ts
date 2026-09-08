@@ -37,6 +37,7 @@ export const PIPELINE_STEPS: { key: string; label: string; ownerRole: PipelineRo
   { key: 'lightstone_uploaded',       label: 'Transfer Reports Uploaded',     ownerRole: 'tc' },
   { key: 'evaluation_pack_prepared',  label: 'Evaluation Pack Prepared',      ownerRole: 'tc' },
   { key: 'property_inspected',        label: 'Property Inspection Completed', ownerRole: 'agent' },
+  { key: 'cma_conducted',             label: 'CMA Conducted',                 ownerRole: 'agent' },
   { key: 'cma_approved',              label: 'CMA Approved',                  ownerRole: 'cma_approver' },
   { key: 'mandate_pack_prepared',     label: 'Mandate Pack',                  ownerRole: 'tc' },
   { key: 'presentation_scheduled',    label: 'Presentation Scheduled',        ownerRole: 'agent' },
@@ -146,6 +147,21 @@ export async function checkEvaluationFormGate(evaluationId: string, userId: stri
   if (!complete) return
   await markStepComplete(evaluationId, 'evaluation_form_completed', userId)
   await checkPreparedGate(evaluationId)
+}
+
+// EV-08 "CMA Conducted" -- both Evaluation Price and Marketing Price
+// captured. Auto-completes exactly once: the brief tracks this as a
+// submitted-at timestamp feeding the CMA Turnaround SLA metric (Inspection
+// Completed -> CMA Conducted, target 24h), so re-saving the form after the
+// prices are already in must never re-stamp it to "now". Doesn't gate
+// evaluations.status itself -- that still only moves on CMA Approved.
+export async function checkCmaConductedGate(
+  evaluationId: string, userId: string,
+  evaluationPrice: string | number | null, marketingPrice: string | number | null,
+) {
+  if (!evaluationPrice || !marketingPrice) return
+  if (await isStepComplete(evaluationId, 'cma_conducted')) return
+  await markStepComplete(evaluationId, 'cma_conducted', userId)
 }
 
 export { isStepComplete, promoteStatus }
