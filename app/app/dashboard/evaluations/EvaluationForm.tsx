@@ -1047,7 +1047,7 @@ export function EvaluationForm({ evaluationId, readOnly = false, calendarEventLi
     // from the first row in the batch, and rejects the whole insert
     // (PGRST102) if a later row's key set doesn't match.
     const nowIso = new Date().toISOString()
-    await supabase.from('evaluation_pipeline_steps').insert(
+    const { error: stepsErr } = await supabase.from('evaluation_pipeline_steps').insert(
       PIPELINE_STEPS.map((step, i) => {
         const ownerUserId = step.ownerRole === 'agent' ? (agentId || null) : step.ownerRole === 'tc' ? (tcId || null) : null
 
@@ -1073,6 +1073,17 @@ export function EvaluationForm({ evaluationId, readOnly = false, calendarEventLi
         }
       })
     )
+    // A failure here (e.g. a DB constraint rejecting one of the seeded step
+    // keys) previously failed completely silently -- the evaluation record
+    // still got created, just with an empty, broken Pipeline tab and no
+    // indication anything had gone wrong. Surface it loudly instead: the
+    // record already exists at this point, so this can't be a clean abort,
+    // but at least it's visible and points at what to fix.
+    if (stepsErr) {
+      setError(`Evaluation saved, but its pipeline steps failed to create: ${stepsErr.message}. Contact support -- the Pipeline tab will be empty until this is fixed.`)
+      setSaving(false)
+      return
+    }
 
     // An Evaluation Date and Time captured on save automatically creates the
     // Google Calendar event; the "Evaluation Scheduled" step and the
@@ -1570,6 +1581,43 @@ export function EvaluationForm({ evaluationId, readOnly = false, calendarEventLi
           </div>
         </Field>
 
+        <Field label="Evaluation Outcome" readOnly={readOnly}
+          value={EVALUATION_OUTCOMES.find(o => o.value === evaluationOutcome)?.label}>
+          <select value={evaluationOutcome} onChange={e => setEvaluationOutcome(e.target.value)} className={select}>
+            <option value="">—</option>
+            {EVALUATION_OUTCOMES.map(o => <option key={o.value} value={o.value}>{o.label}</option>)}
+          </select>
+          <p className="text-xs text-gray-400 mt-2">Recording an outcome closes this evaluation.</p>
+        </Field>
+
+        {evaluationOutcome === 'lost' && (
+          <Field label="Reason Lost" readOnly={readOnly}
+            value={reasonLost === 'other' ? (reasonLostOther || 'Other') : REASONS_LOST.find(r => r.value === reasonLost)?.label}>
+            <select value={reasonLost} onChange={e => setReasonLost(e.target.value)} className={select}>
+              <option value="">—</option>
+              {REASONS_LOST.map(r => <option key={r.value} value={r.value}>{r.label}</option>)}
+            </select>
+            {reasonLost === 'other' && (
+              <input value={reasonLostOther} onChange={e => setReasonLostOther(e.target.value)}
+                placeholder="Describe the reason" className={`${input} mt-2`} />
+            )}
+          </Field>
+        )}
+
+        {evaluationOutcome === 'cancelled' && (
+          <Field label="Reason Cancelled" readOnly={readOnly}
+            value={reasonCancelled === 'other' ? (reasonCancelledOther || 'Other') : REASONS_CANCELLED.find(r => r.value === reasonCancelled)?.label}>
+            <select value={reasonCancelled} onChange={e => setReasonCancelled(e.target.value)} className={select}>
+              <option value="">—</option>
+              {REASONS_CANCELLED.map(r => <option key={r.value} value={r.value}>{r.label}</option>)}
+            </select>
+            {reasonCancelled === 'other' && (
+              <input value={reasonCancelledOther} onChange={e => setReasonCancelledOther(e.target.value)}
+                placeholder="Describe the reason" className={`${input} mt-2`} />
+            )}
+          </Field>
+        )}
+
         <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
           <Field label="Evaluation Price" readOnly={readOnly} value={evaluationPrice ? formatZAR(evaluationPrice) : undefined}>
             <input type="number" value={evaluationPrice} onChange={e => setEvaluationPrice(e.target.value)}
@@ -1678,49 +1726,6 @@ export function EvaluationForm({ evaluationId, readOnly = false, calendarEventLi
           </Field>
         </Section>
       )}
-
-      {/* ── Evaluation Outcome — the last item on the page, per Luke's
-          request: recording an outcome is what closes the evaluation, so
-          it reads as the final step, after everything else (price, CMA,
-          presentation) has already been captured. ── */}
-      <Section title="Evaluation Outcome">
-        <Field label="Evaluation Outcome" readOnly={readOnly}
-          value={EVALUATION_OUTCOMES.find(o => o.value === evaluationOutcome)?.label}>
-          <select value={evaluationOutcome} onChange={e => setEvaluationOutcome(e.target.value)} className={select}>
-            <option value="">—</option>
-            {EVALUATION_OUTCOMES.map(o => <option key={o.value} value={o.value}>{o.label}</option>)}
-          </select>
-          <p className="text-xs text-gray-400 mt-2">Recording an outcome closes this evaluation.</p>
-        </Field>
-
-        {evaluationOutcome === 'lost' && (
-          <Field label="Reason Lost" readOnly={readOnly}
-            value={reasonLost === 'other' ? (reasonLostOther || 'Other') : REASONS_LOST.find(r => r.value === reasonLost)?.label}>
-            <select value={reasonLost} onChange={e => setReasonLost(e.target.value)} className={select}>
-              <option value="">—</option>
-              {REASONS_LOST.map(r => <option key={r.value} value={r.value}>{r.label}</option>)}
-            </select>
-            {reasonLost === 'other' && (
-              <input value={reasonLostOther} onChange={e => setReasonLostOther(e.target.value)}
-                placeholder="Describe the reason" className={`${input} mt-2`} />
-            )}
-          </Field>
-        )}
-
-        {evaluationOutcome === 'cancelled' && (
-          <Field label="Reason Cancelled" readOnly={readOnly}
-            value={reasonCancelled === 'other' ? (reasonCancelledOther || 'Other') : REASONS_CANCELLED.find(r => r.value === reasonCancelled)?.label}>
-            <select value={reasonCancelled} onChange={e => setReasonCancelled(e.target.value)} className={select}>
-              <option value="">—</option>
-              {REASONS_CANCELLED.map(r => <option key={r.value} value={r.value}>{r.label}</option>)}
-            </select>
-            {reasonCancelled === 'other' && (
-              <input value={reasonCancelledOther} onChange={e => setReasonCancelledOther(e.target.value)}
-                placeholder="Describe the reason" className={`${input} mt-2`} />
-            )}
-          </Field>
-        )}
-      </Section>
 
       {error && <p className="text-sm text-red-500 bg-red-50 px-4 py-3 rounded-lg">{error}</p>}
 
