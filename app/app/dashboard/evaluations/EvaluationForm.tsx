@@ -273,6 +273,8 @@ type RawEvaluationRow = {
   motivation_for_selling_notes: string | null
   selling_timeline_notes: string | null
   scheduled_at: string | null
+  original_scheduled_at: string | null
+  reschedule_count: number | null
   sellers_agent_user_id: string | null
   transaction_coordinator_user_id: string | null
   evaluation_price: number | null
@@ -384,6 +386,12 @@ export function EvaluationForm({ evaluationId, readOnly = false, calendarEventLi
   // Scheduling
   const [schedDate, setSchedDate] = useState('')
   const [schedTime, setSchedTime] = useState('')
+  // Read-only -- set entirely by the DB trigger track_evaluation_reschedule
+  // whenever scheduled_at changes, from whichever of the three code paths
+  // caused it (this form, the calendar sync route, or the Google Calendar
+  // webhook reconciling an external edit).
+  const [originalScheduledAt, setOriginalScheduledAt] = useState<string | null>(null)
+  const [rescheduleCount, setRescheduleCount]         = useState(0)
   const scheduledAt = schedDate && schedTime ? `${schedDate}T${schedTime}` : ''
 
   const [saving, setSaving] = useState(false)
@@ -457,6 +465,8 @@ export function EvaluationForm({ evaluationId, readOnly = false, calendarEventLi
     const schedIso = row.scheduled_at ? row.scheduled_at.slice(0, 16) : ''
     setSchedDate(schedIso ? schedIso.slice(0, 10) : '')
     setSchedTime(schedIso ? schedIso.slice(11, 16) : '')
+    setOriginalScheduledAt(row.original_scheduled_at)
+    setRescheduleCount(row.reschedule_count ?? 0)
 
     const sortedContacts = [...(row.evaluation_contacts ?? [])].sort((a, b) => a.sort_order - b.sort_order)
     setContacts(sortedContacts.filter(ec => ec.contacts).map(ec => ({
@@ -476,6 +486,7 @@ export function EvaluationForm({ evaluationId, readOnly = false, calendarEventLi
         id, status, reason_lost, reason_cancelled, lead_generated_by, lead_source_other_text, lead_referral_notes,
         referral_type, referral_contact_id, referral_contact:referral_contact_id (id, first_name, last_name),
         motivation_for_selling_notes, selling_timeline_notes, scheduled_at,
+        original_scheduled_at, reschedule_count,
         sellers_agent_user_id, transaction_coordinator_user_id, evaluation_price, marketing_price,
         date_captured, captured_by_user_id, ownership, evaluation_outcome,
         cma_approved_by_user_id, cma_approved_at,
@@ -1580,6 +1591,13 @@ export function EvaluationForm({ evaluationId, readOnly = false, calendarEventLi
             </div>
           </div>
         </Field>
+
+        {rescheduleCount > 0 && originalScheduledAt && (
+          <p className="text-xs text-gray-400 mt-2">
+            Originally scheduled for {new Date(originalScheduledAt.slice(0, 10)).toLocaleDateString('en-ZA', { day: 'numeric', month: 'long', year: 'numeric' })}
+            {' · '}Rescheduled {rescheduleCount}x
+          </p>
+        )}
 
         <Field label="Evaluation Outcome" readOnly={readOnly}
           value={EVALUATION_OUTCOMES.find(o => o.value === evaluationOutcome)?.label}>
