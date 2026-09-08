@@ -653,9 +653,15 @@ const EMPTY_INSPECTION: InspectionForm = {
 
 const APPOINTMENT_OUTCOMES = [
   { value: 'completed',            label: 'Completed' },
+  { value: 'rescheduled',          label: 'Rescheduled' },
+  { value: 'seller_cancelled',     label: 'Seller Cancelled' },
   { value: 'no_show',              label: 'No Show' },
   { value: 'unable_to_complete',   label: 'Unable to Complete' },
 ]
+
+// Every non-Completed outcome means the visit didn't happen -- none of
+// them should be able to advance the evaluation to Inspected.
+const APPOINTMENT_OUTCOMES_REVERT_TO_SCHEDULED = ['rescheduled', 'seller_cancelled', 'no_show', 'unable_to_complete']
 
 function InspectionTab({ evaluationId, userDesignation, onSaved }: { evaluationId: string; userDesignation: string | null; onSaved: () => void }) {
   const [form, setForm]                 = useState<InspectionForm>(EMPTY_INSPECTION)
@@ -877,12 +883,13 @@ function InspectionTab({ evaluationId, userDesignation, onSaved }: { evaluationI
 
       // "Property Inspection Completed" only actually completes -- and
       // advances the evaluation to Inspected -- once the Appointment
-      // Outcome says the visit happened. No Show / Unable to Complete
-      // route back to scheduling instead of moving the pipeline forward.
+      // Outcome says the visit happened. Any other recorded outcome
+      // (Rescheduled, Seller Cancelled, No Show, Unable to Complete)
+      // routes back to scheduling instead of moving the pipeline forward.
       if (form.appointment_outcome === 'completed') {
         await markStepComplete(evaluationId, 'property_inspected', userId)
         await promoteStatus(evaluationId, 'inspected')
-      } else if (form.appointment_outcome === 'no_show' || form.appointment_outcome === 'unable_to_complete') {
+      } else if (APPOINTMENT_OUTCOMES_REVERT_TO_SCHEDULED.includes(form.appointment_outcome)) {
         await supabase.from('evaluations').update({ status: 'scheduled' }).eq('id', evaluationId)
       }
     }
@@ -906,7 +913,7 @@ function InspectionTab({ evaluationId, userDesignation, onSaved }: { evaluationI
             <option value="">—</option>
             {APPOINTMENT_OUTCOMES.map(o => <option key={o.value} value={o.value}>{o.label}</option>)}
           </select>
-          {(form.appointment_outcome === 'no_show' || form.appointment_outcome === 'unable_to_complete') && (
+          {APPOINTMENT_OUTCOMES_REVERT_TO_SCHEDULED.includes(form.appointment_outcome) && (
             <p className="text-xs text-gray-400 mt-2">Saving will move this evaluation back to Scheduled.</p>
           )}
         </div>

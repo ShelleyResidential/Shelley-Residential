@@ -70,4 +70,12 @@ export const REASONS_LOST = [
   { value: 'other',             label: 'Other (please specify)' },
 ]
 
+export const REASONS_CANCELLED = [
+  { value: 'seller_changed_mind',      label: 'Seller Changed Mind' },
+  { value: 'property_withdrawn',       label: 'Property Withdrawn From Market' },
+  { value: 'duplicate_entry',          label: 'Duplicate Entry' },
+  { value: 'incorrect_details',        label: 'Incorrect Details' },
+  { value: 'other',                    label: 'Other (please specify)' },
+]
+
 export const CONTACT_TAGS = ['Seller', 'Attorney', 'Managing Agent', 'Tenant']
