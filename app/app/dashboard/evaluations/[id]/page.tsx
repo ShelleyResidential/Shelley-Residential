@@ -303,12 +303,9 @@ export default function EvaluationDetailPage() {
                   <div className="flex-1">
                     <p className={`text-sm font-medium flex items-center gap-2 flex-wrap ${complete ? 'text-[#1a1a1a]' : 'text-gray-400'}`}>
                       {i + 1}. {stepLabel(step.step_key)}
-                      {stepState !== 'completed' && (
-                        <span className={`text-xs font-medium px-2 py-0.5 rounded-full flex-shrink-0 ${
-                          stepState === 'pending' ? 'bg-amber-50 text-amber-600 border border-amber-200'
-                            : 'bg-gray-100 text-gray-400'
-                        }`}>
-                          {stepState === 'pending' ? 'Pending' : 'Not Started'}
+                      {stepState === 'pending' && (
+                        <span className="text-xs font-medium px-2 py-0.5 rounded-full flex-shrink-0 bg-amber-50 text-amber-600 border border-amber-200">
+                          Pending
                         </span>
                       )}
                     </p>
