@@ -290,8 +290,8 @@ export default function EvaluationDetailPage() {
                     className={`w-6 h-6 rounded-full border-2 flex-shrink-0 flex items-center justify-center transition-all ${
                       complete
                         ? 'bg-[#1a1a1a] border-[#1a1a1a] text-white'
-                        : 'border-gray-300 hover:border-gray-500'
-                    } ${!canAct ? 'opacity-40 cursor-not-allowed' : ''}`}
+                        : 'border-[#1a1a1a] hover:bg-gray-50'
+                    } ${!canAct && !complete ? 'opacity-40 cursor-not-allowed' : !canAct ? 'cursor-not-allowed' : ''}`}
                   >
                     {complete && (
                       <svg width="10" height="8" viewBox="0 0 10 8" fill="none">
@@ -303,13 +303,14 @@ export default function EvaluationDetailPage() {
                   <div className="flex-1">
                     <p className={`text-sm font-medium flex items-center gap-2 flex-wrap ${complete ? 'text-[#1a1a1a]' : 'text-gray-400'}`}>
                       {i + 1}. {stepLabel(step.step_key)}
-                      <span className={`text-xs font-medium px-2 py-0.5 rounded-full flex-shrink-0 ${
-                        stepState === 'completed' ? 'bg-[#1a1a1a] text-white'
-                          : stepState === 'pending' ? 'bg-amber-50 text-amber-600 border border-amber-200'
-                          : 'bg-gray-100 text-gray-400'
-                      }`}>
-                        {stepState === 'completed' ? 'Completed' : stepState === 'pending' ? 'Pending' : 'Not Started'}
-                      </span>
+                      {stepState !== 'completed' && (
+                        <span className={`text-xs font-medium px-2 py-0.5 rounded-full flex-shrink-0 ${
+                          stepState === 'pending' ? 'bg-amber-50 text-amber-600 border border-amber-200'
+                            : 'bg-gray-100 text-gray-400'
+                        }`}>
+                          {stepState === 'pending' ? 'Pending' : 'Not Started'}
+                        </span>
+                      )}
                     </p>
                     {complete && step.completed_at ? (
                       <p className="text-xs text-gray-400 mt-0.5">
