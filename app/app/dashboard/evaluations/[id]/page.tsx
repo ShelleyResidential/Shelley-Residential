@@ -10,7 +10,7 @@ import Link from 'next/link'
 import { EvaluationForm } from '../EvaluationForm'
 import { REPORT_TYPES } from '@/lib/evaluation-documents'
 import {
-  STATUS_LABELS, STATUS_COLOURS, stepLabel, stepOwnerRole, canActOnRole,
+  STATUS_LABELS, STATUS_COLOURS, stepLabel, stepOwnerRole, canActOnRole, roleLabel, getNextAction,
   markStepComplete, promoteStatus, checkPreparedGate, checkPresentationReadyGate,
 } from '@/lib/pipeline'
 
@@ -26,7 +26,7 @@ type Property = {
 
 type PipelineStep = {
   id: string; step_key: string; is_complete: boolean; status: string
-  owner_role: string | null; due_date: string | null; created_at: string | null
+  owner_role: string | null; owner_user_id: string | null; due_date: string | null; created_at: string | null
   completed_at: string | null; completed_by_user_id: string | null; sort_order: number
 }
 
@@ -86,7 +86,7 @@ export default function EvaluationDetailPage() {
           street_number, street_name, suburb, city, province, postal_code,
           google_maps_url, latitude, longitude),
         evaluation_pipeline_steps (
-          id, step_key, is_complete, status, owner_role, due_date, created_at, completed_at, completed_by_user_id, sort_order
+          id, step_key, is_complete, status, owner_role, owner_user_id, due_date, created_at, completed_at, completed_by_user_id, sort_order
         )
       `)
       .eq('id', id)
@@ -168,6 +168,17 @@ export default function EvaluationDetailPage() {
   const stepsComplete  = sortedSteps.filter(s => s.status === 'complete' || s.is_complete).length
   const dateStr = new Date(ev.date_captured).toLocaleDateString('en-ZA', { day: 'numeric', month: 'long', year: 'numeric' })
 
+  // Rule R7 / BR-03 -- one clearly-surfaced Next Action, Owner and Due
+  // Date, not just the full Pipeline tab checklist.
+  const nextAction = getNextAction(sortedSteps)
+  const nextActionOwnerName = nextAction
+    ? (nextAction.owner_user_id ? (profiles[nextAction.owner_user_id]?.full_name ?? profiles[nextAction.owner_user_id]?.email) : null) ?? roleLabel(nextAction.owner_role)
+    : null
+  const nextActionOverdue = !!nextAction?.due_date && new Date(nextAction.due_date) < new Date()
+  const nextActionDueLabel = nextAction?.due_date
+    ? new Date(nextAction.due_date).toLocaleDateString('en-ZA', { day: 'numeric', month: 'short', year: 'numeric' }) + (nextActionOverdue ? ' (overdue)' : '')
+    : null
+
   return (
     <div className="p-10 max-w-4xl">
 
@@ -180,6 +191,16 @@ export default function EvaluationDetailPage() {
           <div className="min-w-0">
             <h1 className="text-2xl font-bold text-[#1a1a1a] truncate" title={address}>{address}</h1>
             <p className="text-sm text-gray-400 mt-1">Captured {dateStr}</p>
+            {nextAction && (
+              <p className="text-sm mt-1">
+                <span className="text-gray-400">Next: </span>
+                <span className="text-[#1a1a1a] font-medium">{stepLabel(nextAction.step_key)}</span>
+                {nextActionOwnerName && <span className="text-gray-400"> · {nextActionOwnerName}</span>}
+                {nextActionDueLabel && (
+                  <span className={nextActionOverdue ? 'text-red-500 font-medium' : 'text-gray-400'}> · Due {nextActionDueLabel}</span>
+                )}
+              </p>
+            )}
           </div>
           <div className="flex items-center gap-3 flex-shrink-0">
             <span className={`text-sm px-3 py-1 rounded-full font-medium whitespace-nowrap ${STATUS_COLOURS[ev.status] ?? 'bg-gray-100 text-gray-500'}`}>

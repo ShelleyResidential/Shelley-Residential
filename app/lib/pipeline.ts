@@ -60,6 +60,32 @@ export function stepOwnerRole(stepKey: string): PipelineRole | null {
   return PIPELINE_STEPS.find(s => s.key === stepKey)?.ownerRole ?? null
 }
 
+export function roleLabel(role: string | null | undefined): string {
+  if (role === 'tc') return 'Transaction Coordinator'
+  if (role === 'cma_approver') return 'CMA Approver'
+  if (role === 'agent') return 'Agent'
+  return '—'
+}
+
+export type PipelineStepRow = {
+  step_key: string
+  status?: string | null
+  is_complete?: boolean | null
+  owner_role: string | null
+  owner_user_id: string | null
+  due_date: string | null
+  sort_order: number
+}
+
+// The single most important next step, per Rule R7 / BR-03: every active
+// evaluation should expose one Next Action, Owner and Due Date, not just
+// the full checklist. The first pipeline step (by sort_order) that isn't
+// complete yet -- null once every step is done (a Closed evaluation).
+export function getNextAction(steps: PipelineStepRow[]): PipelineStepRow | null {
+  const sorted = [...steps].sort((a, b) => a.sort_order - b.sort_order)
+  return sorted.find(s => !(s.status === 'complete' || s.is_complete)) ?? null
+}
+
 // ── Statuses ──────────────────────────────────────────────────
 export const STATUS_ORDER = [
   'new', 'scheduled', 'prepared', 'inspected', 'evaluated',
