@@ -291,6 +291,9 @@ type RawEvaluationRow = {
   presentation_scheduled_at: string | null
   presentation_calendar_event_link: string | null
   presentation_outcome: string | null
+  expected_decision_date: string | null
+  last_followed_up_at: string | null
+  follow_up_count: number | null
   properties: Property | null
   evaluation_contacts: {
     contact_id: string
@@ -364,6 +367,15 @@ export function EvaluationForm({ evaluationId, readOnly = false, calendarEventLi
   const presentationScheduledAt = presentationDate && presentationTime ? `${presentationDate}T${presentationTime}` : ''
   const [presentationCalendarLink, setPresentationCalendarLink] = useState<string | null>(null)
   const [presentationOutcome, setPresentationOutcome] = useState('')
+
+  // Seller Follow-up (EV-13) -- Expected Decision Date is a normal saved
+  // field; lastFollowedUpAt/followUpCount are read-only, set only by the
+  // "Log Follow-up" button's own direct update (same pattern as CMA
+  // approve/reject), not part of the regular form payload.
+  const [expectedDecisionDate, setExpectedDecisionDate] = useState('')
+  const [lastFollowedUpAt, setLastFollowedUpAt]         = useState<string | null>(null)
+  const [followUpCount, setFollowUpCount]               = useState(0)
+  const [loggingFollowUp, setLoggingFollowUp]           = useState(false)
   const [evaluationOutcome, setEvaluationOutcome]     = useState('')
 
   // Lead info
@@ -439,6 +451,9 @@ export function EvaluationForm({ evaluationId, readOnly = false, calendarEventLi
     setCmaRejectionReason(row.cma_rejection_reason)
     setPresentationCalendarLink(row.presentation_calendar_event_link)
     setPresentationOutcome(row.presentation_outcome ?? '')
+    setExpectedDecisionDate(row.expected_decision_date ?? '')
+    setLastFollowedUpAt(row.last_followed_up_at)
+    setFollowUpCount(row.follow_up_count ?? 0)
 
     const presIso = row.presentation_scheduled_at ? row.presentation_scheduled_at.slice(0, 16) : ''
     setPresentationDate(presIso ? presIso.slice(0, 10) : '')
@@ -492,6 +507,7 @@ export function EvaluationForm({ evaluationId, readOnly = false, calendarEventLi
         cma_approved_by_user_id, cma_approved_at,
         cma_rejected_by_user_id, cma_rejected_at, cma_rejection_reason,
         presentation_scheduled_at, presentation_calendar_event_link, presentation_outcome,
+        expected_decision_date, last_followed_up_at, follow_up_count,
         properties (id, property_type, unit_number, complex_or_building_name, street_number, street_name, suburb, city),
         evaluation_contacts (
           contact_id, is_primary, sort_order,
@@ -869,6 +885,25 @@ export function EvaluationForm({ evaluationId, readOnly = false, calendarEventLi
     await fetchEvaluation()
   }
 
+  // ── Seller Follow-up (EV-13) — logs a touch-point while the seller's
+  // decision is still pending. Deliberately just a timestamp + counter for
+  // now, not a full per-follow-up note log -- that belongs with the audit
+  // log work, not this. "Repeat while decision remains open" (brief) means
+  // this can be clicked again and again, each time just re-stamping "now"
+  // and bumping the count.
+  async function logFollowUp() {
+    if (!evaluationId || !userId) return
+    setLoggingFollowUp(true)
+    const nowIso = new Date().toISOString()
+    const nextCount = followUpCount + 1
+    await supabase.from('evaluations').update({
+      last_followed_up_at: nowIso, follow_up_count: nextCount,
+    }).eq('id', evaluationId)
+    setLastFollowedUpAt(nowIso)
+    setFollowUpCount(nextCount)
+    setLoggingFollowUp(false)
+  }
+
   // ── Submit ───────────────────────────────────────────────
   async function handleSubmit(e: React.FormEvent) {
     e.preventDefault()
@@ -939,6 +974,7 @@ export function EvaluationForm({ evaluationId, readOnly = false, calendarEventLi
       evaluation_outcome:               evaluationOutcome || null,
       presentation_scheduled_at:        presentationScheduledAt || null,
       presentation_outcome:             presentationOutcome || null,
+      expected_decision_date:           expectedDecisionDate || null,
     }
 
     const { data: tagOptions } = await supabase.from('picklist_options').select('id, label').eq('list_name', 'contact_tag')
@@ -1742,6 +1778,32 @@ export function EvaluationForm({ evaluationId, readOnly = false, calendarEventLi
               {PRESENTATION_OUTCOMES.map(o => <option key={o.value} value={o.value}>{o.label}</option>)}
             </select>
           </Field>
+        </Section>
+      )}
+
+      {/* ── Follow-up (EV-13) — only relevant once the presentation has
+          actually happened; the seller's decision is what's being followed
+          up on. ── */}
+      {evaluationId && presentationOutcome === 'completed' && (
+        <Section title="Follow-up">
+          <Field label="Expected Decision Date" readOnly={readOnly}
+            value={expectedDecisionDate ? new Date(expectedDecisionDate).toLocaleDateString('en-ZA', { day: 'numeric', month: 'long', year: 'numeric' }) : undefined}>
+            <input type="date" value={expectedDecisionDate} onChange={e => setExpectedDecisionDate(e.target.value)} className={input} />
+          </Field>
+
+          <div className="flex items-center justify-between gap-3">
+            <p className="text-sm text-gray-400">
+              {lastFollowedUpAt
+                ? `Last followed up ${new Date(lastFollowedUpAt).toLocaleDateString('en-ZA', { day: 'numeric', month: 'long', year: 'numeric' })} (${followUpCount}x)`
+                : 'No follow-up logged yet.'}
+            </p>
+            {!readOnly && (
+              <button type="button" onClick={logFollowUp} disabled={loggingFollowUp}
+                className={`${btn.secondary} flex-shrink-0 disabled:opacity-40 disabled:cursor-not-allowed`}>
+                {loggingFollowUp ? 'Logging…' : 'Log Follow-up'}
+              </button>
+            )}
+          </div>
         </Section>
       )}
 
