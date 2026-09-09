@@ -74,6 +74,8 @@ export type PipelineStepRow = {
   owner_role: string | null
   owner_user_id: string | null
   due_date: string | null
+  completed_at?: string | null
+  evaluation_id?: string
   sort_order: number
 }
 
