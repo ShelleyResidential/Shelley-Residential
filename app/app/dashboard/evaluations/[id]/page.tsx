@@ -65,7 +65,7 @@ export default function EvaluationDetailPage() {
 
   const [evaluation, setEvaluation] = useState<Evaluation | null>(null)
   const [loading, setLoading]       = useState(true)
-  const [activeTab, setActiveTab]   = useState<'details' | 'documents' | 'inspection' | 'pipeline'>('details')
+  const [activeTab, setActiveTab]   = useState<'details' | 'documents' | 'inspection' | 'pipeline' | 'activity'>('details')
   const [userId, setUserId]         = useState<string | null>(null)
   const [userEmail, setUserEmail]   = useState<string | null>(null)
   const [userDesignation, setUserDesignation] = useState<string | null>(null)
@@ -225,6 +225,7 @@ export default function EvaluationDetailPage() {
           { key: 'documents',  label: 'Documents' },
           { key: 'inspection', label: 'Inspection' },
           { key: 'pipeline',   label: 'Pipeline' },
+          { key: 'activity',   label: 'Activity' },
         ] as const).map(tab => (
           <button key={tab.key} onClick={() => setActiveTab(tab.key)}
             className={`px-4 py-2 text-sm font-medium border-b-2 -mb-px transition-colors ${
@@ -348,6 +349,11 @@ export default function EvaluationDetailPage() {
             })}
           </div>
         </div>
+      )}
+
+      {/* ── Activity tab ── */}
+      {activeTab === 'activity' && (
+        <ActivityTab evaluationId={id} profiles={profiles} />
       )}
     </div>
   )
@@ -594,6 +600,77 @@ function CoverLetterCard({ evaluationId, userId, doc, onGenerated }: {
             {generating ? 'Generating…' : 'Generate'}
           </button>
         </>
+      )}
+    </div>
+  )
+}
+
+// ── ActivityTab ────────────────────────────────────────────────
+// Reverse-chronological feed of evaluation_audit_events -- written
+// entirely by DB triggers (see log_evaluation_audit_events and
+// log_pipeline_step_audit_events), never by app code. This tab only
+// ever reads; there's no way to create/edit/delete an entry from here
+// (matches the table's RLS: authenticated users get a select policy
+// only, so this is enforced at the DB level too, not just in the UI).
+type AuditEvent = {
+  id: string
+  event_type: string
+  actor_user_id: string | null
+  description: string
+  metadata: { step_key?: string } | null
+  created_at: string
+}
+
+function ActivityTab({ evaluationId, profiles }: { evaluationId: string; profiles: Record<string, PipelineProfile> }) {
+  const [events, setEvents]   = useState<AuditEvent[]>([])
+  const [loading, setLoading] = useState(true)
+
+  useEffect(() => {
+    supabase.from('evaluation_audit_events')
+      .select('id, event_type, actor_user_id, description, metadata, created_at')
+      .eq('evaluation_id', evaluationId)
+      .order('created_at', { ascending: false })
+      .then(({ data }) => {
+        setEvents((data ?? []) as AuditEvent[])
+        setLoading(false)
+      })
+  }, [evaluationId])
+
+  // Step events read friendlier straight from stepLabel() (the same
+  // catalogue the Pipeline tab uses) than the DB's own prettified
+  // fallback text (which can't know about labels that don't just mirror
+  // the key, e.g. "property_inspected" -> "Property Inspection Completed").
+  function eventText(ev: AuditEvent): string {
+    if (ev.event_type === 'step_completed' && ev.metadata?.step_key) return `Marked "${stepLabel(ev.metadata.step_key)}" complete`
+    if (ev.event_type === 'step_uncompleted' && ev.metadata?.step_key) return `Marked "${stepLabel(ev.metadata.step_key)}" incomplete`
+    return ev.description
+  }
+
+  if (loading) return <div className="text-center py-16 text-gray-400 text-sm">Loading activity…</div>
+
+  return (
+    <div className={`${card} p-6`}>
+      <h3 className={`${sectionTitle} mb-6`}>Activity</h3>
+      {events.length === 0 ? (
+        <p className="text-sm text-gray-400">No activity recorded yet.</p>
+      ) : (
+        <div className="space-y-4">
+          {events.map(ev => {
+            const actor = ev.actor_user_id ? profiles[ev.actor_user_id] : null
+            const actorName = actor?.full_name ?? actor?.email ?? 'System'
+            return (
+              <div key={ev.id} className="flex items-start gap-3 pb-4 border-b border-gray-50 last:border-0 last:pb-0">
+                <div className="w-2 h-2 rounded-full bg-[#1a1a1a] mt-1.5 flex-shrink-0" />
+                <div className="flex-1 min-w-0">
+                  <p className="text-sm text-[#1a1a1a]">{eventText(ev)}</p>
+                  <p className="text-xs text-gray-400 mt-0.5">
+                    {actorName}{' · '}{new Date(ev.created_at).toLocaleString('en-ZA', { dateStyle: 'medium', timeStyle: 'short' })}
+                  </p>
+                </div>
+              </div>
+            )
+          })}
+        </div>
       )}
     </div>
   )
