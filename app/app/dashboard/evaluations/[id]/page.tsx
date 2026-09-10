@@ -703,6 +703,9 @@ const ADDITIONAL_OPTS   = ['Jungle Gym', 'Jojo Tank', 'Storeroom', 'Solar Panels
 // on the Inspection tab. This is scoped to this tab only, not changing the
 // shared style used by every other page/tab in the app.
 const fieldLabelCls = 'block text-sm font-medium text-[#1a1a1a] mb-1'
+// Same size, just bold -- used for every heading in the read-only (saved)
+// view of the Inspection tab.
+const roLabelCls    = 'block text-sm font-bold text-[#1a1a1a] mb-1'
 
 // Option lists for the Inspection selects, pulled out so the same list
 // renders the <option>s in edit mode AND resolves the stored value to a
@@ -732,7 +735,7 @@ function RoField({ label, editing, display, children, className }: {
 }) {
   return (
     <div className={className}>
-      <label className={fieldLabelCls}>{label}</label>
+      <label className={editing ? fieldLabelCls : roLabelCls}>{label}</label>
       {editing ? children : <p className="text-sm text-[#1a1a1a] py-2.5">{display || '—'}</p>}
     </div>
   )
@@ -1301,7 +1304,7 @@ function InspectionTab({ evaluationId, userDesignation, onSaved, editing, setEdi
         <YesNo label="Scullery / Laundry" value={form.scullery_laundry_present} onChange={v => set('scullery_laundry_present', v)} readOnly={!editing} />
 
         <Divider />
-        <SubHeading>Bedrooms</SubHeading>
+        <SubHeading bold={!editing}>Bedrooms</SubHeading>
         <Counter readOnly={!editing}
           value={form.bedrooms_quantity}
           onChange={v => { set('bedrooms_quantity', v); set('bedroom_sizes', resizeArr(form.bedroom_sizes, v)) }}
@@ -1324,7 +1327,7 @@ function InspectionTab({ evaluationId, userDesignation, onSaved, editing, setEdi
         )}
 
         <Divider />
-        <SubHeading>Study</SubHeading>
+        <SubHeading bold={!editing}>Study</SubHeading>
         <Counter readOnly={!editing}
           value={form.study_quantity}
           onChange={v => { set('study_quantity', v); set('study_types', resizeArr(form.study_types, v)) }}
@@ -1347,7 +1350,7 @@ function InspectionTab({ evaluationId, userDesignation, onSaved, editing, setEdi
         )}
 
         <Divider />
-        <SubHeading>Bathrooms</SubHeading>
+        <SubHeading bold={!editing}>Bathrooms</SubHeading>
         <Counter readOnly={!editing}
           value={form.bathrooms_quantity}
           onChange={v => { set('bathrooms_quantity', v); set('bathroom_conditions', resizeArr(form.bathroom_conditions, v)) }}
@@ -1373,13 +1376,13 @@ function InspectionTab({ evaluationId, userDesignation, onSaved, editing, setEdi
         <YesNo label="Security" value={form.security_present} onChange={v => set('security_present', v)} readOnly={!editing} />
         {form.security_present && (
           <div>
-            <label className={fieldLabelCls}>Security Features</label>
+            <label className={editing ? fieldLabelCls : roLabelCls}>Security Features</label>
             <MultiSelect options={SECURITY_OPTIONS} selected={form.security_features} onToggle={l => toggleStr('security_features', l)} readOnly={!editing} />
           </div>
         )}
 
         <Divider />
-        <SubHeading>General Condition</SubHeading>
+        <SubHeading bold={!editing}>General Condition</SubHeading>
         {editing && <p className="text-xs text-gray-400 -mt-2">Select items to rate, then choose Good or Poor for each.</p>}
         {!editing && form.general_condition.length === 0 && <p className="text-sm text-[#1a1a1a]">—</p>}
         <div className="space-y-3">
@@ -1427,7 +1430,7 @@ function InspectionTab({ evaluationId, userDesignation, onSaved, editing, setEdi
 
       {/* ══ OTHER ══ */}
       <InspSection title="Other">
-        <SubHeading>Additional Features</SubHeading>
+        <SubHeading bold={!editing}>Additional Features</SubHeading>
         <MultiSelect options={ADDITIONAL_OPTS} selected={form.additional_features} onToggle={l => toggleStr('additional_features', l)} readOnly={!editing} />
       </InspSection>
 
@@ -1463,11 +1466,10 @@ function InspSection({ title, children }: { title: string; children: React.React
   )
 }
 
-function SubHeading({ children }: { children: React.ReactNode }) {
-  // Only Exterior/Interior/Other (InspSection's title) should stand out as
-  // big and bold -- everything else in the Inspection tab, including these
-  // sub-headings and every field label, shares fieldLabelCls's darkness.
-  return <p className={fieldLabelCls}>{children}</p>
+function SubHeading({ children, bold }: { children: React.ReactNode; bold?: boolean }) {
+  // Same size as every other field label; `bold` (used in the read-only
+  // saved view) just switches the weight, it never changes the size.
+  return <p className={bold ? roLabelCls : fieldLabelCls}>{children}</p>
 }
 
 function Divider() {
@@ -1475,23 +1477,29 @@ function Divider() {
 }
 
 function YesNo({ label, value, onChange, readOnly }: { label: string; value: boolean | null; onChange: (v: boolean | null) => void; readOnly?: boolean }) {
+  // Read-only stacks the answer under a bold label ("Security" / "Yes"),
+  // rather than the far-right toggle layout used while editing.
+  if (readOnly) {
+    return (
+      <div>
+        <p className={roLabelCls}>{label}</p>
+        <p className="text-sm text-[#1a1a1a]">{value === true ? 'Yes' : value === false ? 'No' : '—'}</p>
+      </div>
+    )
+  }
   return (
     <div className="flex items-center justify-between">
       <span className="text-sm font-medium text-[#1a1a1a]">{label}</span>
-      {readOnly ? (
-        <span className="text-sm text-[#1a1a1a]">{value === true ? 'Yes' : value === false ? 'No' : '—'}</span>
-      ) : (
-        <div className="flex gap-2">
-          {([true, false] as const).map(v => (
-            <button key={String(v)} type="button" onClick={() => onChange(value === v ? null : v)}
-              className={`px-4 py-1.5 rounded-lg text-sm font-medium border transition-colors ${
-                value === v ? 'bg-[#1a1a1a] text-white border-[#1a1a1a]' : 'bg-white text-gray-500 border-gray-200 hover:border-gray-400'
-              }`}>
-              {v ? 'Yes' : 'No'}
-            </button>
-          ))}
-        </div>
-      )}
+      <div className="flex gap-2">
+        {([true, false] as const).map(v => (
+          <button key={String(v)} type="button" onClick={() => onChange(value === v ? null : v)}
+            className={`px-4 py-1.5 rounded-lg text-sm font-medium border transition-colors ${
+              value === v ? 'bg-[#1a1a1a] text-white border-[#1a1a1a]' : 'bg-white text-gray-500 border-gray-200 hover:border-gray-400'
+            }`}>
+            {v ? 'Yes' : 'No'}
+          </button>
+        ))}
+      </div>
     </div>
   )
 }
