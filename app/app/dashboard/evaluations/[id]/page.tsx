@@ -70,6 +70,10 @@ export default function EvaluationDetailPage() {
   const [userEmail, setUserEmail]   = useState<string | null>(null)
   const [userDesignation, setUserDesignation] = useState<string | null>(null)
   const [editing, setEditing]       = useState(() => searchParams.get('edit') === '1' || searchParams.get('newContactId') !== null)
+  // The Inspection tab has its own edit lock, separate from the Details
+  // form's -- a saved inspection is read-only until the header Edit button
+  // is clicked while that tab is active.
+  const [inspectionEditing, setInspectionEditing] = useState(false)
   const [deleting, setDeleting]     = useState(false)
   // Looked up separately rather than embedded via a PostgREST relationship
   // join -- completed_by_user_id has no foreign key constraint, so an
@@ -207,8 +211,16 @@ export default function EvaluationDetailPage() {
             <span className={`text-sm px-3 py-1 rounded-full font-medium whitespace-nowrap ${STATUS_COLOURS[ev.status] ?? 'bg-gray-100 text-gray-500'}`}>
               {STATUS_LABELS[ev.status] ?? ev.status}
             </span>
-            {!editing && (
-              <button onClick={() => { setActiveTab('details'); setEditing(true) }} className={`${btn.secondary} whitespace-nowrap`}>Edit</button>
+            {!(activeTab === 'inspection' ? inspectionEditing : editing) && (
+              <button
+                onClick={() => {
+                  if (activeTab === 'inspection') setInspectionEditing(true)
+                  else { setActiveTab('details'); setEditing(true) }
+                }}
+                className={`${btn.secondary} whitespace-nowrap`}
+              >
+                Edit
+              </button>
             )}
             {canDelete(userEmail) && (
               <button onClick={deleteEvaluation} disabled={deleting} className={`${btn.danger} whitespace-nowrap`}>
@@ -261,7 +273,8 @@ export default function EvaluationDetailPage() {
 
       {/* ── Inspection tab ── */}
       {activeTab === 'inspection' && (
-        <InspectionTab evaluationId={id} userDesignation={userDesignation} onSaved={fetchEvaluation} />
+        <InspectionTab evaluationId={id} userDesignation={userDesignation} onSaved={fetchEvaluation}
+          editing={inspectionEditing} setEditing={setInspectionEditing} />
       )}
 
       {/* ── Pipeline tab ── */}
@@ -780,7 +793,10 @@ const APPOINTMENT_OUTCOMES = [
 // them should be able to advance the evaluation to Inspected.
 const APPOINTMENT_OUTCOMES_REVERT_TO_SCHEDULED = ['rescheduled', 'seller_cancelled', 'no_show', 'unable_to_complete']
 
-function InspectionTab({ evaluationId, userDesignation, onSaved }: { evaluationId: string; userDesignation: string | null; onSaved: () => void }) {
+function InspectionTab({ evaluationId, userDesignation, onSaved, editing, setEditing }: {
+  evaluationId: string; userDesignation: string | null; onSaved: () => void
+  editing: boolean; setEditing: (v: boolean) => void
+}) {
   const [form, setForm]                 = useState<InspectionForm>(EMPTY_INSPECTION)
   const [inspectionId, setInspectionId] = useState<string | null>(null)
   const [loading, setLoading]           = useState(true)
@@ -855,9 +871,12 @@ function InspectionTab({ evaluationId, userDesignation, onSaved }: { evaluationI
     } else {
       setInspectionId(null)
       setForm(EMPTY_INSPECTION)
+      // Nothing saved yet -- there's no read-only state to sit in, so a
+      // brand-new inspection opens editable.
+      setEditing(true)
     }
     setLoading(false)
-  }, [evaluationId])
+  }, [evaluationId, setEditing])
 
   useEffect(() => {
     supabase.auth.getUser().then(({ data }) => setUserId(data.user?.id ?? null))
@@ -882,6 +901,9 @@ function InspectionTab({ evaluationId, userDesignation, onSaved }: { evaluationI
     setError('')
     setSaved(false)
     loadInspection()
+    // Drop back to read-only -- but only if there's actually a saved
+    // record to fall back to; a never-saved inspection stays editable.
+    if (inspectionId) setEditing(false)
   }
 
   function set<K extends keyof InspectionForm>(field: K, value: InspectionForm[K]) {
@@ -1014,6 +1036,7 @@ function InspectionTab({ evaluationId, userDesignation, onSaved }: { evaluationI
     setSaved(true)
     setSaving(false)
     onSaved()
+    setEditing(false) // lock back to read-only; the form going read-only is the "it saved" signal
     setTimeout(() => setSaved(false), 2500)
   }
 
@@ -1021,6 +1044,12 @@ function InspectionTab({ evaluationId, userDesignation, onSaved }: { evaluationI
 
   return (
     <div className="space-y-6">
+
+      {/* A native <fieldset disabled> locks every control inside in one
+          shot -- selects, number inputs, and all the YesNo/Counter/
+          MultiSelect/condition toggle buttons -- so a saved inspection is
+          read-only until the header Edit button is pressed. */}
+      <fieldset disabled={!editing} className="space-y-6 border-0 p-0 m-0 min-w-0">
 
       {/* ══ APPOINTMENT OUTCOME -- gates the "Inspected" status ══ */}
       <InspSection title="Appointment Outcome">
@@ -1380,21 +1409,25 @@ function InspectionTab({ evaluationId, userDesignation, onSaved }: { evaluationI
         <MultiSelect options={ADDITIONAL_OPTS} selected={form.additional_features} onToggle={l => toggleStr('additional_features', l)} />
       </InspSection>
 
+      </fieldset>
+
       {error && <p className="text-sm text-red-500 bg-red-50 px-4 py-3 rounded-lg">{error}</p>}
-      {!canActOnRole(userDesignation, 'agent') && (
+      {editing && !canActOnRole(userDesignation, 'agent') && (
         <p className="text-xs text-gray-400 text-center">Only an Agent can save the Property Inspection.</p>
       )}
 
-      <div className="flex gap-3">
-        <button onClick={handleSave} disabled={saving || !canActOnRole(userDesignation, 'agent')}
-          className={`${btn.primary} flex-1 py-4 disabled:opacity-40 disabled:cursor-not-allowed`}>
-          {saving ? 'Saving…' : saved ? '✓ Inspection Saved' : inspectionId ? 'Update Inspection' : 'Save Inspection'}
-        </button>
-        <button type="button" onClick={handleCancel} disabled={saving}
-          className={`${btn.secondary} flex-1 py-4 disabled:opacity-40 disabled:cursor-not-allowed`}>
-          Cancel
-        </button>
-      </div>
+      {editing && (
+        <div className="flex gap-3">
+          <button onClick={handleSave} disabled={saving || !canActOnRole(userDesignation, 'agent')}
+            className={`${btn.primary} flex-1 py-4 disabled:opacity-40 disabled:cursor-not-allowed`}>
+            {saving ? 'Saving…' : saved ? '✓ Inspection Saved' : inspectionId ? 'Update Inspection' : 'Save Inspection'}
+          </button>
+          <button type="button" onClick={handleCancel} disabled={saving}
+            className={`${btn.secondary} flex-1 py-4 disabled:opacity-40 disabled:cursor-not-allowed`}>
+            Cancel
+          </button>
+        </div>
+      )}
     </div>
   )
 }
