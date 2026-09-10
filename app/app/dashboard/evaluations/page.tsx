@@ -5,7 +5,7 @@ import { supabase } from '@/lib/supabase'
 import { btn, card, input } from '@/lib/styles'
 import { Breadcrumbs } from '@/lib/Breadcrumbs'
 import { REPORT_TYPES } from '@/lib/evaluation-documents'
-import { STATUS_LABELS, STATUS_COLOURS, stepLabel, roleLabel, getNextAction, type PipelineStepRow } from '@/lib/pipeline'
+import { STATUS_LABELS, STATUS_COLOURS } from '@/lib/pipeline'
 import { useRouter } from 'next/navigation'
 import Link from 'next/link'
 
@@ -13,7 +13,7 @@ const PAGE_SIZE = 50
 
 type SortColumn =
   | 'status' | 'address' | 'date_captured' | 'agent' | 'tc'
-  | 'contact' | 'lead_source' | 'evaluation_price' | 'marketing_price' | 'next_action_due'
+  | 'contact' | 'lead_source' | 'evaluation_price' | 'marketing_price'
 type SortDirection = 'asc' | 'desc'
 
 // Resolved from a joined table (properties) or a separately-fetched
@@ -23,7 +23,7 @@ type SortDirection = 'asc' | 'desc'
 // server-side way to sort evaluations by one of these. Sorting by one
 // fetches every matching row, resolves + sorts client-side instead, then
 // slices out the page.
-const CLIENT_SORT_COLUMNS: SortColumn[] = ['address', 'agent', 'tc', 'contact', 'lead_source', 'next_action_due']
+const CLIENT_SORT_COLUMNS: SortColumn[] = ['address', 'agent', 'tc', 'contact', 'lead_source']
 
 type Profile = { id: string; full_name: string | null; email: string | null }
 
@@ -94,7 +94,6 @@ type Evaluation = LeadInfo & {
     contacts: Contact | null
     picklist_options: { label: string } | null
   }[]
-  evaluation_pipeline_steps: PipelineStepRow[]
 }
 
 function capitalizeWords(text: string): string {
@@ -158,10 +157,6 @@ function sortValue(ev: Evaluation, column: SortColumn, profiles: Record<string, 
     case 'lead_source':      return ev.lead_source_picklist?.label ?? ev.lead_source_other_text ?? ''
     case 'evaluation_price': return ev.evaluation_price ?? -Infinity
     case 'marketing_price':  return ev.marketing_price ?? -Infinity
-    // No due date sorts to the very end either direction, same idea as the
-    // price columns' -Infinity fallback but inverted (missing = "least
-    // urgent", not "most").
-    case 'next_action_due':  return getNextAction(ev.evaluation_pipeline_steps ?? [])?.due_date ?? '9999-12-31'
   }
 }
 
@@ -213,8 +208,7 @@ export default function EvaluationsPage() {
         contact_preference, marital_status, occupation, company_name, division,
         branch, address, birthday, wedding_anniversary, home_anniversary, id_number, date_added),
       picklist_options:tag_option_id (label)
-    ),
-    evaluation_pipeline_steps (step_key, status, is_complete, owner_role, owner_user_id, due_date, sort_order)
+    )
   `
 
   const fetchEvaluations = useCallback(async () => {
@@ -434,18 +428,6 @@ export default function EvaluationsPage() {
                 const agent = ev.sellers_agent_user_id ? profiles[ev.sellers_agent_user_id] : null
                 const tc = ev.transaction_coordinator_user_id ? profiles[ev.transaction_coordinator_user_id] : null
 
-                const nextAction = getNextAction(ev.evaluation_pipeline_steps ?? [])
-                const nextActionOwnerName = nextAction
-                  ? (nextAction.owner_user_id ? (profiles[nextAction.owner_user_id]?.full_name ?? profiles[nextAction.owner_user_id]?.email) : null) ?? roleLabel(nextAction.owner_role)
-                  : null
-                const nextActionOverdue = !!nextAction?.due_date && new Date(nextAction.due_date) < new Date()
-                const nextActionDueLabel = nextAction?.due_date
-                  ? new Date(nextAction.due_date).toLocaleDateString('en-ZA', { day: 'numeric', month: 'short' }) + (nextActionOverdue ? ' (overdue)' : '')
-                  : null
-                const nextActionText = nextAction
-                  ? [stepLabel(nextAction.step_key), nextActionOwnerName, nextActionDueLabel].filter(Boolean).join(' · ')
-                  : '—'
-
                 return (
                   <tr
                     key={ev.id}
@@ -506,9 +488,6 @@ export default function EvaluationsPage() {
                     </td>
                     <td className="px-3 py-3 text-gray-500 truncate">{formatCurrency(ev.evaluation_price)}</td>
                     <td className="px-3 py-3 text-gray-500 truncate">{formatCurrency(ev.marketing_price)}</td>
-                    <td className="px-3 py-3 truncate" title={nextActionText}>
-                      <span className={nextActionOverdue ? 'text-red-500 font-medium' : 'text-gray-500'}>{nextActionText}</span>
-                    </td>
                   </tr>
                 )
               })}
@@ -551,16 +530,15 @@ function SortArrows({ column, sortColumn, sortDirection, onSort }: {
 }
 
 const HEADER_COLUMNS: { key: SortColumn; label: string; width: string }[] = [
-  { key: 'status',            label: 'Status',       width: 'w-[7%]' },
-  { key: 'address',           label: 'Address',      width: 'w-[14%]' },
-  { key: 'date_captured',     label: 'Date',         width: 'w-[7%]' },
-  { key: 'agent',             label: 'Agent',        width: 'w-[10%]' },
-  { key: 'tc',                label: 'TC',           width: 'w-[8%]' },
-  { key: 'contact',           label: 'Contact',      width: 'w-[10%]' },
-  { key: 'lead_source',       label: 'Lead Source',  width: 'w-[9%]' },
-  { key: 'evaluation_price',  label: 'Evaluation',   width: 'w-[8%]' },
-  { key: 'marketing_price',   label: 'Marketing',    width: 'w-[8%]' },
-  { key: 'next_action_due',   label: 'Next Action',  width: 'w-[15%]' },
+  { key: 'status',            label: 'Status',       width: 'w-[8%]' },
+  { key: 'address',           label: 'Address',      width: 'w-[16%]' },
+  { key: 'date_captured',     label: 'Date',         width: 'w-[9%]' },
+  { key: 'agent',             label: 'Agent',        width: 'w-[12%]' },
+  { key: 'tc',                label: 'TC',           width: 'w-[10%]' },
+  { key: 'contact',           label: 'Contact',      width: 'w-[12%]' },
+  { key: 'lead_source',       label: 'Lead Source',  width: 'w-[11%]' },
+  { key: 'evaluation_price',  label: 'Evaluation',   width: 'w-[9%]' },
+  { key: 'marketing_price',   label: 'Marketing',    width: 'w-[9%]' },
 ]
 
 // ── Table header row, repeated at both the top (thead) and bottom (tfoot)
