@@ -704,6 +704,40 @@ const ADDITIONAL_OPTS   = ['Jungle Gym', 'Jojo Tank', 'Storeroom', 'Solar Panels
 // shared style used by every other page/tab in the app.
 const fieldLabelCls = 'block text-sm font-medium text-[#1a1a1a] mb-1'
 
+// Option lists for the Inspection selects, pulled out so the same list
+// renders the <option>s in edit mode AND resolves the stored value to a
+// label in read-only mode (a saved inspection shows plain text, like the
+// Details tab does).
+const ROAD_LEVEL_OPTS      = [{ value: 'above_road_level', label: 'Above Road Level' }, { value: 'on_road_level', label: 'On Road Level' }, { value: 'below_road_level', label: 'Below Road Level' }]
+const LAND_SIZE_OPTS       = [{ value: 'subdivisible', label: 'Subdivisible' }, { value: 'not_subdivisible', label: 'Not Subdivisible' }]
+const GATE_FENCING_OPTS    = [{ value: 'auto_gate', label: 'Auto Gate' }, { value: 'fully_fenced_walled', label: 'Fully Fenced/Walled' }, { value: 'none', label: 'None' }]
+const GARAGE_DESC_OPTS     = [{ value: 'tandem', label: 'Tandem' }]
+const PARKING_OPTS         = [{ value: '2_cars', label: '2 Cars' }, { value: '3_9_cars', label: '3-9 Cars' }, { value: '10_plus_cars', label: '10+ Cars' }]
+const SIZE_OPTS            = [{ value: 'large', label: 'Large' }, { value: 'medium', label: 'Medium' }, { value: 'small', label: 'Small' }]
+const GARDEN_DESC_OPTS     = [{ value: 'level', label: 'Level' }, { value: 'slope_terrace', label: 'Slope/Terrace' }]
+const GOOD_POOR_OPTS       = [{ value: 'good', label: 'Good' }, { value: 'poor', label: 'Poor' }]
+const FINISH_OPTS          = [{ value: 'modern', label: 'Modern' }, { value: 'neat', label: 'Neat' }, { value: 'outdated', label: 'Outdated' }]
+const KITCHEN_POS_OPTS     = [{ value: 'open_plan', label: 'Open Plan' }, { value: 'down_passage', label: 'Down Passage' }, { value: 'separate', label: 'Separate' }]
+const RECEPTION_TYPE_OPTS  = [{ value: 'pub', label: 'Pub' }, { value: 'gym', label: 'Gym' }, { value: 'library', label: 'Library' }, { value: 'other', label: 'Other' }]
+const STUDY_TYPE_OPTS      = [{ value: 'nook', label: 'Nook' }, { value: 'separate_room', label: 'Separate Room' }]
+const FLATLET_BED_OPTS     = [{ value: 'one_bed', label: '1 Bedroom' }, { value: 'two_bed', label: '2 Bedroom' }, { value: 'three_bed', label: '3 Bedroom' }]
+
+const optLabel = (opts: { value: string; label: string }[], v: string | null | undefined) =>
+  opts.find(o => o.value === v)?.label ?? '—'
+
+// Label + control (edit mode) or label + plain text (read-only), matching
+// the Details tab's Field component.
+function RoField({ label, editing, display, children, className }: {
+  label: string; editing: boolean; display: React.ReactNode; children: React.ReactNode; className?: string
+}) {
+  return (
+    <div className={className}>
+      <label className={fieldLabelCls}>{label}</label>
+      {editing ? children : <p className="text-sm text-[#1a1a1a] py-2.5">{display || '—'}</p>}
+    </div>
+  )
+}
+
 type ConditionItem = { feature: string; condition: string }
 
 type InspectionForm = {
@@ -1045,16 +1079,14 @@ function InspectionTab({ evaluationId, userDesignation, onSaved, editing, setEdi
   return (
     <div className="space-y-6">
 
-      {/* A native <fieldset disabled> locks every control inside in one
-          shot -- selects, number inputs, and all the YesNo/Counter/
-          MultiSelect/condition toggle buttons -- so a saved inspection is
-          read-only until the header Edit button is pressed. */}
-      <fieldset disabled={!editing} className="space-y-6 border-0 p-0 m-0 min-w-0">
+      {/* Every field renders as a control in edit mode and as plain text
+          (via RoField / the readOnly prop on YesNo/Counter/MultiSelect)
+          when a saved inspection is being viewed -- same dual-mode idea as
+          the Details tab's Field component. */}
 
       {/* ══ APPOINTMENT OUTCOME -- gates the "Inspected" status ══ */}
       <InspSection title="Appointment Outcome">
-        <div>
-          <label className={fieldLabelCls}>Outcome</label>
+        <RoField label="Outcome" editing={editing} display={optLabel(APPOINTMENT_OUTCOMES, form.appointment_outcome)}>
           <select value={form.appointment_outcome} onChange={e => set('appointment_outcome', e.target.value)} className={select}>
             <option value="">—</option>
             {APPOINTMENT_OUTCOMES.map(o => <option key={o.value} value={o.value}>{o.label}</option>)}
@@ -1062,130 +1094,112 @@ function InspectionTab({ evaluationId, userDesignation, onSaved, editing, setEdi
           {APPOINTMENT_OUTCOMES_REVERT_TO_SCHEDULED.includes(form.appointment_outcome) && (
             <p className="text-xs text-gray-400 mt-2">Saving will move this evaluation back to Scheduled.</p>
           )}
-        </div>
+        </RoField>
       </InspSection>
 
       {/* ══ EXTERIOR ══ */}
       <InspSection title="Exterior">
 
-        <SubHeading>Road Level Position</SubHeading>
-        <select value={form.road_level_position} onChange={e => set('road_level_position', e.target.value)} className={select}>
-          <option value="">—</option>
-          <option value="above_road_level">Above Road Level</option>
-          <option value="on_road_level">On Road Level</option>
-          <option value="below_road_level">Below Road Level</option>
-        </select>
+        <RoField label="Road Level Position" editing={editing} display={optLabel(ROAD_LEVEL_OPTS, form.road_level_position)}>
+          <select value={form.road_level_position} onChange={e => set('road_level_position', e.target.value)} className={select}>
+            <option value="">—</option>
+            {ROAD_LEVEL_OPTS.map(o => <option key={o.value} value={o.value}>{o.label}</option>)}
+          </select>
+        </RoField>
 
         <Divider />
         <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-          <div>
-            <label className={fieldLabelCls}>Land Size</label>
+          <RoField label="Land Size" editing={editing} display={optLabel(LAND_SIZE_OPTS, form.land_size)}>
             <select value={form.land_size} onChange={e => set('land_size', e.target.value)} className={select}>
               <option value="">—</option>
-              <option value="subdivisible">Subdivisible</option>
-              <option value="not_subdivisible">Not Subdivisible</option>
+              {LAND_SIZE_OPTS.map(o => <option key={o.value} value={o.value}>{o.label}</option>)}
             </select>
-          </div>
-          <div>
-            <label className={fieldLabelCls}>Gate / Fencing</label>
+          </RoField>
+          <RoField label="Gate / Fencing" editing={editing} display={optLabel(GATE_FENCING_OPTS, form.gate_fencing_type)}>
             <select value={form.gate_fencing_type} onChange={e => set('gate_fencing_type', e.target.value)} className={select}>
               <option value="">—</option>
-              <option value="auto_gate">Auto Gate</option>
-              <option value="fully_fenced_walled">Fully Fenced/Walled</option>
-              <option value="none">None</option>
+              {GATE_FENCING_OPTS.map(o => <option key={o.value} value={o.value}>{o.label}</option>)}
             </select>
-          </div>
+          </RoField>
         </div>
 
         <Divider />
         <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
-          <div>
-            <label className={fieldLabelCls}>Garages</label>
+          <RoField label="Garages" editing={editing}
+            display={`${form.garages_quantity}${form.garages_descriptor ? ` (${optLabel(GARAGE_DESC_OPTS, form.garages_descriptor)})` : ''}`}>
             <div className="flex gap-2 items-center">
               <Counter value={form.garages_quantity} onChange={v => set('garages_quantity', v)} />
               {form.garages_quantity > 0 && (
                 <select value={form.garages_descriptor} onChange={e => set('garages_descriptor', e.target.value)} className={`${select} flex-1`}>
                   <option value="">—</option>
-                  <option value="tandem">Tandem</option>
+                  {GARAGE_DESC_OPTS.map(o => <option key={o.value} value={o.value}>{o.label}</option>)}
                 </select>
               )}
             </div>
-          </div>
-          <div>
-            <label className={fieldLabelCls}>Carports</label>
+          </RoField>
+          <RoField label="Carports" editing={editing} display={String(form.carports_quantity)}>
             <Counter value={form.carports_quantity} onChange={v => set('carports_quantity', v)} />
-          </div>
-          <div>
-            <label className={fieldLabelCls}>Parking</label>
+          </RoField>
+          <RoField label="Parking" editing={editing} display={optLabel(PARKING_OPTS, form.parking_capacity)}>
             <select value={form.parking_capacity} onChange={e => set('parking_capacity', e.target.value)} className={select}>
               <option value="">—</option>
-              <option value="2_cars">2 Cars</option>
-              <option value="3_9_cars">3-9 Cars</option>
-              <option value="10_plus_cars">10+ Cars</option>
+              {PARKING_OPTS.map(o => <option key={o.value} value={o.value}>{o.label}</option>)}
             </select>
-          </div>
+          </RoField>
         </div>
 
         <Divider />
-        <YesNo label="Garden" value={form.garden_present} onChange={v => set('garden_present', v)} />
+        <YesNo label="Garden" value={form.garden_present} onChange={v => set('garden_present', v)} readOnly={!editing} />
         {form.garden_present && (
           <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-            <div>
-              <label className={fieldLabelCls}>Garden Size</label>
+            <RoField label="Garden Size" editing={editing} display={optLabel(SIZE_OPTS, form.garden_size)}>
               <select value={form.garden_size} onChange={e => set('garden_size', e.target.value)} className={select}>
                 <option value="">—</option>
-                <option value="large">Large</option>
-                <option value="medium">Medium</option>
-                <option value="small">Small</option>
+                {SIZE_OPTS.map(o => <option key={o.value} value={o.value}>{o.label}</option>)}
               </select>
-            </div>
-            <div>
-              <label className={fieldLabelCls}>Garden Description</label>
+            </RoField>
+            <RoField label="Garden Description" editing={editing} display={optLabel(GARDEN_DESC_OPTS, form.garden_description)}>
               <select value={form.garden_description} onChange={e => set('garden_description', e.target.value)} className={select}>
                 <option value="">—</option>
-                <option value="level">Level</option>
-                <option value="slope_terrace">Slope/Terrace</option>
+                {GARDEN_DESC_OPTS.map(o => <option key={o.value} value={o.value}>{o.label}</option>)}
               </select>
-            </div>
+            </RoField>
           </div>
         )}
 
         <Divider />
-        <YesNo label="Tennis Court" value={form.tennis_court_present} onChange={v => set('tennis_court_present', v)} />
+        <YesNo label="Tennis Court" value={form.tennis_court_present} onChange={v => set('tennis_court_present', v)} readOnly={!editing} />
         {form.tennis_court_present && (
-          <div>
-            <label className={fieldLabelCls}>Tennis Court Condition</label>
+          <RoField label="Tennis Court Condition" editing={editing} display={optLabel(GOOD_POOR_OPTS, form.tennis_court_condition)}>
             <select value={form.tennis_court_condition} onChange={e => set('tennis_court_condition', e.target.value)} className={select}>
-              <option value="">—</option><option value="good">Good</option><option value="poor">Poor</option>
+              <option value="">—</option>{GOOD_POOR_OPTS.map(o => <option key={o.value} value={o.value}>{o.label}</option>)}
             </select>
-          </div>
+          </RoField>
         )}
 
         <Divider />
-        <YesNo label="Pool" value={form.pool_present} onChange={v => set('pool_present', v)} />
+        <YesNo label="Pool" value={form.pool_present} onChange={v => set('pool_present', v)} readOnly={!editing} />
         {form.pool_present && (
-          <div>
-            <label className={fieldLabelCls}>Pool Condition</label>
+          <RoField label="Pool Condition" editing={editing} display={optLabel(GOOD_POOR_OPTS, form.pool_condition)}>
             <select value={form.pool_condition} onChange={e => set('pool_condition', e.target.value)} className={select}>
-              <option value="">—</option><option value="good">Good</option><option value="poor">Poor</option>
+              <option value="">—</option>{GOOD_POOR_OPTS.map(o => <option key={o.value} value={o.value}>{o.label}</option>)}
             </select>
-          </div>
+          </RoField>
         )}
 
         <Divider />
-        <YesNo label="Jacuzzi" value={form.jacuzzi_present} onChange={v => set('jacuzzi_present', v)} />
+        <YesNo label="Jacuzzi" value={form.jacuzzi_present} onChange={v => set('jacuzzi_present', v)} readOnly={!editing} />
         {form.jacuzzi_present && (
-          <div>
-            <label className={fieldLabelCls}>Jacuzzi Condition</label>
+          <RoField label="Jacuzzi Condition" editing={editing} display={optLabel(GOOD_POOR_OPTS, form.jacuzzi_status)}>
             <select value={form.jacuzzi_status} onChange={e => set('jacuzzi_status', e.target.value)} className={select}>
-              <option value="">—</option><option value="good">Good</option><option value="poor">Poor</option>
+              <option value="">—</option>{GOOD_POOR_OPTS.map(o => <option key={o.value} value={o.value}>{o.label}</option>)}
             </select>
-          </div>
+          </RoField>
         )}
 
         <Divider />
-        <div>
-          <label className={fieldLabelCls}>Entertainment Patio</label>
+        <RoField label="Entertainment Patio" editing={editing}
+          display={`${form.patio_quantity}${form.patio_quantity > 0 && form.patio_selections.length ? ` — ${form.patio_selections.join(', ')}` : ''}`}>
           <Counter value={form.patio_quantity} onChange={v => set('patio_quantity', v)} />
           {form.patio_quantity > 0 && (
             <div className="mt-3">
@@ -1193,14 +1207,14 @@ function InspectionTab({ evaluationId, userDesignation, onSaved, editing, setEdi
               <MultiSelect options={PATIO_OPTIONS} selected={form.patio_selections} onToggle={l => toggleStr('patio_selections', l)} />
             </div>
           )}
-        </div>
+        </RoField>
 
         <Divider />
-        <YesNo label="Views" value={form.views_present} onChange={v => set('views_present', v)} />
+        <YesNo label="Views" value={form.views_present} onChange={v => set('views_present', v)} readOnly={!editing} />
 
         <Divider />
-        <div>
-          <label className={fieldLabelCls}>Domestic Accommodation</label>
+        <RoField label="Domestic Accommodation" editing={editing}
+          display={`${form.domestic_quarters_quantity}${form.domestic_quarters_toilet_only ? ' (toilet only)' : ''}`}>
           <Counter value={form.domestic_quarters_quantity} onChange={v => set('domestic_quarters_quantity', v)} />
           {form.domestic_quarters_quantity > 0 && (
             <label className="flex items-center gap-2 mt-3 cursor-pointer select-none">
@@ -1208,9 +1222,10 @@ function InspectionTab({ evaluationId, userDesignation, onSaved, editing, setEdi
               <span className="text-sm text-gray-600">Toilet only (not a full room)</span>
             </label>
           )}
-        </div>
-        <div>
-          <label className={fieldLabelCls}>Flatlet</label>
+        </RoField>
+        <RoField label="Flatlet" editing={editing}
+          display={form.flatlet_quantity === 0 ? '0'
+            : `${form.flatlet_quantity} — ${form.flatlet_bedroom_types.map(t => optLabel(FLATLET_BED_OPTS, t)).join(', ')}`}>
           <Counter
             value={form.flatlet_quantity}
             onChange={v => { set('flatlet_quantity', v); set('flatlet_bedroom_types', resizeArr(form.flatlet_bedroom_types, v)) }}
@@ -1222,13 +1237,13 @@ function InspectionTab({ evaluationId, userDesignation, onSaved, editing, setEdi
                   <span className="text-sm text-gray-500 w-24 flex-shrink-0">Flatlet {form.flatlet_quantity > 1 ? i + 1 : ''}</span>
                   <select value={form.flatlet_bedroom_types[i] ?? ''} onChange={e => { const n = [...form.flatlet_bedroom_types]; n[i] = e.target.value; set('flatlet_bedroom_types', n) }} className={`${select} flex-1`}>
                     <option value="">Bedrooms…</option>
-                    <option value="one_bed">1 Bedroom</option><option value="two_bed">2 Bedroom</option><option value="three_bed">3 Bedroom</option>
+                    {FLATLET_BED_OPTS.map(o => <option key={o.value} value={o.value}>{o.label}</option>)}
                   </select>
                 </div>
               ))}
             </div>
           )}
-        </div>
+        </RoField>
       </InspSection>
 
       {/* ══ INTERIOR ══ */}
@@ -1236,72 +1251,58 @@ function InspectionTab({ evaluationId, userDesignation, onSaved, editing, setEdi
 
         <div className="grid grid-cols-2 gap-4">
           {([['lounges_quantity','Lounges'],['dining_room_quantity','Dining Rooms']] as const).map(([field, lbl]) => (
-            <div key={field}>
-              <label className={fieldLabelCls}>{lbl}</label>
+            <RoField key={field} label={lbl} editing={editing} display={String(form[field])}>
               <Counter value={form[field]} onChange={v => set(field, v)} />
-            </div>
+            </RoField>
           ))}
         </div>
 
         <Divider />
-        <YesNo label="Other Reception" value={form.other_reception_present} onChange={v => set('other_reception_present', v)} />
+        <YesNo label="Other Reception" value={form.other_reception_present} onChange={v => set('other_reception_present', v)} readOnly={!editing} />
         {form.other_reception_present && (
-          <div>
-            <label className={fieldLabelCls}>Reception Type</label>
+          <RoField label="Reception Type" editing={editing}
+            display={form.other_reception_type === 'other'
+              ? (form.other_reception_type_other || 'Other')
+              : optLabel(RECEPTION_TYPE_OPTS, form.other_reception_type)}>
             <select value={form.other_reception_type} onChange={e => set('other_reception_type', e.target.value)} className={select}>
               <option value="">—</option>
-              <option value="pub">Pub</option>
-              <option value="gym">Gym</option>
-              <option value="library">Library</option>
-              <option value="other">Other</option>
+              {RECEPTION_TYPE_OPTS.map(o => <option key={o.value} value={o.value}>{o.label}</option>)}
             </select>
             {form.other_reception_type === 'other' && (
               <input type="text" value={form.other_reception_type_other} onChange={e => set('other_reception_type_other', e.target.value)}
                 placeholder="Describe the reception…" className={`${input} mt-2`} />
             )}
-          </div>
+          </RoField>
         )}
 
         <Divider />
-        <YesNo label="Kitchen" value={form.kitchen_present} onChange={v => set('kitchen_present', v)} />
+        <YesNo label="Kitchen" value={form.kitchen_present} onChange={v => set('kitchen_present', v)} readOnly={!editing} />
         {form.kitchen_present && (
           <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
-            <div>
-              <label className={fieldLabelCls}>Kitchen Size</label>
+            <RoField label="Kitchen Size" editing={editing} display={optLabel(SIZE_OPTS, form.kitchen_size)}>
               <select value={form.kitchen_size} onChange={e => set('kitchen_size', e.target.value)} className={select}>
-                <option value="">—</option>
-                <option value="large">Large</option>
-                <option value="medium">Medium</option>
-                <option value="small">Small</option>
+                <option value="">—</option>{SIZE_OPTS.map(o => <option key={o.value} value={o.value}>{o.label}</option>)}
               </select>
-            </div>
-            <div>
-              <label className={fieldLabelCls}>Kitchen Finish</label>
+            </RoField>
+            <RoField label="Kitchen Finish" editing={editing} display={optLabel(FINISH_OPTS, form.kitchen_finish)}>
               <select value={form.kitchen_finish} onChange={e => set('kitchen_finish', e.target.value)} className={select}>
-                <option value="">—</option>
-                <option value="modern">Modern</option>
-                <option value="neat">Neat</option>
-                <option value="outdated">Outdated</option>
+                <option value="">—</option>{FINISH_OPTS.map(o => <option key={o.value} value={o.value}>{o.label}</option>)}
               </select>
-            </div>
-            <div>
-              <label className={fieldLabelCls}>Kitchen Position</label>
+            </RoField>
+            <RoField label="Kitchen Position" editing={editing} display={optLabel(KITCHEN_POS_OPTS, form.kitchen_position)}>
               <select value={form.kitchen_position} onChange={e => set('kitchen_position', e.target.value)} className={select}>
-                <option value="">—</option>
-                <option value="open_plan">Open Plan</option>
-                <option value="down_passage">Down Passage</option>
-                <option value="separate">Separate</option>
+                <option value="">—</option>{KITCHEN_POS_OPTS.map(o => <option key={o.value} value={o.value}>{o.label}</option>)}
               </select>
-            </div>
+            </RoField>
           </div>
         )}
 
         <Divider />
-        <YesNo label="Scullery / Laundry" value={form.scullery_laundry_present} onChange={v => set('scullery_laundry_present', v)} />
+        <YesNo label="Scullery / Laundry" value={form.scullery_laundry_present} onChange={v => set('scullery_laundry_present', v)} readOnly={!editing} />
 
         <Divider />
         <SubHeading>Bedrooms</SubHeading>
-        <Counter
+        <Counter readOnly={!editing}
           value={form.bedrooms_quantity}
           onChange={v => { set('bedrooms_quantity', v); set('bedroom_sizes', resizeArr(form.bedroom_sizes, v)) }}
         />
@@ -1310,10 +1311,13 @@ function InspectionTab({ evaluationId, userDesignation, onSaved, editing, setEdi
             {Array.from({ length: form.bedrooms_quantity }).map((_, i) => (
               <div key={i} className="flex items-center gap-3">
                 <span className="text-sm text-gray-500 w-24 flex-shrink-0">Bedroom {i + 1}</span>
-                <select value={form.bedroom_sizes[i] ?? ''} onChange={e => { const n = [...form.bedroom_sizes]; n[i] = e.target.value; set('bedroom_sizes', n) }} className={`${select} flex-1`}>
-                  <option value="">Size…</option>
-                  <option value="large">Large</option><option value="medium">Medium</option><option value="small">Small</option>
-                </select>
+                {editing ? (
+                  <select value={form.bedroom_sizes[i] ?? ''} onChange={e => { const n = [...form.bedroom_sizes]; n[i] = e.target.value; set('bedroom_sizes', n) }} className={`${select} flex-1`}>
+                    <option value="">Size…</option>{SIZE_OPTS.map(o => <option key={o.value} value={o.value}>{o.label}</option>)}
+                  </select>
+                ) : (
+                  <span className="text-sm text-[#1a1a1a]">{optLabel(SIZE_OPTS, form.bedroom_sizes[i])}</span>
+                )}
               </div>
             ))}
           </div>
@@ -1321,7 +1325,7 @@ function InspectionTab({ evaluationId, userDesignation, onSaved, editing, setEdi
 
         <Divider />
         <SubHeading>Study</SubHeading>
-        <Counter
+        <Counter readOnly={!editing}
           value={form.study_quantity}
           onChange={v => { set('study_quantity', v); set('study_types', resizeArr(form.study_types, v)) }}
         />
@@ -1330,10 +1334,13 @@ function InspectionTab({ evaluationId, userDesignation, onSaved, editing, setEdi
             {Array.from({ length: form.study_quantity }).map((_, i) => (
               <div key={i} className="flex items-center gap-3">
                 <span className="text-sm text-gray-500 w-24 flex-shrink-0">Study {form.study_quantity > 1 ? i + 1 : ''}</span>
-                <select value={form.study_types[i] ?? ''} onChange={e => { const n = [...form.study_types]; n[i] = e.target.value; set('study_types', n) }} className={`${select} flex-1`}>
-                  <option value="">Type…</option>
-                  <option value="nook">Nook</option><option value="separate_room">Separate Room</option>
-                </select>
+                {editing ? (
+                  <select value={form.study_types[i] ?? ''} onChange={e => { const n = [...form.study_types]; n[i] = e.target.value; set('study_types', n) }} className={`${select} flex-1`}>
+                    <option value="">Type…</option>{STUDY_TYPE_OPTS.map(o => <option key={o.value} value={o.value}>{o.label}</option>)}
+                  </select>
+                ) : (
+                  <span className="text-sm text-[#1a1a1a]">{optLabel(STUDY_TYPE_OPTS, form.study_types[i])}</span>
+                )}
               </div>
             ))}
           </div>
@@ -1341,7 +1348,7 @@ function InspectionTab({ evaluationId, userDesignation, onSaved, editing, setEdi
 
         <Divider />
         <SubHeading>Bathrooms</SubHeading>
-        <Counter
+        <Counter readOnly={!editing}
           value={form.bathrooms_quantity}
           onChange={v => { set('bathrooms_quantity', v); set('bathroom_conditions', resizeArr(form.bathroom_conditions, v)) }}
         />
@@ -1350,31 +1357,46 @@ function InspectionTab({ evaluationId, userDesignation, onSaved, editing, setEdi
             {Array.from({ length: form.bathrooms_quantity }).map((_, i) => (
               <div key={i} className="flex items-center gap-3">
                 <span className="text-sm text-gray-500 w-24 flex-shrink-0">Bathroom {i + 1}</span>
-                <select value={form.bathroom_conditions[i] ?? ''} onChange={e => { const n = [...form.bathroom_conditions]; n[i] = e.target.value; set('bathroom_conditions', n) }} className={`${select} flex-1`}>
-                  <option value="">Condition…</option>
-                  <option value="modern">Modern</option><option value="neat">Neat</option><option value="outdated">Outdated</option>
-                </select>
+                {editing ? (
+                  <select value={form.bathroom_conditions[i] ?? ''} onChange={e => { const n = [...form.bathroom_conditions]; n[i] = e.target.value; set('bathroom_conditions', n) }} className={`${select} flex-1`}>
+                    <option value="">Condition…</option>{FINISH_OPTS.map(o => <option key={o.value} value={o.value}>{o.label}</option>)}
+                  </select>
+                ) : (
+                  <span className="text-sm text-[#1a1a1a]">{optLabel(FINISH_OPTS, form.bathroom_conditions[i])}</span>
+                )}
               </div>
             ))}
           </div>
         )}
 
         <Divider />
-        <YesNo label="Security" value={form.security_present} onChange={v => set('security_present', v)} />
+        <YesNo label="Security" value={form.security_present} onChange={v => set('security_present', v)} readOnly={!editing} />
         {form.security_present && (
           <div>
             <label className={fieldLabelCls}>Security Features</label>
-            <MultiSelect options={SECURITY_OPTIONS} selected={form.security_features} onToggle={l => toggleStr('security_features', l)} />
+            <MultiSelect options={SECURITY_OPTIONS} selected={form.security_features} onToggle={l => toggleStr('security_features', l)} readOnly={!editing} />
           </div>
         )}
 
         <Divider />
         <SubHeading>General Condition</SubHeading>
-        <p className="text-xs text-gray-400 -mt-2">Select items to rate, then choose Good or Poor for each.</p>
+        {editing && <p className="text-xs text-gray-400 -mt-2">Select items to rate, then choose Good or Poor for each.</p>}
+        {!editing && form.general_condition.length === 0 && <p className="text-sm text-[#1a1a1a]">—</p>}
         <div className="space-y-3">
           {CONDITION_ITEMS.map(item => {
             const entry = form.general_condition.find(c => c.feature === item)
             const selected = !!entry
+            if (!editing) {
+              if (!entry) return null
+              return (
+                <div key={item} className="flex items-center gap-3 text-sm">
+                  <span className="text-[#1a1a1a] font-medium">{item}</span>
+                  <span className={entry.condition === 'good' ? 'text-green-600' : 'text-red-500'}>
+                    {entry.condition === 'good' ? 'Good' : entry.condition === 'poor' ? 'Poor' : '—'}
+                  </span>
+                </div>
+              )
+            }
             return (
               <div key={item} className="flex items-center gap-3 flex-wrap">
                 <button type="button" onClick={() => toggleConditionItem(item)}
@@ -1406,10 +1428,8 @@ function InspectionTab({ evaluationId, userDesignation, onSaved, editing, setEdi
       {/* ══ OTHER ══ */}
       <InspSection title="Other">
         <SubHeading>Additional Features</SubHeading>
-        <MultiSelect options={ADDITIONAL_OPTS} selected={form.additional_features} onToggle={l => toggleStr('additional_features', l)} />
+        <MultiSelect options={ADDITIONAL_OPTS} selected={form.additional_features} onToggle={l => toggleStr('additional_features', l)} readOnly={!editing} />
       </InspSection>
-
-      </fieldset>
 
       {error && <p className="text-sm text-red-500 bg-red-50 px-4 py-3 rounded-lg">{error}</p>}
       {editing && !canActOnRole(userDesignation, 'agent') && (
@@ -1454,25 +1474,30 @@ function Divider() {
   return <hr className="border-gray-100" />
 }
 
-function YesNo({ label, value, onChange }: { label: string; value: boolean | null; onChange: (v: boolean | null) => void }) {
+function YesNo({ label, value, onChange, readOnly }: { label: string; value: boolean | null; onChange: (v: boolean | null) => void; readOnly?: boolean }) {
   return (
     <div className="flex items-center justify-between">
       <span className="text-sm font-medium text-[#1a1a1a]">{label}</span>
-      <div className="flex gap-2">
-        {([true, false] as const).map(v => (
-          <button key={String(v)} type="button" onClick={() => onChange(value === v ? null : v)}
-            className={`px-4 py-1.5 rounded-lg text-sm font-medium border transition-colors ${
-              value === v ? 'bg-[#1a1a1a] text-white border-[#1a1a1a]' : 'bg-white text-gray-500 border-gray-200 hover:border-gray-400'
-            }`}>
-            {v ? 'Yes' : 'No'}
-          </button>
-        ))}
-      </div>
+      {readOnly ? (
+        <span className="text-sm text-[#1a1a1a]">{value === true ? 'Yes' : value === false ? 'No' : '—'}</span>
+      ) : (
+        <div className="flex gap-2">
+          {([true, false] as const).map(v => (
+            <button key={String(v)} type="button" onClick={() => onChange(value === v ? null : v)}
+              className={`px-4 py-1.5 rounded-lg text-sm font-medium border transition-colors ${
+                value === v ? 'bg-[#1a1a1a] text-white border-[#1a1a1a]' : 'bg-white text-gray-500 border-gray-200 hover:border-gray-400'
+              }`}>
+              {v ? 'Yes' : 'No'}
+            </button>
+          ))}
+        </div>
+      )}
     </div>
   )
 }
 
-function Counter({ value, onChange }: { value: number; onChange: (v: number) => void }) {
+function Counter({ value, onChange, readOnly }: { value: number; onChange: (v: number) => void; readOnly?: boolean }) {
+  if (readOnly) return <span className="text-sm text-[#1a1a1a] py-2.5 block">{value}</span>
   return (
     <div className="flex items-center gap-3">
       <button type="button" onClick={() => onChange(Math.max(0, value - 1))}
@@ -1484,7 +1509,8 @@ function Counter({ value, onChange }: { value: number; onChange: (v: number) => 
   )
 }
 
-function MultiSelect({ options, selected, onToggle }: { options: string[]; selected: string[]; onToggle: (l: string) => void }) {
+function MultiSelect({ options, selected, onToggle, readOnly }: { options: string[]; selected: string[]; onToggle: (l: string) => void; readOnly?: boolean }) {
+  if (readOnly) return <p className="text-sm text-[#1a1a1a] py-2.5">{selected.length ? selected.join(', ') : '—'}</p>
   return (
     <div className="flex flex-wrap gap-2">
       {options.map(opt => (
