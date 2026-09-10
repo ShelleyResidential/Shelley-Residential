@@ -135,9 +135,10 @@ export default function EvaluationDetailPage() {
 
   // These three complete purely as a side effect of another action --
   // creating the evaluation, a successful calendar sync, the required
-  // fields all being filled in -- never a direct click in the Pipeline
-  // tab, for anyone, regardless of role.
-  const AUTO_ONLY_STEPS = ['captured', 'scheduled', 'evaluation_form_completed', 'cma_conducted']
+  // fields all being filled in, or the Property Inspection being saved
+  // with Appointment Outcome = Completed -- never a direct click in the
+  // Pipeline tab, for anyone, regardless of role.
+  const AUTO_ONLY_STEPS = ['captured', 'scheduled', 'evaluation_form_completed', 'cma_conducted', 'property_inspected']
 
   async function togglePipelineStep(stepId: string, stepKey: string, currentlyComplete: boolean) {
     if (!userId) return
@@ -307,7 +308,9 @@ export default function EvaluationDetailPage() {
                     onClick={() => togglePipelineStep(step.id, step.step_key, complete)}
                     disabled={!canAct}
                     title={autoOnly
-                      ? 'Completes automatically -- not manually toggleable'
+                      ? (step.step_key === 'property_inspected'
+                          ? 'Completed by saving the Property Inspection with Appointment Outcome = Completed'
+                          : 'Completes automatically -- not manually toggleable')
                       : !canAct ? `Only ${ownerRole === 'tc' ? 'a Transaction Coordinator' : ownerRole === 'cma_approver' ? 'a CMA Approver' : 'an Agent'} can toggle this step` : undefined}
                     className={`w-6 h-6 rounded-full border-2 flex-shrink-0 flex items-center justify-center transition-all ${
                       complete
