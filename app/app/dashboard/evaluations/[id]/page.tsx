@@ -703,9 +703,11 @@ const ADDITIONAL_OPTS   = ['Jungle Gym', 'Jojo Tank', 'Storeroom', 'Solar Panels
 // on the Inspection tab. This is scoped to this tab only, not changing the
 // shared style used by every other page/tab in the app.
 const fieldLabelCls = 'block text-sm font-medium text-[#1a1a1a] mb-1'
-// Same size, just bold -- used for every heading in the read-only (saved)
-// view of the Inspection tab.
-const roLabelCls    = 'block text-sm font-bold text-[#1a1a1a] mb-1'
+// The read-only (saved) Inspection view mirrors the Details tab exactly:
+// a light grey heading with the value in dark text underneath -- this is
+// byte-for-byte the shared `label` style from lib/styles. Edit mode keeps
+// the darker fieldLabelCls above.
+const roLabelCls    = 'block text-sm font-medium text-gray-500 mb-1'
 
 // Option lists for the Inspection selects, pulled out so the same list
 // renders the <option>s in edit mode AND resolves the stored value to a
@@ -1304,7 +1306,7 @@ function InspectionTab({ evaluationId, userDesignation, onSaved, editing, setEdi
         <YesNo label="Scullery / Laundry" value={form.scullery_laundry_present} onChange={v => set('scullery_laundry_present', v)} readOnly={!editing} />
 
         <Divider />
-        <SubHeading bold={!editing}>Bedrooms</SubHeading>
+        <SubHeading readOnly={!editing}>Bedrooms</SubHeading>
         <Counter readOnly={!editing}
           value={form.bedrooms_quantity}
           onChange={v => { set('bedrooms_quantity', v); set('bedroom_sizes', resizeArr(form.bedroom_sizes, v)) }}
@@ -1327,7 +1329,7 @@ function InspectionTab({ evaluationId, userDesignation, onSaved, editing, setEdi
         )}
 
         <Divider />
-        <SubHeading bold={!editing}>Study</SubHeading>
+        <SubHeading readOnly={!editing}>Study</SubHeading>
         <Counter readOnly={!editing}
           value={form.study_quantity}
           onChange={v => { set('study_quantity', v); set('study_types', resizeArr(form.study_types, v)) }}
@@ -1350,7 +1352,7 @@ function InspectionTab({ evaluationId, userDesignation, onSaved, editing, setEdi
         )}
 
         <Divider />
-        <SubHeading bold={!editing}>Bathrooms</SubHeading>
+        <SubHeading readOnly={!editing}>Bathrooms</SubHeading>
         <Counter readOnly={!editing}
           value={form.bathrooms_quantity}
           onChange={v => { set('bathrooms_quantity', v); set('bathroom_conditions', resizeArr(form.bathroom_conditions, v)) }}
@@ -1382,7 +1384,7 @@ function InspectionTab({ evaluationId, userDesignation, onSaved, editing, setEdi
         )}
 
         <Divider />
-        <SubHeading bold={!editing}>General Condition</SubHeading>
+        <SubHeading readOnly={!editing}>General Condition</SubHeading>
         {editing && <p className="text-xs text-gray-400 -mt-2">Select items to rate, then choose Good or Poor for each.</p>}
         {!editing && form.general_condition.length === 0 && <p className="text-sm text-[#1a1a1a]">—</p>}
         <div className="space-y-3">
@@ -1430,7 +1432,7 @@ function InspectionTab({ evaluationId, userDesignation, onSaved, editing, setEdi
 
       {/* ══ OTHER ══ */}
       <InspSection title="Other">
-        <SubHeading bold={!editing}>Additional Features</SubHeading>
+        <SubHeading readOnly={!editing}>Additional Features</SubHeading>
         <MultiSelect options={ADDITIONAL_OPTS} selected={form.additional_features} onToggle={l => toggleStr('additional_features', l)} readOnly={!editing} />
       </InspSection>
 
@@ -1466,10 +1468,10 @@ function InspSection({ title, children }: { title: string; children: React.React
   )
 }
 
-function SubHeading({ children, bold }: { children: React.ReactNode; bold?: boolean }) {
-  // Same size as every other field label; `bold` (used in the read-only
-  // saved view) just switches the weight, it never changes the size.
-  return <p className={bold ? roLabelCls : fieldLabelCls}>{children}</p>
+function SubHeading({ children, readOnly }: { children: React.ReactNode; readOnly?: boolean }) {
+  // Read-only uses the lighter grey Details-style label; edit mode keeps
+  // the darker fieldLabelCls. Same size either way.
+  return <p className={readOnly ? roLabelCls : fieldLabelCls}>{children}</p>
 }
 
 function Divider() {
@@ -1477,13 +1479,14 @@ function Divider() {
 }
 
 function YesNo({ label, value, onChange, readOnly }: { label: string; value: boolean | null; onChange: (v: boolean | null) => void; readOnly?: boolean }) {
-  // Read-only stacks the answer under a bold label ("Security" / "Yes"),
-  // rather than the far-right toggle layout used while editing.
+  // Read-only stacks the answer under the label ("Security" / "Yes"),
+  // matching the Details tab's Field, rather than the far-right toggle
+  // layout used while editing.
   if (readOnly) {
     return (
       <div>
-        <p className={roLabelCls}>{label}</p>
-        <p className="text-sm text-[#1a1a1a]">{value === true ? 'Yes' : value === false ? 'No' : '—'}</p>
+        <span className={roLabelCls}>{label}</span>
+        <p className="text-sm text-[#1a1a1a] py-2.5">{value === true ? 'Yes' : value === false ? 'No' : '—'}</p>
       </div>
     )
   }
