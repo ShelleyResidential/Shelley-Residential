@@ -1635,43 +1635,6 @@ export function EvaluationForm({ evaluationId, readOnly = false, calendarEventLi
           </p>
         )}
 
-        <Field label="Evaluation Outcome" readOnly={readOnly}
-          value={EVALUATION_OUTCOMES.find(o => o.value === evaluationOutcome)?.label}>
-          <select value={evaluationOutcome} onChange={e => setEvaluationOutcome(e.target.value)} className={select}>
-            <option value="">—</option>
-            {EVALUATION_OUTCOMES.map(o => <option key={o.value} value={o.value}>{o.label}</option>)}
-          </select>
-          <p className="text-xs text-gray-400 mt-2">Recording an outcome closes this evaluation.</p>
-        </Field>
-
-        {evaluationOutcome === 'lost' && (
-          <Field label="Reason Lost" readOnly={readOnly}
-            value={reasonLost === 'other' ? (reasonLostOther || 'Other') : REASONS_LOST.find(r => r.value === reasonLost)?.label}>
-            <select value={reasonLost} onChange={e => setReasonLost(e.target.value)} className={select}>
-              <option value="">—</option>
-              {REASONS_LOST.map(r => <option key={r.value} value={r.value}>{r.label}</option>)}
-            </select>
-            {reasonLost === 'other' && (
-              <input value={reasonLostOther} onChange={e => setReasonLostOther(e.target.value)}
-                placeholder="Describe the reason" className={`${input} mt-2`} />
-            )}
-          </Field>
-        )}
-
-        {evaluationOutcome === 'cancelled' && (
-          <Field label="Reason Cancelled" readOnly={readOnly}
-            value={reasonCancelled === 'other' ? (reasonCancelledOther || 'Other') : REASONS_CANCELLED.find(r => r.value === reasonCancelled)?.label}>
-            <select value={reasonCancelled} onChange={e => setReasonCancelled(e.target.value)} className={select}>
-              <option value="">—</option>
-              {REASONS_CANCELLED.map(r => <option key={r.value} value={r.value}>{r.label}</option>)}
-            </select>
-            {reasonCancelled === 'other' && (
-              <input value={reasonCancelledOther} onChange={e => setReasonCancelledOther(e.target.value)}
-                placeholder="Describe the reason" className={`${input} mt-2`} />
-            )}
-          </Field>
-        )}
-
         <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
           <Field label="Evaluation Price" readOnly={readOnly} value={evaluationPrice ? formatZAR(evaluationPrice) : undefined}>
             <input type="number" value={evaluationPrice} onChange={e => setEvaluationPrice(e.target.value)}
@@ -1806,6 +1769,47 @@ export function EvaluationForm({ evaluationId, readOnly = false, calendarEventLi
           </div>
         </Section>
       )}
+
+      {/* ── Evaluation Outcome — last on the page, after Presentation:
+          recording an outcome is what closes the evaluation. ── */}
+      <Section title="Evaluation Outcome">
+        <Field label="Evaluation Outcome" readOnly={readOnly}
+          value={EVALUATION_OUTCOMES.find(o => o.value === evaluationOutcome)?.label}>
+          <select value={evaluationOutcome} onChange={e => setEvaluationOutcome(e.target.value)} className={select}>
+            <option value="">—</option>
+            {EVALUATION_OUTCOMES.map(o => <option key={o.value} value={o.value}>{o.label}</option>)}
+          </select>
+          <p className="text-xs text-gray-400 mt-2">Recording an outcome closes this evaluation.</p>
+        </Field>
+
+        {evaluationOutcome === 'lost' && (
+          <Field label="Reason Lost" readOnly={readOnly}
+            value={reasonLost === 'other' ? (reasonLostOther || 'Other') : REASONS_LOST.find(r => r.value === reasonLost)?.label}>
+            <select value={reasonLost} onChange={e => setReasonLost(e.target.value)} className={select}>
+              <option value="">—</option>
+              {REASONS_LOST.map(r => <option key={r.value} value={r.value}>{r.label}</option>)}
+            </select>
+            {reasonLost === 'other' && (
+              <input value={reasonLostOther} onChange={e => setReasonLostOther(e.target.value)}
+                placeholder="Describe the reason" className={`${input} mt-2`} />
+            )}
+          </Field>
+        )}
+
+        {evaluationOutcome === 'cancelled' && (
+          <Field label="Reason Cancelled" readOnly={readOnly}
+            value={reasonCancelled === 'other' ? (reasonCancelledOther || 'Other') : REASONS_CANCELLED.find(r => r.value === reasonCancelled)?.label}>
+            <select value={reasonCancelled} onChange={e => setReasonCancelled(e.target.value)} className={select}>
+              <option value="">—</option>
+              {REASONS_CANCELLED.map(r => <option key={r.value} value={r.value}>{r.label}</option>)}
+            </select>
+            {reasonCancelled === 'other' && (
+              <input value={reasonCancelledOther} onChange={e => setReasonCancelledOther(e.target.value)}
+                placeholder="Describe the reason" className={`${input} mt-2`} />
+            )}
+          </Field>
+        )}
+      </Section>
 
       {error && <p className="text-sm text-red-500 bg-red-50 px-4 py-3 rounded-lg">{error}</p>}
 
