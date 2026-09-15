@@ -61,6 +61,14 @@ function ChevronIcon({ open }: { open: boolean }) {
   )
 }
 
+function HamburgerIcon() {
+  return (
+    <svg width="22" height="22" viewBox="0 0 22 22" fill="none">
+      <path d="M3 6h16M3 11h16M3 16h16" stroke="white" strokeWidth="1.8" strokeLinecap="round" />
+    </svg>
+  )
+}
+
 export default function DashboardLayout({ children }: { children: React.ReactNode }) {
   const router   = useRouter()
   const pathname = usePathname()
@@ -68,6 +76,22 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
   const [displayName, setDisplayName] = useState('')
   const [avatarUrl, setAvatarUrl] = useState<string | null>(null)
   const [analyseOpen, setAnalyseOpen] = useState(() => ANALYSE_ROUTES.some(r => pathname.startsWith(r)))
+  const [mobileMenuOpen, setMobileMenuOpen] = useState(false)
+
+  // Close the drawer on navigation -- adjusted during render (React's
+  // recommended pattern for "reset state when a prop changes") rather than
+  // in an effect, to avoid the extra render pass that would cause.
+  const [prevPathname, setPrevPathname] = useState(pathname)
+  if (pathname !== prevPathname) {
+    setPrevPathname(pathname)
+    setMobileMenuOpen(false)
+  }
+
+  // Don't let the page scroll behind the drawer while it's open.
+  useEffect(() => {
+    document.body.style.overflow = mobileMenuOpen ? 'hidden' : ''
+    return () => { document.body.style.overflow = '' }
+  }, [mobileMenuOpen])
 
   useEffect(() => {
     supabase.auth.getUser().then(({ data }) => {
@@ -89,16 +113,47 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
   const analyseActive   = pathname === '/dashboard/analyse'
 
   return (
-    <div style={{ display: 'grid', gridTemplateColumns: '240px minmax(0, 1fr)', minHeight: '100vh' }}>
+    <div className="min-h-screen md:grid md:grid-cols-[240px_minmax(0,1fr)]">
+
+      {/* ── Mobile top bar ── */}
+      <div className="md:hidden sticky top-0 z-30 flex items-center gap-3 bg-[#2A2A2A] px-4 py-3">
+        <button
+          type="button"
+          aria-label="Open menu"
+          onClick={() => setMobileMenuOpen(true)}
+          className="p-1 -ml-1"
+        >
+          <HamburgerIcon />
+        </button>
+        <Image src="/logo.png" alt="Shelley Residential" width={110} height={55} style={{ filter: 'brightness(0) invert(1)' }} />
+      </div>
+
+      {/* ── Backdrop (mobile drawer only) ── */}
+      {mobileMenuOpen && (
+        <div
+          className="md:hidden fixed inset-0 z-40 bg-black/40"
+          onClick={() => setMobileMenuOpen(false)}
+        />
+      )}
 
       {/* ── Sidebar ── */}
-      <aside style={{
-        background: '#2A2A2A', color: '#fff', padding: '28px 24px',
-        display: 'flex', flexDirection: 'column',
-        position: 'sticky', top: 0, height: '100vh', overflowY: 'auto',
-      }}>
-        <div style={{ marginBottom: 40, textAlign: 'center' }}>
+      <aside
+        className={`fixed md:sticky top-0 left-0 z-50 h-screen overflow-y-auto transition-transform duration-200 ease-in-out md:translate-x-0 ${mobileMenuOpen ? 'translate-x-0' : '-translate-x-full'}`}
+        style={{
+          background: '#2A2A2A', color: '#fff', padding: '28px 24px',
+          display: 'flex', flexDirection: 'column', width: 240,
+        }}
+      >
+        <div className="relative" style={{ marginBottom: 40, textAlign: 'center' }}>
           <Image src="/logo.png" alt="Shelley Residential" width={160} height={80} style={{ filter: 'brightness(0) invert(1)' }} />
+          <button
+            type="button"
+            aria-label="Close menu"
+            onClick={() => setMobileMenuOpen(false)}
+            className="md:hidden absolute top-0 right-0 text-white text-xl leading-none p-1"
+          >
+            ×
+          </button>
         </div>
 
         <nav style={{ flex: 1 }}>
