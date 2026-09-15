@@ -156,6 +156,40 @@ type CalendarEventSummary = {
   start?: { dateTime?: string; date?: string }
 }
 
+export type CalendarEventDetail = {
+  id: string
+  status: string
+  summary?: string
+  description?: string
+  location?: string
+  htmlLink?: string
+  start?: { dateTime?: string; date?: string; timeZone?: string }
+  end?: { dateTime?: string; date?: string; timeZone?: string }
+}
+
+// Everything on the calendar within [timeMin, timeMax) -- for a
+// day-at-a-glance view (see /api/calendar/today), not the incremental
+// sync-token approach listChangedEvents uses for the webhook. timeMin/
+// timeMax should carry an explicit offset (e.g. "2026-09-15T00:00:00+02:00")
+// so the window means the same instant regardless of where this runs.
+export async function listEventsForRange(accessToken: string, timeMinISO: string, timeMaxISO: string) {
+  const params = new URLSearchParams({
+    singleEvents: 'true',
+    orderBy: 'startTime',
+    timeMin: timeMinISO,
+    timeMax: timeMaxISO,
+    maxResults: '50',
+  })
+  const res  = await fetch(`${CALENDAR_BASE}?${params}`, {
+    headers: { Authorization: `Bearer ${accessToken}` },
+  })
+  const json = await res.json()
+  if (json.error) {
+    return { items: [] as CalendarEventDetail[], error: { message: json.error.message, code: res.status } }
+  }
+  return { items: (json.items ?? []) as CalendarEventDetail[], error: undefined as { message: string; code?: number } | undefined }
+}
+
 // Pulls everything that changed since `syncToken` (or, with no token yet,
 // establishes a fresh baseline by listing everything currently on the
 // calendar). Always uses the same parameters either way -- Google requires
