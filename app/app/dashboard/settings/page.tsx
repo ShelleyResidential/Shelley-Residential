@@ -85,7 +85,7 @@ export default function SettingsPage() {
   }
 
   return (
-    <div className="p-10">
+    <div className="p-4 md:p-10">
       <div className="flex items-center justify-between mb-8">
         <h1 className="text-2xl font-bold text-[#1a1a1a]">Settings</h1>
         <button onClick={signOut} className={btn.danger}>

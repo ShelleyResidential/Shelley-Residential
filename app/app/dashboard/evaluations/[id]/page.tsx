@@ -185,7 +185,7 @@ export default function EvaluationDetailPage() {
     : null
 
   return (
-    <div className="p-10 max-w-4xl">
+    <div className="p-4 md:p-10 max-w-4xl">
 
       <Link href="/dashboard/evaluations/new" className={`${btn.primary} fixed top-8 right-10 z-40 shadow-md`}>+ New Evaluation</Link>
 

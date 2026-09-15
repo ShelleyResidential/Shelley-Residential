@@ -342,11 +342,11 @@ export default function EvaluationsPage() {
   )
 
   return (
-    <div className="p-10">
+    <div className="p-4 md:p-10">
       <Breadcrumbs items={[{ label: 'Analyse' }, { label: 'Evaluations' }]} />
       <div className="flex items-center justify-between mb-4">
         <h1 className="text-2xl font-bold text-[#1a1a1a]">Evaluations</h1>
-        <Link href="/dashboard/evaluations/new" className={`${btn.primary} fixed top-8 right-10 z-40 shadow-md`}>+ New Evaluation</Link>
+        <Link href="/dashboard/evaluations/new" className={`${btn.primary} md:fixed md:top-8 md:right-10 md:z-40 md:shadow-md`}>+ New Evaluation</Link>
       </div>
 
       {/* Status filter tabs */}
@@ -412,91 +412,155 @@ export default function EvaluationsPage() {
           <Link href="/dashboard/evaluations/new" className={btn.primary}>Create your first evaluation</Link>
         </div>
       ) : (
-        <div className={`${card} overflow-x-auto`}>
-          <table className="w-full text-sm table-fixed">
-            <thead>
-              <TableHeaderRow sortColumn={sortColumn} sortDirection={sortDirection} onSort={handleSort} />
-            </thead>
-            <tbody>
-              {evaluations.map((ev, i) => {
-                const statusMeta = {
-                  label:  STATUS_LABELS[ev.status] ?? ev.status,
-                  colour: STATUS_COLOURS[ev.status] ?? 'bg-gray-100 text-gray-500',
-                }
-                const date = new Date(ev.date_captured).toLocaleDateString('en-ZA', { day: 'numeric', month: 'short', year: 'numeric' })
-                const leadSource = ev.lead_source_picklist?.label ?? ev.lead_source_other_text ?? '—'
-                const agent = ev.sellers_agent_user_id ? profiles[ev.sellers_agent_user_id] : null
-                const tc = ev.transaction_coordinator_user_id ? profiles[ev.transaction_coordinator_user_id] : null
+        <>
+          {/* Mobile: stacked cards -- the table's fixed percentage columns
+              would otherwise squeeze every cell into an unreadable sliver
+              on a phone-width screen. */}
+          <div className="md:hidden space-y-3">
+            {evaluations.map(ev => {
+              const statusMeta = {
+                label:  STATUS_LABELS[ev.status] ?? ev.status,
+                colour: STATUS_COLOURS[ev.status] ?? 'bg-gray-100 text-gray-500',
+              }
+              const date = new Date(ev.date_captured).toLocaleDateString('en-ZA', { day: 'numeric', month: 'short', year: 'numeric' })
+              const leadSource = ev.lead_source_picklist?.label ?? ev.lead_source_other_text ?? '—'
+              const agent = ev.sellers_agent_user_id ? profiles[ev.sellers_agent_user_id] : null
+              const tc = ev.transaction_coordinator_user_id ? profiles[ev.transaction_coordinator_user_id] : null
+              const seller = getSeller(ev)
 
-                return (
-                  <tr
-                    key={ev.id}
-                    onClick={() => router.push(`/dashboard/evaluations/${ev.id}`)}
-                    className={`cursor-pointer hover:bg-gray-100 transition-colors ${i % 2 === 0 ? 'bg-white' : 'bg-gray-50'}`}
-                  >
-                    <td className="px-3 py-3 whitespace-nowrap" onClick={e => e.stopPropagation()}>
-                      <input
-                        type="radio"
-                        name="selected-evaluation"
-                        checked={selectedId === ev.id}
-                        onClick={() => toggleSelected(ev.id)}
-                        onChange={() => setSelectedId(ev.id)}
-                        className="w-4 h-4 border-gray-300 accent-[#E8266F] cursor-pointer"
-                      />
-                    </td>
-                    <td className="px-3 py-3 overflow-hidden">
-                      <span className={`text-xs px-2 py-0.5 rounded-full font-medium truncate inline-block max-w-full align-bottom ${statusMeta.colour}`}
-                        title={statusMeta.label}>
-                        {statusMeta.label}
-                      </span>
-                    </td>
-                    <td className="px-3 py-3 overflow-hidden">
-                      {mapsUrl(ev.properties) ? (
-                        <a
-                          href={mapsUrl(ev.properties)!}
-                          target="_blank"
-                          rel="noopener noreferrer"
-                          onClick={e => e.stopPropagation()}
-                          title={formatAddress(ev.properties)}
-                          className="block truncate font-medium text-[#1a1a1a] underline hover:font-bold transition-all"
-                        >
-                          {formatAddress(ev.properties)}
-                        </a>
-                      ) : (
-                        <span title={formatAddress(ev.properties)} className="block truncate font-medium text-[#1a1a1a] underline">{formatAddress(ev.properties)}</span>
-                      )}
-                    </td>
-                    <td className="px-3 py-3 text-gray-500 truncate">{date}</td>
-                    <td className="px-3 py-3 text-gray-500 truncate" title={agent?.full_name ?? agent?.email ?? undefined}>{agent?.full_name ?? agent?.email ?? '—'}</td>
-                    <td className="px-3 py-3 text-gray-500 truncate" title={tc?.full_name ?? tc?.email ?? undefined}>{tc?.full_name ?? tc?.email ?? '—'}</td>
-                    <td className="px-3 py-3 overflow-hidden">
-                      {getSeller(ev) ? (
-                        <Link
-                          href={`/dashboard/contacts/${getSeller(ev)!.id}`}
-                          onClick={e => e.stopPropagation()}
-                          title={sellerName(ev)}
-                          className="block w-full truncate text-gray-500 underline hover:font-bold hover:text-[#1a1a1a] transition-all"
-                        >
-                          {sellerName(ev)}
-                        </Link>
-                      ) : (
-                        <span className="text-gray-500">—</span>
-                      )}
-                    </td>
-                    <td className="px-3 py-3 text-gray-500 truncate" title={leadSource}>
-                      {leadSource}
-                    </td>
-                    <td className="px-3 py-3 text-gray-500 truncate">{formatCurrency(ev.evaluation_price)}</td>
-                    <td className="px-3 py-3 text-gray-500 truncate">{formatCurrency(ev.marketing_price)}</td>
-                  </tr>
-                )
-              })}
-            </tbody>
-            <tfoot>
-              <TableHeaderRow sortColumn={sortColumn} sortDirection={sortDirection} onSort={handleSort} />
-            </tfoot>
-          </table>
-        </div>
+              return (
+                <div
+                  key={ev.id}
+                  onClick={() => router.push(`/dashboard/evaluations/${ev.id}`)}
+                  className={`${card} p-4 cursor-pointer active:bg-gray-50 transition-colors`}
+                >
+                  <div className="flex items-start justify-between gap-2 mb-2.5">
+                    {mapsUrl(ev.properties) ? (
+                      <a
+                        href={mapsUrl(ev.properties)!}
+                        target="_blank"
+                        rel="noopener noreferrer"
+                        onClick={e => e.stopPropagation()}
+                        className="text-[#1a1a1a] font-semibold underline truncate"
+                      >
+                        {formatAddress(ev.properties)}
+                      </a>
+                    ) : (
+                      <span className="text-[#1a1a1a] font-semibold truncate">{formatAddress(ev.properties)}</span>
+                    )}
+                    <span className={`text-xs px-2 py-0.5 rounded-full font-medium flex-shrink-0 ${statusMeta.colour}`}>
+                      {statusMeta.label}
+                    </span>
+                  </div>
+                  <div className="space-y-1.5 text-sm">
+                    <CardRow label="Date" value={date} />
+                    <CardRow label="Agent" value={agent?.full_name ?? agent?.email ?? '—'} />
+                    <CardRow label="TC" value={tc?.full_name ?? tc?.email ?? '—'} />
+                    <CardRow label="Contact" value={seller ? (
+                      <Link
+                        href={`/dashboard/contacts/${seller.id}`}
+                        onClick={e => e.stopPropagation()}
+                        className="underline"
+                      >
+                        {sellerName(ev)}
+                      </Link>
+                    ) : '—'} />
+                    <CardRow label="Lead Source" value={leadSource} />
+                    <CardRow label="Evaluation" value={formatCurrency(ev.evaluation_price)} />
+                    <CardRow label="Marketing" value={formatCurrency(ev.marketing_price)} />
+                  </div>
+                </div>
+              )
+            })}
+          </div>
+
+          {/* Desktop: table */}
+          <div className={`hidden md:block ${card} overflow-x-auto`}>
+            <table className="w-full text-sm table-fixed">
+              <thead>
+                <TableHeaderRow sortColumn={sortColumn} sortDirection={sortDirection} onSort={handleSort} />
+              </thead>
+              <tbody>
+                {evaluations.map((ev, i) => {
+                  const statusMeta = {
+                    label:  STATUS_LABELS[ev.status] ?? ev.status,
+                    colour: STATUS_COLOURS[ev.status] ?? 'bg-gray-100 text-gray-500',
+                  }
+                  const date = new Date(ev.date_captured).toLocaleDateString('en-ZA', { day: 'numeric', month: 'short', year: 'numeric' })
+                  const leadSource = ev.lead_source_picklist?.label ?? ev.lead_source_other_text ?? '—'
+                  const agent = ev.sellers_agent_user_id ? profiles[ev.sellers_agent_user_id] : null
+                  const tc = ev.transaction_coordinator_user_id ? profiles[ev.transaction_coordinator_user_id] : null
+
+                  return (
+                    <tr
+                      key={ev.id}
+                      onClick={() => router.push(`/dashboard/evaluations/${ev.id}`)}
+                      className={`cursor-pointer hover:bg-gray-100 transition-colors ${i % 2 === 0 ? 'bg-white' : 'bg-gray-50'}`}
+                    >
+                      <td className="px-3 py-3 whitespace-nowrap" onClick={e => e.stopPropagation()}>
+                        <input
+                          type="radio"
+                          name="selected-evaluation"
+                          checked={selectedId === ev.id}
+                          onClick={() => toggleSelected(ev.id)}
+                          onChange={() => setSelectedId(ev.id)}
+                          className="w-4 h-4 border-gray-300 accent-[#E8266F] cursor-pointer"
+                        />
+                      </td>
+                      <td className="px-3 py-3 overflow-hidden">
+                        <span className={`text-xs px-2 py-0.5 rounded-full font-medium truncate inline-block max-w-full align-bottom ${statusMeta.colour}`}
+                          title={statusMeta.label}>
+                          {statusMeta.label}
+                        </span>
+                      </td>
+                      <td className="px-3 py-3 overflow-hidden">
+                        {mapsUrl(ev.properties) ? (
+                          <a
+                            href={mapsUrl(ev.properties)!}
+                            target="_blank"
+                            rel="noopener noreferrer"
+                            onClick={e => e.stopPropagation()}
+                            title={formatAddress(ev.properties)}
+                            className="block truncate font-medium text-[#1a1a1a] underline hover:font-bold transition-all"
+                          >
+                            {formatAddress(ev.properties)}
+                          </a>
+                        ) : (
+                          <span title={formatAddress(ev.properties)} className="block truncate font-medium text-[#1a1a1a] underline">{formatAddress(ev.properties)}</span>
+                        )}
+                      </td>
+                      <td className="px-3 py-3 text-gray-500 truncate">{date}</td>
+                      <td className="px-3 py-3 text-gray-500 truncate" title={agent?.full_name ?? agent?.email ?? undefined}>{agent?.full_name ?? agent?.email ?? '—'}</td>
+                      <td className="px-3 py-3 text-gray-500 truncate" title={tc?.full_name ?? tc?.email ?? undefined}>{tc?.full_name ?? tc?.email ?? '—'}</td>
+                      <td className="px-3 py-3 overflow-hidden">
+                        {getSeller(ev) ? (
+                          <Link
+                            href={`/dashboard/contacts/${getSeller(ev)!.id}`}
+                            onClick={e => e.stopPropagation()}
+                            title={sellerName(ev)}
+                            className="block w-full truncate text-gray-500 underline hover:font-bold hover:text-[#1a1a1a] transition-all"
+                          >
+                            {sellerName(ev)}
+                          </Link>
+                        ) : (
+                          <span className="text-gray-500">—</span>
+                        )}
+                      </td>
+                      <td className="px-3 py-3 text-gray-500 truncate" title={leadSource}>
+                        {leadSource}
+                      </td>
+                      <td className="px-3 py-3 text-gray-500 truncate">{formatCurrency(ev.evaluation_price)}</td>
+                      <td className="px-3 py-3 text-gray-500 truncate">{formatCurrency(ev.marketing_price)}</td>
+                    </tr>
+                  )
+                })}
+              </tbody>
+              <tfoot>
+                <TableHeaderRow sortColumn={sortColumn} sortDirection={sortDirection} onSort={handleSort} />
+              </tfoot>
+            </table>
+          </div>
+        </>
       )}
 
       {paginationControls && <div className="mt-4">{paginationControls}</div>}
@@ -558,6 +622,16 @@ function TableHeaderRow({ sortColumn, sortDirection, onSort }: {
         </th>
       ))}
     </tr>
+  )
+}
+
+// ── Mobile card list: one label/value row per field.
+function CardRow({ label, value }: { label: string; value: React.ReactNode }) {
+  return (
+    <div className="flex items-baseline justify-between gap-3">
+      <span className="text-gray-400 flex-shrink-0">{label}</span>
+      <span className="text-[#1a1a1a] text-right truncate">{value}</span>
+    </div>
   )
 }
 

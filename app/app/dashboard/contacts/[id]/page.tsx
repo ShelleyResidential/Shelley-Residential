@@ -186,7 +186,7 @@ export default function ContactDetailPage() {
   if (!contact) return null
 
   return (
-    <div className="p-10 max-w-4xl">
+    <div className="p-4 md:p-10 max-w-4xl">
 
       <Link href="/dashboard/contacts/new" className={`${btn.primary} fixed top-8 right-10 z-40 shadow-md`}>+ New Contact</Link>
 
@@ -230,7 +230,7 @@ export default function ContactDetailPage() {
         {tab === 'info' && (
           <div className="space-y-6">
             <Section title="Basic Information">
-              <div className="grid grid-cols-3 gap-3">
+              <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
                 <Field label="Title" editing={editing} value={contact.title}>
                   <select value={editForm.title ?? ''} onChange={e => setField('title', e.target.value || null)} className={select}>
                     <option value="">—</option>
@@ -252,7 +252,7 @@ export default function ContactDetailPage() {
               <Field label="ID Number" editing={editing} value={contact.id_number}>
                 <input value={editForm.id_number ?? ''} onChange={e => setField('id_number', e.target.value || null)} className={input} />
               </Field>
-              <div className="grid grid-cols-2 gap-3">
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
                 <Field label="Date Added" editing={false} value={formatDate(contact.date_added)} />
                 <Field label="Captured By" editing={false}
                   value={profiles.find(p => p.id === contact.created_by)?.full_name ?? profiles.find(p => p.id === contact.created_by)?.email} />
@@ -260,7 +260,7 @@ export default function ContactDetailPage() {
             </Section>
 
             <Section title="Contact Details">
-              <div className="grid grid-cols-2 gap-3">
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
                 <Field label="Phone" editing={editing} value={formatPhoneDisplay(contact.phone_number)}>
                   <input value={editForm.phone_number ?? ''} onChange={e => setField('phone_number', e.target.value || null)} className={input} />
                 </Field>
@@ -283,7 +283,7 @@ export default function ContactDetailPage() {
                   {['Single', 'Married', 'Divorced', 'Widowed', 'Separated'].map(s => <option key={s}>{s}</option>)}
                 </select>
               </Field>
-              <div className="grid grid-cols-3 gap-3">
+              <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
                 <Field label="Birthday" editing={editing} value={formatDate(contact.birthday)}>
                   <input type="date" value={editForm.birthday ?? ''} onChange={e => setField('birthday', e.target.value || null)} className={input} />
                 </Field>
@@ -297,7 +297,7 @@ export default function ContactDetailPage() {
             </Section>
 
             <Section title="Work Details">
-              <div className="grid grid-cols-2 gap-3">
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
                 <Field label="Occupation" editing={editing} value={contact.occupation}>
                   <input value={editForm.occupation ?? ''} onChange={e => setField('occupation', e.target.value || null)} className={input} />
                 </Field>

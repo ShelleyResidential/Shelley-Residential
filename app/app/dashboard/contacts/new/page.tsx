@@ -162,7 +162,7 @@ function AddContactForm() {
   }
 
   return (
-    <div className="p-10 max-w-4xl">
+    <div className="p-4 md:p-10 max-w-4xl">
       <Breadcrumbs items={returnTo
         ? [{ label: 'Analyse' }, { label: 'Evaluations', href: '/dashboard/evaluations' }, { label: 'Back to Evaluation', href: `${returnTo}?resume=1` }, { label: 'New Contact' }]
         : [{ label: 'Analyse' }, { label: 'Contacts', href: '/dashboard/contacts' }, { label: 'New Contact' }]
@@ -171,7 +171,7 @@ function AddContactForm() {
       <form onSubmit={handleSubmit} className="space-y-6">
 
           <Section title="Basic Information">
-            <div className="grid grid-cols-3 gap-3">
+            <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
               <div>
                 <label className={labelCls}>Title</label>
                 <select value={form.title} onChange={e => set('title', e.target.value)} className={select}>

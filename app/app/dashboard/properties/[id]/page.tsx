@@ -179,7 +179,7 @@ export default function PropertyDetailPage() {
   const capturedBy = profiles.find(p => p.id === property.created_by_user_id)
 
   return (
-    <div className="p-10 max-w-4xl">
+    <div className="p-4 md:p-10 max-w-4xl">
 
       {/* ── Header ── */}
       <div className="mb-8">
@@ -242,7 +242,7 @@ export default function PropertyDetailPage() {
               </select>
             </Field>
             {editForm.property_type === 'sectional_title' && (
-              <div className="grid grid-cols-2 gap-3">
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
                 <Field label="Unit Number" editing={editing} value={property.unit_number}>
                   <input value={editForm.unit_number ?? ''} onChange={e => setField('unit_number', e.target.value || null)} className={input} />
                 </Field>
@@ -259,7 +259,7 @@ export default function PropertyDetailPage() {
           </Section>
 
           <Section title="Address">
-            <div className="grid grid-cols-2 gap-3">
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
               <Field label="Street Number" editing={editing} value={property.street_number}>
                 <input value={editForm.street_number ?? ''} onChange={e => setField('street_number', e.target.value || null)} className={input} />
               </Field>
@@ -267,7 +267,7 @@ export default function PropertyDetailPage() {
                 <input value={editForm.street_name ?? ''} onChange={e => setField('street_name', e.target.value || null)} className={input} />
               </Field>
             </div>
-            <div className="grid grid-cols-2 gap-3">
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
               <Field label="Suburb" editing={editing} value={property.suburb}>
                 <input value={editForm.suburb ?? ''} onChange={e => setField('suburb', e.target.value || null)} className={input} />
               </Field>
@@ -275,7 +275,7 @@ export default function PropertyDetailPage() {
                 <input value={editForm.city ?? ''} onChange={e => setField('city', e.target.value || null)} className={input} />
               </Field>
             </div>
-            <div className="grid grid-cols-2 gap-3">
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
               <Field label="Province" editing={editing} value={property.province}>
                 <input value={editForm.province ?? ''} onChange={e => setField('province', e.target.value || null)} className={input} />
               </Field>
@@ -286,7 +286,7 @@ export default function PropertyDetailPage() {
             <Field label="Country" editing={editing} value={property.country}>
               <input value={editForm.country ?? ''} onChange={e => setField('country', e.target.value || null)} className={input} />
             </Field>
-            <div className="grid grid-cols-2 gap-3">
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
               <Field label="Date Added" editing={false} value={formatDate(property.created_at)} />
               <Field label="Captured By" editing={false} value={capturedBy?.full_name ?? capturedBy?.email} />
             </div>

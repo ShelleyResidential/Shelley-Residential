@@ -1404,7 +1404,7 @@ export function EvaluationForm({ evaluationId, readOnly = false, calendarEventLi
           <div className="space-y-4 border border-gray-200 rounded-xl p-4 bg-gray-50">
             {newPropertyType === 'sectional_title' && (
               <>
-                <div className="grid grid-cols-2 gap-3">
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
                   <div>
                     <label className={labelCls}>Unit Number</label>
                     <input value={propertyDraft.unit_number} onChange={e => updateDraft('unit_number', e.target.value)} className={input} />
@@ -1421,7 +1421,7 @@ export function EvaluationForm({ evaluationId, readOnly = false, calendarEventLi
               </>
             )}
 
-            <div className="grid grid-cols-2 gap-3">
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
               <div>
                 <label className={labelCls}>Street Number</label>
                 <input value={propertyDraft.street_number} onChange={e => updateDraft('street_number', e.target.value)} className={input} />
@@ -1432,7 +1432,7 @@ export function EvaluationForm({ evaluationId, readOnly = false, calendarEventLi
               </div>
             </div>
 
-            <div className="grid grid-cols-2 gap-3">
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
               <div>
                 <label className={labelCls}>Suburb</label>
                 <input value={propertyDraft.suburb} onChange={e => updateDraft('suburb', e.target.value)} className={input} />
@@ -1443,7 +1443,7 @@ export function EvaluationForm({ evaluationId, readOnly = false, calendarEventLi
               </div>
             </div>
 
-            <div className="grid grid-cols-2 gap-3">
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
               <div>
                 <label className={labelCls}>Province</label>
                 <input value={propertyDraft.province} onChange={e => updateDraft('province', e.target.value)} className={input} />
