@@ -312,6 +312,7 @@ function TodaysBriefing({ userId }: { userId: string }) {
   const [connected, setConnected] = useState(true)
   const [loading, setLoading]   = useState(true)
   const [errorMsg, setErrorMsg] = useState('')
+  const [unreadCount, setUnreadCount] = useState<number | null>(null)
 
   useEffect(() => {
     let cancelled = false
@@ -332,6 +333,23 @@ function TodaysBriefing({ userId }: { userId: string }) {
     return () => { cancelled = true }
   }, [userId])
 
+  useEffect(() => {
+    let cancelled = false
+    // Best-effort, separate from the calendar fetch above -- until an agent
+    // next logs in and picks up the gmail.readonly scope top-up, this call
+    // will fail with an insufficient-scope error, and the count should just
+    // stay hidden rather than showing an error in the briefing card.
+    fetch('/api/gmail/unread', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ userId }),
+    })
+      .then(res => res.json())
+      .then(data => { if (!cancelled) setUnreadCount(typeof data.count === 'number' ? data.count : null) })
+      .catch(() => { if (!cancelled) setUnreadCount(null) })
+    return () => { cancelled = true }
+  }, [userId])
+
   const todayLabel = new Date().toLocaleDateString('en-ZA', {
     weekday: 'long', day: 'numeric', month: 'long', timeZone: 'Africa/Johannesburg',
   })
@@ -344,9 +362,16 @@ function TodaysBriefing({ userId }: { userId: string }) {
           <p className="text-sm text-gray-400 mt-0.5">{todayLabel}</p>
         </div>
         {!loading && connected && (
-          <span className="text-base text-gray-400">
-            {events.length} {events.length === 1 ? 'appointment' : 'appointments'}
-          </span>
+          <div className="text-right">
+            <span className="text-base text-gray-400">
+              {events.length} {events.length === 1 ? 'appointment' : 'appointments'}
+            </span>
+            {unreadCount != null && (
+              <p className="text-sm text-gray-400 mt-0.5">
+                <span className={unreadCount > 0 ? 'font-semibold text-[#E8266F]' : ''}>{unreadCount}</span> unread email{unreadCount === 1 ? '' : 's'}
+              </p>
+            )}
+          </div>
         )}
       </div>
 

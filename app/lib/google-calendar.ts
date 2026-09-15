@@ -13,9 +13,12 @@ export const REQUIRED_GOOGLE_SCOPES = [
   'https://www.googleapis.com/auth/contacts',
   'https://www.googleapis.com/auth/drive',
   'https://www.googleapis.com/auth/documents',
+  // Read-only -- only used for the dashboard's unread-inbox count, see
+  // lib/google-gmail.ts.
+  'https://www.googleapis.com/auth/gmail.readonly',
 ]
 
-// Combined sign-in + Calendar/Contacts/Drive/Docs consent — used by the
+// Combined sign-in + Calendar/Contacts/Drive/Docs/Gmail consent — used by the
 // login flow so all of it is granted automatically as part of signing in
 // with Google. `forceConsent` re-shows the full permission screen even if
 // Google would otherwise silently skip it (needed the one time an account
