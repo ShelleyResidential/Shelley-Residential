@@ -128,7 +128,7 @@ export function MobileShell({ children }: { children: React.ReactNode }) {
           {avatarUrl ? (
             <Image src={avatarUrl} alt={displayName} width={36} height={36} referrerPolicy="no-referrer" style={{ objectFit: 'cover', width: '100%', height: '100%' }} />
           ) : (
-            <div className="w-full h-full flex items-center justify-center text-xs font-bold text-white" style={{ background: '#E8266F' }}>
+            <div className="w-full h-full flex items-center justify-center text-base font-bold text-white" style={{ background: '#E8266F' }}>
               {displayName.charAt(0).toUpperCase()}
             </div>
           )}
@@ -182,7 +182,7 @@ export function MobileShell({ children }: { children: React.ReactNode }) {
             {avatarUrl ? (
               <Image src={avatarUrl} alt={displayName} width={40} height={40} referrerPolicy="no-referrer" style={{ borderRadius: '50%', objectFit: 'cover', flexShrink: 0 }} />
             ) : (
-              <div className="w-10 h-10 rounded-full flex items-center justify-center text-sm font-bold text-white flex-shrink-0" style={{ background: '#E8266F' }}>
+              <div className="w-10 h-10 rounded-full flex items-center justify-center text-lg font-bold text-white flex-shrink-0" style={{ background: '#E8266F' }}>
                 {displayName.charAt(0).toUpperCase()}
               </div>
             )}
