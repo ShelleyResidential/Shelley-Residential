@@ -6,13 +6,16 @@ import { useRouter, usePathname } from 'next/navigation'
 import Link from 'next/link'
 import Image from 'next/image'
 
-const ANALYSE_ROUTES = ['/dashboard/analyse', '/dashboard/contacts', '/dashboard/properties', '/dashboard/evaluations']
+const ANALYSE_ROUTES = ['/dashboard/analytics', '/dashboard/contacts', '/dashboard/properties', '/dashboard/evaluations']
 
 // Nav link that bolds on hover (in addition to when active) and supports a
 // slightly larger font for the top-level Dashboard/Analyse tabs so they
 // stand out from the indented Contacts/Properties/Evaluations sub-items.
+// Omitting `href` (used for "Analyse" itself, which is a dropdown toggle
+// with no page of its own) renders a plain button instead of a Link, with
+// identical styling, so it never navigates -- only `onClick` fires.
 function NavLink({ href, active, indented, large, onClick, children, trailingIcon }: {
-  href: string
+  href?: string
   active: boolean
   indented: boolean
   large?: boolean
@@ -22,28 +25,39 @@ function NavLink({ href, active, indented, large, onClick, children, trailingIco
 }) {
   const [hovered, setHovered] = useState(false)
   const basePadding = indented ? 24 : 12
+  const style = {
+    display: 'flex' as const,
+    alignItems: 'center' as const,
+    justifyContent: 'space-between' as const,
+    width: '100%',
+    gap: 8,
+    padding: '11px 12px',
+    marginBottom: 2,
+    fontSize: large ? 15 : 13,
+    color: '#fff',
+    fontWeight: active || hovered ? 700 : 400,
+    paddingLeft: active ? basePadding - 2 : basePadding,
+    textDecoration: 'none',
+    background: 'none',
+    border: 'none',
+    borderLeft: active ? '2px solid #E8266F' : '2px solid transparent',
+    font: 'inherit',
+    cursor: 'pointer',
+    textAlign: 'left' as const,
+  }
+  const handlers = { onClick, onMouseEnter: () => setHovered(true), onMouseLeave: () => setHovered(false) }
+
+  if (!href) {
+    return (
+      <button type="button" {...handlers} style={style}>
+        <span>{children}</span>
+        {trailingIcon}
+      </button>
+    )
+  }
 
   return (
-    <Link
-      href={href}
-      onClick={onClick}
-      onMouseEnter={() => setHovered(true)}
-      onMouseLeave={() => setHovered(false)}
-      style={{
-        display: 'flex',
-        alignItems: 'center',
-        justifyContent: 'space-between',
-        gap: 8,
-        padding: '11px 12px',
-        marginBottom: 2,
-        fontSize: large ? 15 : 13,
-        color: '#fff',
-        fontWeight: active || hovered ? 700 : 400,
-        borderLeft: active ? '2px solid #E8266F' : '2px solid transparent',
-        paddingLeft: active ? basePadding - 2 : basePadding,
-        textDecoration: 'none',
-      }}
-    >
+    <Link href={href} {...handlers} style={style}>
       <span>{children}</span>
       {trailingIcon}
     </Link>
@@ -114,7 +128,6 @@ export function DesktopShell({ children }: { children: React.ReactNode }) {
   }, [pathname])
 
   const dashboardActive = pathname === '/dashboard'
-  const analyseActive   = pathname === '/dashboard/analyse'
 
   return (
     <div className="min-h-screen md:grid md:grid-cols-[240px_minmax(0,1fr)]">
@@ -166,8 +179,7 @@ export function DesktopShell({ children }: { children: React.ReactNode }) {
           </NavLink>
 
           <NavLink
-            href="/dashboard/analyse"
-            active={analyseActive}
+            active={false}
             indented={false}
             large
             onClick={() => setAnalyseOpen(o => !o)}
@@ -186,6 +198,9 @@ export function DesktopShell({ children }: { children: React.ReactNode }) {
               </NavLink>
               <NavLink href="/dashboard/evaluations" active={pathname.startsWith('/dashboard/evaluations')} indented>
                 Evaluations
+              </NavLink>
+              <NavLink href="/dashboard/analytics" active={pathname.startsWith('/dashboard/analytics')} indented>
+                Analytics
               </NavLink>
             </div>
           )}

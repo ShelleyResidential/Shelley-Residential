@@ -5,7 +5,7 @@ import { supabase } from '@/lib/supabase'
 import { useRouter, usePathname } from 'next/navigation'
 import Image from 'next/image'
 
-const ANALYSE_ROUTES = ['/dashboard/analyse', '/dashboard/contacts', '/dashboard/properties', '/dashboard/evaluations']
+const ANALYSE_ROUTES = ['/dashboard/analytics', '/dashboard/contacts', '/dashboard/properties', '/dashboard/evaluations']
 
 // The top bar is `fixed` (not `sticky`) so it can translate fully out of
 // view on scroll-down -- main gets matching padding-top so content starts
@@ -104,7 +104,6 @@ export function MobileShell({ children }: { children: React.ReactNode }) {
   }
 
   const dashboardActive = pathname === '/dashboard'
-  const analyseActive   = pathname === '/dashboard/analyse'
 
   const navItemCls = (active: boolean) =>
     `w-full flex items-center justify-between text-left py-4 text-xl border-b border-white/10 ${active ? 'font-bold text-white' : 'font-normal text-white/80'}`
@@ -151,7 +150,7 @@ export function MobileShell({ children }: { children: React.ReactNode }) {
             <button type="button" onClick={() => go('/dashboard')} className={navItemCls(dashboardActive)}>
               Dashboard
             </button>
-            <button type="button" onClick={() => setAnalyseOpen(o => !o)} className={navItemCls(analyseActive)}>
+            <button type="button" onClick={() => setAnalyseOpen(o => !o)} className={navItemCls(false)}>
               Analyse
               <ChevronIcon open={analyseOpen} />
             </button>
@@ -165,6 +164,9 @@ export function MobileShell({ children }: { children: React.ReactNode }) {
                 </button>
                 <button type="button" onClick={() => go('/dashboard/evaluations')} className={subNavItemCls(pathname.startsWith('/dashboard/evaluations'))}>
                   Evaluations
+                </button>
+                <button type="button" onClick={() => go('/dashboard/analytics')} className={subNavItemCls(pathname.startsWith('/dashboard/analytics'))}>
+                  Analytics
                 </button>
               </div>
             )}

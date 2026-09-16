@@ -79,7 +79,7 @@ function formatDuration(hours: number): string {
   return `${(hours / 24).toFixed(1)}d`
 }
 
-export default function AnalysePage() {
+export default function AnalyticsPage() {
   const router = useRouter()
   const [loading, setLoading] = useState(true)
   const [evaluations, setEvaluations] = useState<EvalRow[]>([])
@@ -306,8 +306,8 @@ export default function AnalysePage() {
 
   return (
     <div className="p-4 md:p-10">
-      <Breadcrumbs items={[{ label: 'Analyse' }]} />
-      <h1 className="text-lg sm:text-2xl font-bold text-[#1a1a1a] mb-8">Analyse</h1>
+      <Breadcrumbs items={[{ label: 'Analyse' }, { label: 'Analytics' }]} />
+      <h1 className="text-lg sm:text-2xl font-bold text-[#1a1a1a] mb-8">Analytics</h1>
 
       {/* ══ EVALUATIONS ══ */}
       <h2 className={sectionTitle}>Evaluations</h2>
