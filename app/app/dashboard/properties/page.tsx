@@ -241,8 +241,11 @@ export default function PropertiesPage() {
           <p className="text-gray-400 text-sm">No properties found.</p>
         </div>
       ) : (
+        // min-w-[800px] is what actually makes this scrollable on a phone --
+        // w-full alone lets table-fixed's percentage columns just shrink to
+        // fit the viewport, squeezing every cell into an unreadable sliver.
         <div className={`${card} overflow-x-auto`}>
-          <table className="w-full text-sm table-fixed">
+          <table className="w-full min-w-[800px] text-sm table-fixed">
             <thead>
               <TableHeaderRow />
             </thead>

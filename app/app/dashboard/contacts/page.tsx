@@ -274,108 +274,70 @@ export default function ContactsPage() {
           <Link href="/dashboard/contacts/new" className={btn.primary}>Add your first contact</Link>
         </div>
       ) : (
-        <>
-          {/* Mobile: stacked cards -- the table's fixed percentage columns
-              would otherwise squeeze every cell into an unreadable sliver
-              on a phone-width screen. */}
-          <div className="md:hidden space-y-3">
-            {contacts.map(c => (
-              <div
-                key={c.id}
-                onClick={() => router.push(`/dashboard/contacts/${c.id}`)}
-                className={`${card} p-4 cursor-pointer active:bg-gray-50 transition-colors`}
-              >
-                <div className="flex items-start justify-between gap-2 mb-2.5">
-                  <p className="text-[#1a1a1a] font-semibold truncate">{fullName(c)}</p>
-                  <span className={`text-xs px-2 py-0.5 rounded-full font-medium flex-shrink-0 ${
-                    c.status === 'Active' ? 'bg-green-50 text-green-700' : 'bg-gray-100 text-gray-500'
-                  }`}>
-                    {c.status || '—'}
-                  </span>
-                </div>
-                <div className="space-y-1.5 text-sm">
-                  <CardRow label="Phone" value={formatPhoneDisplay(c.phone_number)} />
-                  <CardRow label="Email" value={c.email_address ? (
-                    <a
-                      href={`https://mail.google.com/mail/?view=cm&fs=1&to=${encodeURIComponent(c.email_address)}`}
-                      target="_blank"
-                      rel="noopener noreferrer"
-                      onClick={e => e.stopPropagation()}
-                      className="underline"
-                    >
-                      {c.email_address}
-                    </a>
-                  ) : '—'} />
-                  <CardRow label="Preference" value={c.contact_preference || '—'} />
-                  <CardRow label="Added" value={formatDate(c.date_added)} />
-                  <CardRow label="Captured By" value={profiles.find(p => p.id === c.created_by)?.full_name ?? profiles.find(p => p.id === c.created_by)?.email ?? '—'} />
-                </div>
-              </div>
-            ))}
-          </div>
-
-          {/* Desktop: table */}
-          <div className={`hidden md:block ${card} overflow-x-auto`}>
-            <table className="w-full text-sm table-fixed">
-              <thead>
-                <TableHeaderRow sortColumn={sortColumn} sortDirection={sortDirection} onSort={handleSort} />
-              </thead>
-              <tbody>
-                {contacts.map((c, i) => (
-                  <tr
-                    key={c.id}
-                    onClick={() => router.push(`/dashboard/contacts/${c.id}`)}
-                    className={`cursor-pointer hover:bg-gray-100 transition-colors ${i % 2 === 0 ? 'bg-white' : 'bg-gray-50'}`}
-                  >
-                    <td className="px-3 py-3 whitespace-nowrap" onClick={e => e.stopPropagation()}>
-                      <input
-                        type="radio"
-                        name="selected-contact"
-                        checked={selectedId === c.id}
-                        onClick={() => toggleSelected(c.id)}
-                        onChange={() => setSelectedId(c.id)}
-                        className="w-4 h-4 border-gray-300 accent-[#E8266F] cursor-pointer"
-                      />
-                    </td>
-                    <td className="px-3 py-3 overflow-hidden">
-                      <span className={`text-xs px-2 py-0.5 rounded-full font-medium truncate inline-block max-w-full align-bottom ${
-                        c.status === 'Active' ? 'bg-green-50 text-green-700' : 'bg-gray-100 text-gray-500'
-                      }`}>
-                        {c.status || '—'}
-                      </span>
-                    </td>
-                    <td className="px-3 py-3 text-[#1a1a1a] font-medium truncate" title={fullName(c)}>{fullName(c)}</td>
-                    <td className="px-3 py-3 text-gray-500 truncate">{formatPhoneDisplay(c.phone_number)}</td>
-                    <td className="px-3 py-3 overflow-hidden">
-                      {c.email_address ? (
-                        <a
-                          href={`https://mail.google.com/mail/?view=cm&fs=1&to=${encodeURIComponent(c.email_address)}`}
-                          target="_blank"
-                          rel="noopener noreferrer"
-                          onClick={e => e.stopPropagation()}
-                          title={c.email_address}
-                          className="block truncate text-gray-500 underline hover:font-bold hover:text-[#1a1a1a] transition-all"
-                        >
-                          {c.email_address}
-                        </a>
-                      ) : (
-                        <span className="text-gray-500">—</span>
-                      )}
-                    </td>
-                    <td className="px-3 py-3 text-gray-500 truncate">{c.contact_preference || '—'}</td>
-                    <td className="px-3 py-3 text-gray-500 truncate">{formatDate(c.date_added)}</td>
-                    <td className="px-3 py-3 text-gray-500 truncate">
-                      {profiles.find(p => p.id === c.created_by)?.full_name ?? profiles.find(p => p.id === c.created_by)?.email ?? '—'}
-                    </td>
-                  </tr>
-                ))}
-              </tbody>
-              <tfoot>
-                <TableHeaderRow sortColumn={sortColumn} sortDirection={sortDirection} onSort={handleSort} />
-              </tfoot>
-            </table>
-          </div>
-        </>
+        // min-w-[1000px] on the table itself is what actually makes this
+        // scrollable on a phone -- w-full alone lets table-fixed's percentage
+        // columns just shrink to fit the viewport instead, squeezing every
+        // cell into an unreadable sliver rather than sliding sideways.
+        <div className={`${card} overflow-x-auto`}>
+          <table className="w-full min-w-[1000px] text-sm table-fixed">
+            <thead>
+              <TableHeaderRow sortColumn={sortColumn} sortDirection={sortDirection} onSort={handleSort} />
+            </thead>
+            <tbody>
+              {contacts.map((c, i) => (
+                <tr
+                  key={c.id}
+                  onClick={() => router.push(`/dashboard/contacts/${c.id}`)}
+                  className={`cursor-pointer hover:bg-gray-100 transition-colors ${i % 2 === 0 ? 'bg-white' : 'bg-gray-50'}`}
+                >
+                  <td className="px-3 py-3 whitespace-nowrap" onClick={e => e.stopPropagation()}>
+                    <input
+                      type="radio"
+                      name="selected-contact"
+                      checked={selectedId === c.id}
+                      onClick={() => toggleSelected(c.id)}
+                      onChange={() => setSelectedId(c.id)}
+                      className="w-4 h-4 border-gray-300 accent-[#E8266F] cursor-pointer"
+                    />
+                  </td>
+                  <td className="px-3 py-3 overflow-hidden">
+                    <span className={`text-xs px-2 py-0.5 rounded-full font-medium truncate inline-block max-w-full align-bottom ${
+                      c.status === 'Active' ? 'bg-green-50 text-green-700' : 'bg-gray-100 text-gray-500'
+                    }`}>
+                      {c.status || '—'}
+                    </span>
+                  </td>
+                  <td className="px-3 py-3 text-[#1a1a1a] font-medium truncate" title={fullName(c)}>{fullName(c)}</td>
+                  <td className="px-3 py-3 text-gray-500 truncate">{formatPhoneDisplay(c.phone_number)}</td>
+                  <td className="px-3 py-3 overflow-hidden">
+                    {c.email_address ? (
+                      <a
+                        href={`https://mail.google.com/mail/?view=cm&fs=1&to=${encodeURIComponent(c.email_address)}`}
+                        target="_blank"
+                        rel="noopener noreferrer"
+                        onClick={e => e.stopPropagation()}
+                        title={c.email_address}
+                        className="block truncate text-gray-500 underline hover:font-bold hover:text-[#1a1a1a] transition-all"
+                      >
+                        {c.email_address}
+                      </a>
+                    ) : (
+                      <span className="text-gray-500">—</span>
+                    )}
+                  </td>
+                  <td className="px-3 py-3 text-gray-500 truncate">{c.contact_preference || '—'}</td>
+                  <td className="px-3 py-3 text-gray-500 truncate">{formatDate(c.date_added)}</td>
+                  <td className="px-3 py-3 text-gray-500 truncate">
+                    {profiles.find(p => p.id === c.created_by)?.full_name ?? profiles.find(p => p.id === c.created_by)?.email ?? '—'}
+                  </td>
+                </tr>
+              ))}
+            </tbody>
+            <tfoot>
+              <TableHeaderRow sortColumn={sortColumn} sortDirection={sortDirection} onSort={handleSort} />
+            </tfoot>
+          </table>
+        </div>
       )}
 
       {paginationControls && <div className="mt-4">{paginationControls}</div>}
@@ -439,16 +401,6 @@ function TableHeaderRow({ sortColumn, sortDirection, onSort }: {
         </th>
       ))}
     </tr>
-  )
-}
-
-// ── Mobile card list: one label/value row per field.
-function CardRow({ label, value }: { label: string; value: React.ReactNode }) {
-  return (
-    <div className="flex items-baseline justify-between gap-3">
-      <span className="text-gray-400 flex-shrink-0">{label}</span>
-      <span className="text-[#1a1a1a] text-right truncate">{value}</span>
-    </div>
   )
 }
 
