@@ -215,13 +215,13 @@ export default function PropertyDetailPage() {
       </div>
 
       {/* ── Tabs ── */}
-      <div className="flex gap-1 mb-6 border-b border-gray-200">
+      <div className="flex gap-1 mb-6 border-b border-gray-200 overflow-x-auto">
         {([
           { key: 'info',        label: 'Details' },
           { key: 'evaluations', label: 'Evaluations' },
         ] as const).map(t => (
           <button key={t.key} onClick={() => setTab(t.key)}
-            className={`px-4 py-2 text-sm font-medium border-b-2 -mb-px transition-colors ${
+            className={`px-4 py-2 text-sm font-medium border-b-2 -mb-px whitespace-nowrap flex-shrink-0 transition-colors ${
               tab === t.key ? 'border-[#1a1a1a] text-[#1a1a1a]' : 'border-transparent text-gray-400 hover:text-[#1a1a1a]'
             }`}>
             {t.label}

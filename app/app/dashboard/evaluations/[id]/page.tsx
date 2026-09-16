@@ -231,8 +231,12 @@ export default function EvaluationDetailPage() {
         </div>
       </div>
 
-      {/* ── Tabs ── */}
-      <div className="flex gap-1 mb-6 border-b border-gray-200">
+      {/* ── Tabs -- overflow-x-auto + flex-shrink-0 (same pattern as the
+          Evaluations list page's status filter tabs) so a phone-width
+          screen scrolls just this row sideways to reveal Activity, instead
+          of the whole page growing wider than the viewport to fit all
+          five. ── */}
+      <div className="flex gap-1 mb-6 border-b border-gray-200 overflow-x-auto">
         {([
           { key: 'details',    label: 'Details' },
           { key: 'documents',  label: 'Documents' },
@@ -241,7 +245,7 @@ export default function EvaluationDetailPage() {
           { key: 'activity',   label: 'Activity' },
         ] as const).map(tab => (
           <button key={tab.key} onClick={() => setActiveTab(tab.key)}
-            className={`px-4 py-2 text-sm font-medium border-b-2 -mb-px transition-colors ${
+            className={`px-4 py-2 text-sm font-medium border-b-2 -mb-px whitespace-nowrap flex-shrink-0 transition-colors ${
               activeTab === tab.key ? 'border-[#1a1a1a] text-[#1a1a1a]' : 'border-transparent text-gray-400 hover:text-[#1a1a1a]'
             }`}>
             {tab.label}
