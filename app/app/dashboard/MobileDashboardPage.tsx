@@ -85,7 +85,11 @@ export function MobileDashboardPage() {
       {!loading && stats.evaluations > 0 && (
         <>
           <SectionLabel>Evaluations by Status</SectionLabel>
-          <div className="flex gap-2 overflow-x-auto pb-2 mb-6 [&>*:first-child]:ml-4 [&>*:last-child]:mr-4" style={{ scrollSnapType: 'x proximity' }}>
+          {/* No scroll-snap here -- scroll-snap-align on the first card
+              makes Chrome anchor its snap area to the scrollport start,
+              which visually cancels out that card's own left margin (the
+              gap fix below) even though it's still there in the box model. */}
+          <div className="flex gap-2 overflow-x-auto pb-2 mb-6 [&>*:first-child]:ml-4 [&>*:last-child]:mr-4">
             {STATUS_ORDER.map(key => {
               const count = stats.evaluationsByStatus[key] ?? 0
               return (
@@ -93,7 +97,6 @@ export function MobileDashboardPage() {
                   key={key}
                   href={`/dashboard/evaluations?status=${key}`}
                   className={`flex-shrink-0 flex flex-col items-center justify-center rounded-2xl px-5 py-3 min-w-[92px] ${STATUS_COLOURS[key] ?? 'bg-gray-100 text-gray-500'}`}
-                  style={{ scrollSnapAlign: 'start' }}
                 >
                   <span className="text-xl font-bold">{count}</span>
                   <span className="text-xs font-medium mt-0.5 text-center">{STATUS_LABELS[key]}</span>
@@ -184,8 +187,11 @@ function MyPerformance({ userId }: { userId: string }) {
       {/* Margin on the first/last card, not px-4 on this container -- a
           horizontally-scrolling flex row with overflow-x-auto doesn't
           reliably render its own left/right padding once content overflows,
-          so the leading card ends up flush against the screen edge. */}
-      <div className="flex gap-3 overflow-x-auto pb-2 mb-6 [&>*:first-child]:ml-4 [&>*:last-child]:mr-4" style={{ scrollSnapType: 'x proximity' }}>
+          so the leading card ends up flush against the screen edge. Also no
+          scroll-snap: scroll-snap-align on the first card makes Chrome
+          anchor its snap area to the scrollport start, which visually
+          cancels out that margin again even though it's still applied. */}
+      <div className="flex gap-3 overflow-x-auto pb-2 mb-6 [&>*:first-child]:ml-4 [&>*:last-child]:mr-4">
         <MobileStatCard label="Evaluations" value={totalEvals} />
         <MobileStatCard label="Win Rate" value={winRate != null ? `${winRate.toFixed(0)}%` : '—'} sub={winRate != null ? `${won}W · ${lost}L` : undefined} />
         <MobileStatCard label="Clients" value={totalContacts} sub={totalContacts ? `${activeContacts} active` : undefined} />
@@ -197,7 +203,7 @@ function MyPerformance({ userId }: { userId: string }) {
 
 function MobileStatCard({ label, value, sub }: { label: string; value: string | number; sub?: string }) {
   return (
-    <div className={`${card} p-4 flex-shrink-0`} style={{ minWidth: 130, scrollSnapAlign: 'start' }}>
+    <div className={`${card} p-4 flex-shrink-0`} style={{ minWidth: 130 }}>
       <p className="text-xs font-medium text-gray-400 uppercase tracking-wide mb-1.5">{label}</p>
       <p className="text-xl font-bold text-[#1a1a1a]">{value}</p>
       {sub && <p className="text-xs text-gray-400 mt-1">{sub}</p>}
