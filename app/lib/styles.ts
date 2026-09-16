@@ -1,9 +1,15 @@
 // Shared button and component class strings for consistent styling across the app
 
+// px-5 py-2.5 text-sm from sm: up is the "real" size (unchanged from
+// before) -- below that every primary/secondary/danger button scales down
+// together, so no page ever ends up with noticeably bigger buttons than
+// its neighbours on a phone.
+const btnSize = 'px-2.5 py-1.5 text-xs sm:px-5 sm:py-2.5 sm:text-sm'
+
 export const btn = {
-  primary:   'inline-flex items-center justify-center px-5 py-2.5 rounded-lg text-sm font-medium bg-[#1a1a1a] text-white hover:bg-[#333] transition-colors disabled:opacity-50 disabled:cursor-not-allowed',
-  secondary: 'inline-flex items-center justify-center px-5 py-2.5 rounded-lg text-sm font-medium border border-gray-200 text-[#1a1a1a] bg-white hover:bg-gray-50 transition-colors',
-  danger:    'inline-flex items-center justify-center px-5 py-2.5 rounded-lg text-sm font-medium border border-red-200 text-red-600 bg-white hover:bg-red-50 transition-colors',
+  primary:   `inline-flex items-center justify-center ${btnSize} rounded-lg font-medium bg-[#1a1a1a] text-white hover:bg-[#333] transition-colors disabled:opacity-50 disabled:cursor-not-allowed`,
+  secondary: `inline-flex items-center justify-center ${btnSize} rounded-lg font-medium border border-gray-200 text-[#1a1a1a] bg-white hover:bg-gray-50 transition-colors`,
+  danger:    `inline-flex items-center justify-center ${btnSize} rounded-lg font-medium border border-red-200 text-red-600 bg-white hover:bg-red-50 transition-colors`,
   ghost:     'inline-flex items-center justify-center px-3 py-1.5 rounded-lg text-xs font-medium text-gray-500 hover:text-[#1a1a1a] hover:bg-gray-100 transition-colors',
 }
 

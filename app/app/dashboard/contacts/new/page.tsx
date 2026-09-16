@@ -167,7 +167,7 @@ function AddContactForm() {
         ? [{ label: 'Analyse' }, { label: 'Evaluations', href: '/dashboard/evaluations' }, { label: 'Back to Evaluation', href: `${returnTo}?resume=1` }, { label: 'New Contact' }]
         : [{ label: 'Analyse' }, { label: 'Contacts', href: '/dashboard/contacts' }, { label: 'New Contact' }]
       } />
-      <h1 className="text-2xl font-bold text-[#1a1a1a] mb-8">New Contact</h1>
+      <h1 className="text-lg sm:text-2xl font-bold text-[#1a1a1a] mb-8">New Contact</h1>
       <form onSubmit={handleSubmit} className="space-y-6">
 
           <Section title="Basic Information">

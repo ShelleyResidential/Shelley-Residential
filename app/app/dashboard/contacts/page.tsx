@@ -218,19 +218,10 @@ export default function ContactsPage() {
       <div className="flex items-center justify-between mb-4 gap-2">
         <h1 className="text-lg sm:text-2xl font-bold text-[#1a1a1a]">Contacts</h1>
         <div className="flex items-center gap-2 sm:gap-3">
-          <button
-            onClick={syncContacts}
-            disabled={syncing}
-            className="inline-flex items-center justify-center rounded-lg font-medium bg-[#1a1a1a] text-white hover:bg-[#333] transition-colors disabled:opacity-50 disabled:cursor-not-allowed px-2.5 py-1.5 text-xs sm:px-5 sm:py-2.5 sm:text-sm"
-          >
+          <button onClick={syncContacts} disabled={syncing} className={btn.primary}>
             {syncing ? 'Syncing…' : 'Sync Contacts'}
           </button>
-          <Link
-            href="/dashboard/contacts/new"
-            className="inline-flex items-center justify-center rounded-lg font-medium bg-[#1a1a1a] text-white hover:bg-[#333] transition-colors px-2.5 py-1.5 text-xs sm:px-5 sm:py-2.5 sm:text-sm"
-          >
-            + New Contact
-          </Link>
+          <Link href="/dashboard/contacts/new" className={btn.primary}>+ New Contact</Link>
         </div>
       </div>
       {syncMessage && <p className="text-xs text-gray-400 -mt-2 mb-4">{syncMessage}</p>}

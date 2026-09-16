@@ -192,7 +192,7 @@ export default function PropertiesPage() {
     <div className="p-4 md:p-10">
       <Breadcrumbs items={[{ label: 'Analyse' }, { label: 'Properties' }]} />
       <div className="flex items-center justify-between mb-4">
-        <h1 className="text-2xl font-bold text-[#1a1a1a]">Properties</h1>
+        <h1 className="text-lg sm:text-2xl font-bold text-[#1a1a1a]">Properties</h1>
       </div>
 
       {/* Filters */}

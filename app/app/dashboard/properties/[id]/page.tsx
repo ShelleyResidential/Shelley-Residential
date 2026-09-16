@@ -187,7 +187,7 @@ export default function PropertyDetailPage() {
         <div className="flex items-start justify-between gap-4">
           <div className="min-w-0">
             <div className="flex items-center gap-2 flex-wrap">
-              <h1 className="text-2xl font-bold text-[#1a1a1a] truncate" title={address}>{address}</h1>
+              <h1 className="text-lg sm:text-2xl font-bold text-[#1a1a1a] truncate" title={address}>{address}</h1>
               {property.property_type && (
                 <span className="text-xs px-2 py-0.5 rounded-full bg-gray-100 text-gray-600 font-medium flex-shrink-0">
                   {TYPE_LABELS[property.property_type] ?? property.property_type}
@@ -196,7 +196,7 @@ export default function PropertyDetailPage() {
             </div>
             <p className="text-sm text-gray-400 mt-1">Added {formatDate(property.created_at)}</p>
           </div>
-          <div className="flex items-center gap-3 flex-shrink-0">
+          <div className="flex items-center gap-2 sm:gap-3 flex-shrink-0">
             {mapsLink && (
               <a href={mapsLink} target="_blank" rel="noopener noreferrer" className={`${btn.primary} whitespace-nowrap`}>
                 View Maps

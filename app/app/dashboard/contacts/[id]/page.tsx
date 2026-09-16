@@ -195,10 +195,10 @@ export default function ContactDetailPage() {
         <Breadcrumbs items={[{ label: 'Analyse' }, { label: 'Contacts', href: '/dashboard/contacts' }, { label: fullName(contact) }]} />
         <div className="flex items-start justify-between gap-4">
           <div className="min-w-0">
-            <h1 className="text-2xl font-bold text-[#1a1a1a] truncate" title={fullName(contact)}>{fullName(contact)}</h1>
+            <h1 className="text-lg sm:text-2xl font-bold text-[#1a1a1a] truncate" title={fullName(contact)}>{fullName(contact)}</h1>
             <p className="text-sm text-gray-400 mt-1">Added {formatDate(contact.date_added)}</p>
           </div>
-          <div className="flex items-center gap-3 flex-shrink-0">
+          <div className="flex items-center gap-2 sm:gap-3 flex-shrink-0">
             <span className={`text-sm px-3 py-1 rounded-full font-medium whitespace-nowrap ${
               contact.status === 'Active' ? 'bg-green-50 text-green-700' : 'bg-gray-100 text-gray-500'
             }`}>{contact.status}</span>

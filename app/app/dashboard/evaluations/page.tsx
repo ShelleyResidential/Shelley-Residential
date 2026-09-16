@@ -344,8 +344,8 @@ export default function EvaluationsPage() {
   return (
     <div className="p-4 md:p-10">
       <Breadcrumbs items={[{ label: 'Analyse' }, { label: 'Evaluations' }]} />
-      <div className="flex items-center justify-between mb-4">
-        <h1 className="text-2xl font-bold text-[#1a1a1a]">Evaluations</h1>
+      <div className="flex items-center justify-between mb-4 gap-2">
+        <h1 className="text-lg sm:text-2xl font-bold text-[#1a1a1a]">Evaluations</h1>
         <Link href="/dashboard/evaluations/new" className={`${btn.primary} md:fixed md:top-8 md:right-10 md:z-40 md:shadow-md`}>+ New Evaluation</Link>
       </div>
 

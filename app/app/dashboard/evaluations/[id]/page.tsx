@@ -194,7 +194,7 @@ export default function EvaluationDetailPage() {
         <Breadcrumbs items={[{ label: 'Analyse' }, { label: 'Evaluations', href: '/dashboard/evaluations' }, { label: address }]} />
         <div className="flex items-start justify-between gap-4">
           <div className="min-w-0">
-            <h1 className="text-2xl font-bold text-[#1a1a1a] truncate" title={address}>{address}</h1>
+            <h1 className="text-lg sm:text-2xl font-bold text-[#1a1a1a] truncate" title={address}>{address}</h1>
             <p className="text-sm text-gray-400 mt-1">Captured {dateStr}</p>
             {nextAction && (
               <p className="text-sm mt-1">
@@ -207,7 +207,7 @@ export default function EvaluationDetailPage() {
               </p>
             )}
           </div>
-          <div className="flex items-center gap-3 flex-shrink-0">
+          <div className="flex items-center gap-2 sm:gap-3 flex-shrink-0">
             <span className={`text-sm px-3 py-1 rounded-full font-medium whitespace-nowrap ${STATUS_COLOURS[ev.status] ?? 'bg-gray-100 text-gray-500'}`}>
               {STATUS_LABELS[ev.status] ?? ev.status}
             </span>
