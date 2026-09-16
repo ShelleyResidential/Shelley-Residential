@@ -215,13 +215,22 @@ export default function ContactsPage() {
   return (
     <div className="p-4 md:p-10">
       <Breadcrumbs items={[{ label: 'Analyse' }, { label: 'Contacts' }]} />
-      <div className="flex items-center justify-between mb-4">
-        <h1 className="text-2xl font-bold text-[#1a1a1a]">Contacts</h1>
-        <div className="flex items-center gap-3">
-          <button onClick={syncContacts} disabled={syncing} className={btn.primary}>
+      <div className="flex items-center justify-between mb-4 gap-2">
+        <h1 className="text-lg sm:text-2xl font-bold text-[#1a1a1a]">Contacts</h1>
+        <div className="flex items-center gap-2 sm:gap-3">
+          <button
+            onClick={syncContacts}
+            disabled={syncing}
+            className="inline-flex items-center justify-center rounded-lg font-medium bg-[#1a1a1a] text-white hover:bg-[#333] transition-colors disabled:opacity-50 disabled:cursor-not-allowed px-2.5 py-1.5 text-xs sm:px-5 sm:py-2.5 sm:text-sm"
+          >
             {syncing ? 'Syncing…' : 'Sync Contacts'}
           </button>
-          <Link href="/dashboard/contacts/new" className={btn.primary}>+ New Contact</Link>
+          <Link
+            href="/dashboard/contacts/new"
+            className="inline-flex items-center justify-center rounded-lg font-medium bg-[#1a1a1a] text-white hover:bg-[#333] transition-colors px-2.5 py-1.5 text-xs sm:px-5 sm:py-2.5 sm:text-sm"
+          >
+            + New Contact
+          </Link>
         </div>
       </div>
       {syncMessage && <p className="text-xs text-gray-400 -mt-2 mb-4">{syncMessage}</p>}
@@ -275,13 +284,21 @@ export default function ContactsPage() {
         </div>
       ) : (
         // min-w-[1000px] on the table itself is what actually makes this
-        // scrollable on a phone -- w-full alone lets table-fixed's percentage
-        // columns just shrink to fit the viewport instead, squeezing every
-        // cell into an unreadable sliver rather than sliding sideways.
-        <div className={`${card} overflow-x-auto`}>
+        // scrollable sideways on a phone -- w-full alone lets table-fixed's
+        // percentage columns just shrink to fit the viewport instead,
+        // squeezing every cell into an unreadable sliver. max-h-[65vh] +
+        // overflow-auto (both axes, not overflow-x-auto) turns this into its
+        // own bounded scroll panel -- required for the sticky header below
+        // to actually work: overflow-x-auto alone forces overflow-y to also
+        // compute as auto per the CSS overflow spec, which makes this div
+        // (not the page) the sticky positioning context, but since the div's
+        // height was unbounded (auto-grows with content) it never actually
+        // scrolled, so the "stuck" header just scrolled away with everything
+        // else instead of pinning in place.
+        <div className={`${card} overflow-auto max-h-[65vh]`}>
           <table className="w-full min-w-[1000px] text-sm table-fixed">
             <thead>
-              <TableHeaderRow sortColumn={sortColumn} sortDirection={sortDirection} onSort={handleSort} />
+              <TableHeaderRow sortColumn={sortColumn} sortDirection={sortDirection} onSort={handleSort} sticky />
             </thead>
             <tbody>
               {contacts.map((c, i) => (
@@ -385,17 +402,26 @@ const HEADER_COLUMNS: { key: SortColumn; label: string; width: string }[] = [
 ]
 
 // ── Table header row, repeated at both the top (thead) and bottom (tfoot)
-// of the contacts table so the column labels stay visible either way.
-function TableHeaderRow({ sortColumn, sortDirection, onSort }: {
+// of the contacts table so the column labels stay visible either way. Only
+// the thead instance passes `sticky` -- a sticky footer would just pin
+// itself to the top of the viewport, which makes no sense for a tfoot.
+// `position: sticky` has to sit on each <th> itself, not the <tr>/<thead>,
+// to work reliably across browsers with a table layout.
+function TableHeaderRow({ sortColumn, sortDirection, onSort, sticky }: {
   sortColumn: SortColumn
   sortDirection: SortDirection
   onSort: (column: SortColumn, direction: SortDirection) => void
+  sticky?: boolean
 }) {
+  // top-0 relative to the table's own scroll panel (see the max-h-[65vh]
+  // wrapper), not the page -- MobileShell's fixed top bar is a separate,
+  // unrelated scroll context and doesn't need compensating for here.
+  const thCls = `px-3 py-3 font-semibold text-[#1a1a1a] whitespace-nowrap text-xs uppercase tracking-wide ${sticky ? 'sticky top-0 z-10 bg-white' : ''}`
   return (
     <tr className="border-b border-gray-100 text-left">
-      <th className="px-3 py-3 whitespace-nowrap w-[4%]" />
+      <th className={`w-[4%] ${thCls}`} />
       {HEADER_COLUMNS.map(col => (
-        <th key={col.key} className={`px-3 py-3 font-semibold text-[#1a1a1a] whitespace-nowrap text-xs uppercase tracking-wide ${col.width}`}>
+        <th key={col.key} className={`${col.width} ${thCls}`}>
           {col.label}
           <SortArrows column={col.key} sortColumn={sortColumn} sortDirection={sortDirection} onSort={onSort} />
         </th>
