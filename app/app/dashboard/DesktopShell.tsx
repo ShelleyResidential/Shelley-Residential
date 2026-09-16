@@ -1,0 +1,262 @@
+'use client'
+
+import { useEffect, useState } from 'react'
+import { supabase } from '@/lib/supabase'
+import { useRouter, usePathname } from 'next/navigation'
+import Link from 'next/link'
+import Image from 'next/image'
+
+const ANALYSE_ROUTES = ['/dashboard/analyse', '/dashboard/contacts', '/dashboard/properties', '/dashboard/evaluations']
+
+// Nav link that bolds on hover (in addition to when active) and supports a
+// slightly larger font for the top-level Dashboard/Analyse tabs so they
+// stand out from the indented Contacts/Properties/Evaluations sub-items.
+function NavLink({ href, active, indented, large, onClick, children, trailingIcon }: {
+  href: string
+  active: boolean
+  indented: boolean
+  large?: boolean
+  onClick?: () => void
+  children: React.ReactNode
+  trailingIcon?: React.ReactNode
+}) {
+  const [hovered, setHovered] = useState(false)
+  const basePadding = indented ? 24 : 12
+
+  return (
+    <Link
+      href={href}
+      onClick={onClick}
+      onMouseEnter={() => setHovered(true)}
+      onMouseLeave={() => setHovered(false)}
+      style={{
+        display: 'flex',
+        alignItems: 'center',
+        justifyContent: 'space-between',
+        gap: 8,
+        padding: '11px 12px',
+        marginBottom: 2,
+        fontSize: large ? 15 : 13,
+        color: '#fff',
+        fontWeight: active || hovered ? 700 : 400,
+        borderLeft: active ? '2px solid #E8266F' : '2px solid transparent',
+        paddingLeft: active ? basePadding - 2 : basePadding,
+        textDecoration: 'none',
+      }}
+    >
+      <span>{children}</span>
+      {trailingIcon}
+    </Link>
+  )
+}
+
+function ChevronIcon({ open }: { open: boolean }) {
+  return (
+    <svg
+      width="10" height="10" viewBox="0 0 10 10"
+      style={{ transform: open ? 'rotate(0deg)' : 'rotate(-90deg)', transition: 'transform 0.2s ease', opacity: 0.7, flexShrink: 0 }}
+    >
+      <path d="M2 3.5L5 6.5L8 3.5" stroke="white" strokeWidth="1.5" fill="none" strokeLinecap="round" strokeLinejoin="round" />
+    </svg>
+  )
+}
+
+function HamburgerIcon() {
+  return (
+    <svg width="22" height="22" viewBox="0 0 22 22" fill="none">
+      <path d="M3 6h16M3 11h16M3 16h16" stroke="white" strokeWidth="1.8" strokeLinecap="round" />
+    </svg>
+  )
+}
+
+// Desktop/tablet chrome: a sticky 240px sidebar, always visible. Below a
+// tablet-width breakpoint (a narrow desktop browser window, not a phone --
+// phones get MobileShell instead, chosen server-side in proxy.ts) it still
+// collapses into a slide-in drawer so a resized window stays usable.
+export function DesktopShell({ children }: { children: React.ReactNode }) {
+  const router   = useRouter()
+  const pathname = usePathname()
+  const [email, setEmail]         = useState('')
+  const [displayName, setDisplayName] = useState('')
+  const [avatarUrl, setAvatarUrl] = useState<string | null>(null)
+  const [analyseOpen, setAnalyseOpen] = useState(() => ANALYSE_ROUTES.some(r => pathname.startsWith(r)))
+  const [mobileMenuOpen, setMobileMenuOpen] = useState(false)
+
+  // Close the drawer on navigation -- adjusted during render (React's
+  // recommended pattern for "reset state when a prop changes") rather than
+  // in an effect, to avoid the extra render pass that would cause.
+  const [prevPathname, setPrevPathname] = useState(pathname)
+  if (pathname !== prevPathname) {
+    setPrevPathname(pathname)
+    setMobileMenuOpen(false)
+  }
+
+  // Don't let the page scroll behind the drawer while it's open.
+  useEffect(() => {
+    document.body.style.overflow = mobileMenuOpen ? 'hidden' : ''
+    return () => { document.body.style.overflow = '' }
+  }, [mobileMenuOpen])
+
+  useEffect(() => {
+    supabase.auth.getUser().then(({ data }) => {
+      if (!data.user) { router.push('/'); return }
+      const meta = data.user.user_metadata ?? {}
+      setEmail(data.user.email ?? '')
+      setDisplayName(meta.full_name ?? meta.name ?? (data.user.email ?? '').split('@')[0])
+      setAvatarUrl(meta.avatar_url ?? meta.picture ?? null)
+    })
+  }, [router])
+
+  // Re-expand Analyse whenever navigation lands on one of its child pages
+  // (e.g. a link from elsewhere in the app), without fighting a manual toggle.
+  useEffect(() => {
+    if (ANALYSE_ROUTES.some(r => pathname.startsWith(r))) setAnalyseOpen(true)
+  }, [pathname])
+
+  const dashboardActive = pathname === '/dashboard'
+  const analyseActive   = pathname === '/dashboard/analyse'
+
+  return (
+    <div className="min-h-screen md:grid md:grid-cols-[240px_minmax(0,1fr)]">
+
+      {/* ── Mobile top bar (narrow desktop window fallback) ── */}
+      <div className="md:hidden sticky top-0 z-30 flex items-center gap-3 bg-[#2A2A2A] px-4 py-3">
+        <button
+          type="button"
+          aria-label="Open menu"
+          onClick={() => setMobileMenuOpen(true)}
+          className="p-1 -ml-1"
+        >
+          <HamburgerIcon />
+        </button>
+        <Image src="/logo.png" alt="Shelley Residential" width={110} height={55} style={{ filter: 'brightness(0) invert(1)' }} />
+      </div>
+
+      {/* ── Backdrop (mobile drawer only) ── */}
+      {mobileMenuOpen && (
+        <div
+          className="md:hidden fixed inset-0 z-40 bg-black/40"
+          onClick={() => setMobileMenuOpen(false)}
+        />
+      )}
+
+      {/* ── Sidebar ── */}
+      <aside
+        className={`fixed md:sticky top-0 left-0 z-50 h-screen overflow-y-auto transition-transform duration-200 ease-in-out md:translate-x-0 ${mobileMenuOpen ? 'translate-x-0' : '-translate-x-full'}`}
+        style={{
+          background: '#2A2A2A', color: '#fff', padding: '28px 24px',
+          display: 'flex', flexDirection: 'column', width: 240,
+        }}
+      >
+        <div className="relative" style={{ marginBottom: 40, textAlign: 'center' }}>
+          <Image src="/logo.png" alt="Shelley Residential" width={160} height={80} style={{ filter: 'brightness(0) invert(1)' }} />
+          <button
+            type="button"
+            aria-label="Close menu"
+            onClick={() => setMobileMenuOpen(false)}
+            className="md:hidden absolute top-0 right-0 text-white text-xl leading-none p-1"
+          >
+            ×
+          </button>
+        </div>
+
+        <nav style={{ flex: 1 }}>
+          <NavLink href="/dashboard" active={dashboardActive} indented={false} large>
+            Dashboard
+          </NavLink>
+
+          <NavLink
+            href="/dashboard/analyse"
+            active={analyseActive}
+            indented={false}
+            large
+            onClick={() => setAnalyseOpen(o => !o)}
+            trailingIcon={<ChevronIcon open={analyseOpen} />}
+          >
+            Analyse
+          </NavLink>
+
+          {analyseOpen && (
+            <div>
+              <NavLink href="/dashboard/contacts" active={pathname.startsWith('/dashboard/contacts')} indented>
+                Contacts
+              </NavLink>
+              <NavLink href="/dashboard/properties" active={pathname.startsWith('/dashboard/properties')} indented>
+                Properties
+              </NavLink>
+              <NavLink href="/dashboard/evaluations" active={pathname.startsWith('/dashboard/evaluations')} indented>
+                Evaluations
+              </NavLink>
+            </div>
+          )}
+        </nav>
+
+        {/* Slogan */}
+        <p style={{ fontSize: 10, color: '#fff', textAlign: 'left', paddingLeft: 4, marginBottom: 16, whiteSpace: 'nowrap' }}>
+          One Name. One Team. <span style={{ color: '#E8266F', fontWeight: 700 }}>One Standard.</span>
+        </p>
+
+        {/* ── User section ── */}
+        <div style={{ borderTop: '1px solid #3a3a3a', paddingTop: 20 }}>
+          <Link
+            href="/dashboard/settings"
+            style={{
+              display: 'flex',
+              alignItems: 'center',
+              gap: 10,
+              width: '100%',
+              padding: '6px 8px',
+              borderRadius: 8,
+              textDecoration: 'none',
+              transition: 'background 0.15s',
+            }}
+            onMouseEnter={e => (e.currentTarget.style.background = '#333')}
+            onMouseLeave={e => (e.currentTarget.style.background = 'none')}
+          >
+            {/* Avatar: Google photo if available, else initials */}
+            {avatarUrl ? (
+              <Image
+                src={avatarUrl}
+                alt={displayName}
+                width={30}
+                height={30}
+                referrerPolicy="no-referrer"
+                style={{ borderRadius: '50%', flexShrink: 0, objectFit: 'cover' }}
+              />
+            ) : (
+              <div style={{
+                width: 30,
+                height: 30,
+                borderRadius: '50%',
+                background: '#E8266F',
+                display: 'flex',
+                alignItems: 'center',
+                justifyContent: 'center',
+                fontSize: 12,
+                fontWeight: 700,
+                color: '#fff',
+                flexShrink: 0,
+              }}>
+                {displayName.charAt(0).toUpperCase()}
+              </div>
+            )}
+            <div style={{ minWidth: 0 }}>
+              <p style={{ fontSize: 13, color: '#fff', fontWeight: 500, margin: 0, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+                {displayName}
+              </p>
+              <p style={{ fontSize: 11, color: '#6E6E6E', margin: 0, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+                {email}
+              </p>
+            </div>
+          </Link>
+        </div>
+      </aside>
+
+      {/* ── Main ── */}
+      <main style={{ background: '#FAFAF9', minHeight: '100vh' }}>
+        {children}
+      </main>
+
+    </div>
+  )
+}
