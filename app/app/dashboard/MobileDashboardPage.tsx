@@ -85,7 +85,7 @@ export function MobileDashboardPage() {
       {!loading && stats.evaluations > 0 && (
         <>
           <SectionLabel>Evaluations by Status</SectionLabel>
-          <div className="flex gap-2 overflow-x-auto px-4 pb-2 mb-6" style={{ scrollSnapType: 'x proximity' }}>
+          <div className="flex gap-2 overflow-x-auto pb-2 mb-6 [&>*:first-child]:ml-4 [&>*:last-child]:mr-4" style={{ scrollSnapType: 'x proximity' }}>
             {STATUS_ORDER.map(key => {
               const count = stats.evaluationsByStatus[key] ?? 0
               return (
@@ -181,7 +181,11 @@ function MyPerformance({ userId }: { userId: string }) {
   return (
     <>
       <SectionLabel>My Performance</SectionLabel>
-      <div className="flex gap-3 overflow-x-auto px-4 pb-2 mb-6" style={{ scrollSnapType: 'x proximity' }}>
+      {/* Margin on the first/last card, not px-4 on this container -- a
+          horizontally-scrolling flex row with overflow-x-auto doesn't
+          reliably render its own left/right padding once content overflows,
+          so the leading card ends up flush against the screen edge. */}
+      <div className="flex gap-3 overflow-x-auto pb-2 mb-6 [&>*:first-child]:ml-4 [&>*:last-child]:mr-4" style={{ scrollSnapType: 'x proximity' }}>
         <MobileStatCard label="Evaluations" value={totalEvals} />
         <MobileStatCard label="Win Rate" value={winRate != null ? `${winRate.toFixed(0)}%` : '—'} sub={winRate != null ? `${won}W · ${lost}L` : undefined} />
         <MobileStatCard label="Clients" value={totalContacts} sub={totalContacts ? `${activeContacts} active` : undefined} />

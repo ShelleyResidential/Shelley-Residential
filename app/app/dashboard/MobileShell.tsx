@@ -7,10 +7,10 @@ import Image from 'next/image'
 
 const ANALYSE_ROUTES = ['/dashboard/analyse', '/dashboard/contacts', '/dashboard/properties', '/dashboard/evaluations']
 
-function HamburgerIcon() {
+function HamburgerIcon({ color = 'white' }: { color?: string }) {
   return (
     <svg width="24" height="24" viewBox="0 0 24 24" fill="none">
-      <path d="M3 6h18M3 12h18M3 18h18" stroke="white" strokeWidth="2" strokeLinecap="round" />
+      <path d="M3 6h18M3 12h18M3 18h18" stroke={color} strokeWidth="2" strokeLinecap="round" />
     </svg>
   )
 }
@@ -87,22 +87,13 @@ export function MobileShell({ children }: { children: React.ReactNode }) {
   return (
     <div className="min-h-screen" style={{ background: '#FAFAF9' }}>
 
-      {/* ── Top bar ── */}
-      <header className="sticky top-0 z-30 flex items-center justify-between px-4 py-3" style={{ background: '#2A2A2A' }}>
+      {/* ── Top bar -- hamburger only. The logo and account avatar live in
+          the full-screen menu instead, not duplicated on every page. ── */}
+      <div className="sticky top-0 z-30 px-4 py-3" style={{ background: '#FAFAF9' }}>
         <button type="button" aria-label="Open menu" onClick={() => setMenuOpen(true)} className="p-1 -ml-1">
-          <HamburgerIcon />
+          <HamburgerIcon color="#1a1a1a" />
         </button>
-        <Image src="/logo.png" alt="Shelley Residential" width={100} height={50} style={{ filter: 'brightness(0) invert(1)' }} />
-        <button type="button" aria-label="Account" onClick={() => go('/dashboard/settings')} className="w-9 h-9 rounded-full overflow-hidden flex-shrink-0">
-          {avatarUrl ? (
-            <Image src={avatarUrl} alt={displayName} width={36} height={36} referrerPolicy="no-referrer" style={{ objectFit: 'cover', width: '100%', height: '100%' }} />
-          ) : (
-            <div className="w-full h-full flex items-center justify-center text-xs font-bold text-white" style={{ background: '#E8266F' }}>
-              {displayName.charAt(0).toUpperCase()}
-            </div>
-          )}
-        </button>
-      </header>
+      </div>
 
       {/* ── Full-screen nav overlay ── */}
       {menuOpen && (
