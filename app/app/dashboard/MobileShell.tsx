@@ -1,11 +1,16 @@
 'use client'
 
-import { useEffect, useState } from 'react'
+import { useEffect, useRef, useState } from 'react'
 import { supabase } from '@/lib/supabase'
 import { useRouter, usePathname } from 'next/navigation'
 import Image from 'next/image'
 
 const ANALYSE_ROUTES = ['/dashboard/analyse', '/dashboard/contacts', '/dashboard/properties', '/dashboard/evaluations']
+
+// The top bar is `fixed` (not `sticky`) so it can translate fully out of
+// view on scroll-down -- main gets matching padding-top so content starts
+// below it instead of sliding underneath.
+const HEADER_HEIGHT = 72
 
 function HamburgerIcon({ color = 'white' }: { color?: string }) {
   return (
@@ -71,6 +76,28 @@ export function MobileShell({ children }: { children: React.ReactNode }) {
     return () => { document.body.style.overflow = '' }
   }, [menuOpen])
 
+  // Hide the top bar on scroll-down, reveal it again on scroll-up -- a
+  // small threshold on both the delta and a "near top" cutoff stops it
+  // flickering on tiny scroll jitter.
+  const [headerVisible, setHeaderVisible] = useState(true)
+  const lastScrollY = useRef(0)
+
+  useEffect(() => {
+    function onScroll() {
+      const currentY = window.scrollY
+      if (currentY < 10) {
+        setHeaderVisible(true)
+      } else if (currentY > lastScrollY.current + 5) {
+        setHeaderVisible(false)
+      } else if (currentY < lastScrollY.current - 5) {
+        setHeaderVisible(true)
+      }
+      lastScrollY.current = currentY
+    }
+    window.addEventListener('scroll', onScroll, { passive: true })
+    return () => window.removeEventListener('scroll', onScroll)
+  }, [])
+
   function go(href: string) {
     setMenuOpen(false)
     router.push(href)
@@ -87,11 +114,24 @@ export function MobileShell({ children }: { children: React.ReactNode }) {
   return (
     <div className="min-h-screen" style={{ background: '#FAFAF9' }}>
 
-      {/* ── Top bar -- hamburger only. The logo and account avatar live in
-          the full-screen menu instead, not duplicated on every page. ── */}
-      <div className="sticky top-0 z-30 px-4 py-3" style={{ background: '#FAFAF9' }}>
+      {/* ── Top bar -- fixed + translated, not sticky, so it can slide
+          fully out of view on scroll-down and back in on scroll-up. ── */}
+      <div
+        className={`fixed top-0 inset-x-0 z-30 flex items-center justify-between px-4 transition-transform duration-300 ease-in-out ${headerVisible ? 'translate-y-0' : '-translate-y-full'}`}
+        style={{ background: '#2A2A2A', height: HEADER_HEIGHT }}
+      >
         <button type="button" aria-label="Open menu" onClick={() => setMenuOpen(true)} className="p-1 -ml-1">
-          <HamburgerIcon color="#1a1a1a" />
+          <HamburgerIcon />
+        </button>
+        <Image src="/logo.png" alt="Shelley Residential" width={100} height={50} style={{ filter: 'brightness(0) invert(1)' }} />
+        <button type="button" aria-label="Account" onClick={() => go('/dashboard/settings')} className="w-9 h-9 rounded-full overflow-hidden flex-shrink-0">
+          {avatarUrl ? (
+            <Image src={avatarUrl} alt={displayName} width={36} height={36} referrerPolicy="no-referrer" style={{ objectFit: 'cover', width: '100%', height: '100%' }} />
+          ) : (
+            <div className="w-full h-full flex items-center justify-center text-xs font-bold text-white" style={{ background: '#E8266F' }}>
+              {displayName.charAt(0).toUpperCase()}
+            </div>
+          )}
         </button>
       </div>
 
@@ -154,7 +194,7 @@ export function MobileShell({ children }: { children: React.ReactNode }) {
         </div>
       )}
 
-      <main>{children}</main>
+      <main style={{ paddingTop: HEADER_HEIGHT }}>{children}</main>
     </div>
   )
 }
