@@ -25,7 +25,7 @@ type ExistingRow = Record<GoogleOwnedField, string | null> & { google_resource_n
 // it always trusts Google's copy for these fields.
 export async function PATCH(request: NextRequest, { params }: { params: Promise<{ id: string }> }) {
   const { id } = await params
-  const updates = await request.json()
+  const { userId, ...updates } = await request.json()
 
   const { data: existing } = await supabaseAdmin
     .from('contacts')
@@ -37,6 +37,12 @@ export async function PATCH(request: NextRequest, { params }: { params: Promise<
     return NextResponse.json({ error: 'Contact not found' }, { status: 404 })
   }
   const existingRow = existing as unknown as ExistingRow
+
+  // Only the agent who captured this contact can edit it -- everyone else
+  // is view-only (see contacts SELECT policy, which stays open to all).
+  if (existingRow.created_by && userId !== existingRow.created_by) {
+    return NextResponse.json({ error: 'Only the agent who captured this contact can edit it.' }, { status: 403 })
+  }
 
   let googlePushError: string | null = null
 

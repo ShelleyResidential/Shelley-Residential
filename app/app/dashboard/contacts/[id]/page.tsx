@@ -79,6 +79,24 @@ export default function ContactDetailPage() {
   const [noteHistory, setNoteHistory]     = useState<Record<string, NoteHistory[]>>({})
   const [showHistoryFor, setShowHistoryFor] = useState<string | null>(null)
 
+  // Only the agent who captured this contact can edit it -- everyone else
+  // is view-only. Contacts with no recorded creator (legacy data) stay
+  // editable by anyone, since there's no owner to restrict to.
+  const canEditContact = !!contact && (!contact.created_by || userId === contact.created_by)
+
+  // Guards against `?edit=1` forcing edit mode open for a non-creator --
+  // flips editing back off once we actually know who the contact belongs
+  // to and who's viewing it. Adjusted during render (not an effect) since
+  // it's purely derived from contact/userId changing.
+  const guardState = contact ? `${contact.id}|${userId ?? ''}` : ''
+  const [prevGuardState, setPrevGuardState] = useState(guardState)
+  if (guardState !== prevGuardState) {
+    setPrevGuardState(guardState)
+    if (contact && userId && contact.created_by && userId !== contact.created_by) {
+      setEditing(false)
+    }
+  }
+
   const fetchNotes = useCallback(async () => {
     const { data } = await supabase
       .from('contact_notes').select('id, note_text, created_at, last_edited_at')
@@ -143,10 +161,12 @@ export default function ContactDetailPage() {
     // Routed through an API route rather than a direct client update -- if
     // this contact came from Google, the route also pushes the change back
     // out to the person's Google Contacts (see app/api/contacts/[id]/route.ts).
+    // userId is included so the route can verify this is the contact's
+    // creator, not just any signed-in agent.
     const res  = await fetch(`/api/contacts/${id}`, {
       method: 'PATCH',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify(updated),
+      body: JSON.stringify({ ...updated, userId }),
     })
     const json = await res.json().catch(() => ({}))
     if (!res.ok) { setSaveError(json.error ?? 'Failed to save.'); setSaving(false); return }
@@ -202,7 +222,7 @@ export default function ContactDetailPage() {
             <span className={`text-sm px-3 py-1 rounded-full font-medium whitespace-nowrap ${
               contact.status === 'Active' ? 'bg-green-50 text-green-700' : 'bg-gray-100 text-gray-500'
             }`}>{contact.status}</span>
-            {!editing && (
+            {!editing && canEditContact && (
               <button onClick={() => { setEditing(true); setEditForm(contact) }} className={btn.secondary}>Edit</button>
             )}
             {canDelete(userEmail) && (
