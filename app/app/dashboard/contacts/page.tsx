@@ -33,6 +33,22 @@ function fullName(c: Pick<Contact, 'first_name' | 'last_name'>) {
   return [c.first_name, c.last_name].filter(Boolean).join(' ')
 }
 
+// Ranks how well a contact matches a search term -- lower is better. An
+// alphabetical sort buries an exact match (e.g. searching "Scott" for a
+// contact literally named Scott) under every other match that happens to
+// come earlier in the alphabet (e.g. "Charles Scott"), which is exactly
+// backwards from what a search should do.
+function relevanceScore(c: Pick<Contact, 'first_name' | 'last_name'>, q: string): number {
+  const first = (c.first_name ?? '').trim().toLowerCase()
+  const last = (c.last_name ?? '').trim().toLowerCase()
+  const full = [first, last].filter(Boolean).join(' ')
+  if (full === q) return 0
+  if (first === q || last === q) return 1
+  if (first.startsWith(q) || last.startsWith(q)) return 2
+  if (full.startsWith(q)) return 3
+  return 4
+}
+
 function formatDate(iso: string | null): string {
   if (!iso) return '—'
   return new Date(iso).toLocaleDateString('en-ZA', { day: 'numeric', month: 'short', year: 'numeric' })
@@ -63,6 +79,38 @@ export default function ContactsPage() {
   const fetchContacts = useCallback(async () => {
     setLoading(true)
     const ascending = sortDirection === 'asc'
+    const trimmedSearch = search.trim()
+
+    // While actively searching, rank by match quality instead of whatever
+    // column sort is selected -- alphabetical order (even by name) has
+    // nothing to do with how well a result matches what was typed. Fetches
+    // every match (paginated past Supabase's 1000-row cap), scores +
+    // sorts client-side, then slices out just this page.
+    if (trimmedSearch) {
+      const q = trimmedSearch.toLowerCase()
+      let base = supabase.from('contacts').select(SELECT_COLUMNS)
+        .or(`first_name.ilike.%${trimmedSearch}%,last_name.ilike.%${trimmedSearch}%,name.ilike.%${trimmedSearch}%`)
+      if (myOnly && userId) base = base.eq('agent_id', userId)
+
+      let all: Contact[] = []
+      for (let from = 0; ; from += 1000) {
+        const { data } = await base.range(from, from + 999)
+        if (!data || data.length === 0) break
+        all = all.concat(data)
+        if (data.length < 1000) break
+      }
+
+      all.sort((a, b) => {
+        const scoreDiff = relevanceScore(a, q) - relevanceScore(b, q)
+        return scoreDiff !== 0 ? scoreDiff : fullName(a).localeCompare(fullName(b))
+      })
+
+      const from = (page - 1) * PAGE_SIZE
+      setContacts(all.slice(from, from + PAGE_SIZE))
+      setTotalCount(all.length)
+      setLoading(false)
+      return
+    }
 
     // "Captured By" sorts by a joined profile's display name, which
     // PostgREST can't order by directly on the contacts table -- fetch
@@ -71,7 +119,6 @@ export default function ContactsPage() {
     if (sortColumn === 'created_by') {
       let base = supabase.from('contacts').select(SELECT_COLUMNS)
       if (myOnly && userId) base = base.eq('agent_id', userId)
-      if (search) base = base.or(`first_name.ilike.%${search}%,last_name.ilike.%${search}%,name.ilike.%${search}%`)
 
       let all: Contact[] = []
       for (let from = 0; ; from += 1000) {
@@ -105,7 +152,6 @@ export default function ContactsPage() {
     }
 
     if (myOnly && userId) query = query.eq('agent_id', userId)
-    if (search) query = query.or(`first_name.ilike.%${search}%,last_name.ilike.%${search}%,name.ilike.%${search}%`)
 
     const from = (page - 1) * PAGE_SIZE
     query = query.range(from, from + PAGE_SIZE - 1)
