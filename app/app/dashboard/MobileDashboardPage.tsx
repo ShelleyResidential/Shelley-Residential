@@ -3,6 +3,7 @@
 import { useEffect, useState } from 'react'
 import { supabase } from '@/lib/supabase'
 import Link from 'next/link'
+import Image from 'next/image'
 import { STATUS_ORDER, STATUS_LABELS, STATUS_COLOURS } from '@/lib/pipeline'
 import { formatPhoneDisplay } from '@/lib/phone'
 import { card } from '@/lib/styles'
@@ -201,16 +202,17 @@ export function MobileDashboardPage() {
 
   return (
     <div className="pb-10">
-      <div className="px-4 pt-5 pb-3">
-        <h1 className="text-xl font-bold text-[#1a1a1a]">Good day{firstName ? `, ${firstName}` : ''}</h1>
-      </div>
-
       {pageLoading ? (
-        <div className="flex items-center justify-center px-4" style={{ minHeight: '50vh' }}>
+        <div className="flex flex-col items-center justify-center px-4" style={{ minHeight: '70vh' }}>
+          <Image src="/logo.png" alt="Shelley Residential" width={140} height={70} priority className="mb-5" />
           <p className="text-lg font-bold text-[#1a1a1a]">Loading your dashboard…</p>
         </div>
       ) : (
         <>
+          <div className="px-4 pt-5 pb-3">
+            <h1 className="text-xl font-bold text-[#1a1a1a]">Good day{firstName ? `, ${firstName}` : ''}</h1>
+          </div>
+
           <TodaysBriefing
             events={events} connected={connected} errorMsg={briefingErrorMsg} unreadCount={unreadCount}
           />
@@ -251,7 +253,46 @@ export function MobileDashboardPage() {
           <AgentLeaderboard evals={leaderboardEvals} profiles={profiles} />
         </>
       )}
+
+      <AddEvaluationFab />
     </div>
+  )
+}
+
+// ── Floating "+ New Evaluation" button -- hides while the page is being
+// scrolled up, out of the way of whatever the agent's trying to read, and
+// reappears once they scroll back down (or stop).
+function AddEvaluationFab() {
+  const [visible, setVisible] = useState(true)
+
+  useEffect(() => {
+    let lastY = window.scrollY
+    let ticking = false
+    function onScroll() {
+      if (ticking) return
+      ticking = true
+      requestAnimationFrame(() => {
+        const y = window.scrollY
+        if (y < lastY - 4) setVisible(false)
+        else if (y > lastY + 4) setVisible(true)
+        lastY = y
+        ticking = false
+      })
+    }
+    window.addEventListener('scroll', onScroll, { passive: true })
+    return () => window.removeEventListener('scroll', onScroll)
+  }, [])
+
+  return (
+    <Link
+      href="/dashboard/evaluations/new"
+      aria-label="Add new evaluation"
+      className={`fixed bottom-6 left-1/2 -translate-x-1/2 z-50 w-14 h-14 rounded-full bg-[#E8266F] text-white flex items-center justify-center shadow-lg transition-transform duration-200 ${
+        visible ? 'translate-y-0' : 'translate-y-32'
+      }`}
+    >
+      <span className="text-3xl font-light leading-none" style={{ marginTop: -2 }}>+</span>
+    </Link>
   )
 }
 
