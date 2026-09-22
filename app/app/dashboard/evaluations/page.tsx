@@ -234,9 +234,19 @@ export default function EvaluationsPage() {
       if (isSearching) {
         const q = search.toLowerCase()
         results = results.filter(e => {
-          const addr = formatAddress(e.properties).toLowerCase()
-          const seller = sellerName(e).toLowerCase()
-          return addr.includes(q) || seller.includes(q)
+          const p = e.properties
+          // Search every raw address field, not just the curated display
+          // string -- formatAddress() deliberately drops street_number for
+          // sectional-title properties (they're shown as unit + complex
+          // instead), which silently made a plain street-number search
+          // match nothing for those properties even though the field has
+          // real data.
+          const haystack = [
+            formatAddress(p), p?.street_number, p?.street_name,
+            p?.unit_number, p?.complex_or_building_name, p?.suburb, p?.city,
+            sellerName(e),
+          ].filter(Boolean).join(' ').toLowerCase()
+          return haystack.includes(q)
         })
       }
 

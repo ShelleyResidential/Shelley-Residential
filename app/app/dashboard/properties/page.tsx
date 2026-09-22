@@ -117,7 +117,11 @@ export default function PropertiesPage() {
     if (filterSuburb) query = query.eq('suburb', filterSuburb)
     if (search) {
       const q = search.trim()
-      query = query.or(`street_name.ilike.%${q}%,suburb.ilike.%${q}%,city.ilike.%${q}%,complex_or_building_name.ilike.%${q}%`)
+      // street_number/unit_number were missing entirely -- searching a
+      // plain number (e.g. "20" for "20 David Mclean Drive", or a unit
+      // number) matched nothing, since none of the other columns are
+      // ever numeric.
+      query = query.or(`street_number.ilike.%${q}%,street_name.ilike.%${q}%,unit_number.ilike.%${q}%,suburb.ilike.%${q}%,city.ilike.%${q}%,complex_or_building_name.ilike.%${q}%`)
     }
 
     const from = (page - 1) * PAGE_SIZE
