@@ -69,21 +69,23 @@ function normalize(person: PersonResource): GoogleContact | null {
   }
 }
 
-// Pulls ONE page of the user's "My Contacts" (~150-200 people). Deliberately
-// not looped internally into "fetch everything" -- on Vercel Hobby, a
-// serverless function hard-stops at 10 seconds, and a personal account can
-// have thousands of contacts, so paginating through all of them plus
-// writing each page to the database can blow past that limit and get
-// silently killed mid-sync. The caller (a client-side loop for the manual
-// button, or a time-budgeted loop for the cron) drives the pagination
-// across many short calls instead of one long one.
+// Pulls ONE page of the user's "My Contacts" (up to 1000 people -- Google's
+// own maximum pageSize for this endpoint). Deliberately not looped
+// internally into "fetch everything" -- on Vercel Hobby, a serverless
+// function hard-stops at 10 seconds, and a personal account can have
+// thousands of contacts, so paginating through all of them plus writing
+// each page to the database can blow past that limit and get silently
+// killed mid-sync. The caller (a client-side loop for the manual button, or
+// a time-budgeted loop for the cron) drives the pagination across many
+// short calls instead of one long one -- at 1000/page a 10,000-contact
+// account is 10 calls, comfortably finishing in one sitting.
 export async function fetchGoogleContactsPage(
   accessToken: string,
   pageToken?: string | null,
 ): Promise<{ contacts: GoogleContact[]; nextPageToken?: string; error?: string }> {
   const params = new URLSearchParams({
     personFields: PERSON_FIELDS,
-    pageSize:     '200',
+    pageSize:     '1000',
   })
   if (pageToken) params.set('pageToken', pageToken)
 

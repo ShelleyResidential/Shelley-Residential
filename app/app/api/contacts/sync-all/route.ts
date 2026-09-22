@@ -27,7 +27,7 @@ export async function GET(request: NextRequest) {
     .from('user_google_tokens')
     .select('user_id, contacts_sync_cursor')
 
-  const results: { userId: string; created: number; updated: number; done: boolean; error?: string }[] = []
+  const results: { userId: string; created: number; updated: number; skipped: number; done: boolean; error?: string }[] = []
 
   for (const row of connected ?? []) {
     if (Date.now() - start > TIME_BUDGET_MS) break // out of time -- remaining users get picked up next run
@@ -35,6 +35,7 @@ export async function GET(request: NextRequest) {
     let pageToken = row.contacts_sync_cursor ?? undefined
     let created = 0
     let updated = 0
+    let skipped = 0
     let sawError: string | undefined
 
     while (Date.now() - start < TIME_BUDGET_MS) {
@@ -42,6 +43,7 @@ export async function GET(request: NextRequest) {
       if (!page.ok) { sawError = page.error; break }
       created += page.created
       updated += page.updated
+      skipped += page.skipped
       pageToken = page.nextPageToken
       if (!pageToken) break // this user is fully caught up
     }
@@ -52,13 +54,14 @@ export async function GET(request: NextRequest) {
       .update({ contacts_sync_cursor: sawError ? null : (pageToken ?? null) })
       .eq('user_id', row.user_id)
 
-    results.push({ userId: row.user_id, created, updated, done: !pageToken, error: sawError })
+    results.push({ userId: row.user_id, created, updated, skipped, done: !pageToken, error: sawError })
   }
 
   return NextResponse.json({
     usersProcessed: results.length,
     created: results.reduce((sum, r) => sum + r.created, 0),
     updated: results.reduce((sum, r) => sum + r.updated, 0),
+    skipped: results.reduce((sum, r) => sum + r.skipped, 0),
     stillInProgress: results.filter(r => !r.done && !r.error).map(r => r.userId),
     failures: results.filter(r => r.error).map(r => ({ userId: r.userId, error: r.error })),
   })

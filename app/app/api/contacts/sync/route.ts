@@ -1,11 +1,11 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { syncContactsPage } from '@/lib/contacts-sync'
 
-// Manual "Sync Contacts" button. Processes ONE page (~200 contacts) per
-// call and hands back nextPageToken -- the client loops this until it's
-// empty, so a personal account with thousands of contacts still finishes
-// completely, just across several quick requests instead of one that would
-// risk exceeding Vercel's 10s Hobby-plan function limit.
+// Manual "Sync Contacts" button. Processes ONE page (up to 1000 contacts)
+// per call and hands back nextPageToken -- the client loops this until
+// it's empty, so an account with thousands of contacts (10,000+ included)
+// still finishes completely, just across several quick requests instead of
+// one that would risk exceeding Vercel's 10s Hobby-plan function limit.
 export async function POST(request: NextRequest) {
   const { userId, pageToken } = await request.json()
   if (!userId) {
@@ -20,6 +20,7 @@ export async function POST(request: NextRequest) {
   return NextResponse.json({
     created: result.created,
     updated: result.updated,
+    skipped: result.skipped,
     nextPageToken: result.nextPageToken ?? null,
   })
 }

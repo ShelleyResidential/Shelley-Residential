@@ -163,6 +163,7 @@ export default function ContactsPage() {
     let pageToken: string | null = null
     let totalCreated = 0
     let totalUpdated = 0
+    let totalSkipped = 0
     for (;;) {
       const res: Response = await fetch('/api/contacts/sync', {
         method:  'POST',
@@ -177,12 +178,16 @@ export default function ContactsPage() {
       }
       totalCreated += json.created
       totalUpdated += json.updated
+      totalSkipped += json.skipped ?? 0
       pageToken = json.nextPageToken
-      setSyncMessage(`Syncing… ${totalCreated + totalUpdated} contacts so far`)
+      setSyncMessage(`Syncing… ${totalCreated + totalUpdated + totalSkipped} contacts so far`)
       if (!pageToken) break
     }
 
-    setSyncMessage(`Synced — ${totalCreated} new, ${totalUpdated} updated.`)
+    setSyncMessage(
+      `Synced — ${totalCreated} new, ${totalUpdated} updated` +
+      (totalSkipped > 0 ? `, ${totalSkipped} skipped (already saved by another agent)` : '') + '.'
+    )
     await fetchContacts()
     setSyncing(false)
   }
