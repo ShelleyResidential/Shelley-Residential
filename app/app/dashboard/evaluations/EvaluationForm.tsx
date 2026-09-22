@@ -1835,10 +1835,18 @@ function ContactSearch({ placeholder, onSelect, excludeIds }: {
   excludeIds: string[]
 }) {
   const [query, setQuery]     = useState('')
-  const [results, setResults] = useState<{ id: string; first_name: string; last_name: string; phone_number: string | null; email_address: string | null }[]>([])
+  const [results, setResults] = useState<{ id: string; first_name: string; last_name: string; phone_number: string | null; email_address: string | null; created_by: string | null }[]>([])
   const [open, setOpen]       = useState(false)
   const [loading, setLoading] = useState(false)
+  const [profiles, setProfiles] = useState<{ id: string; full_name: string | null; email: string | null }[]>([])
   const containerRef          = useRef<HTMLDivElement>(null)
+
+  // Different agents can each have their own contact for the same real
+  // person -- fetched once so every result can show who captured it,
+  // making it obvious which copy you're picking.
+  useEffect(() => {
+    supabase.from('profiles').select('id, full_name, email').then(({ data }) => setProfiles(data ?? []))
+  }, [])
 
   useEffect(() => {
     function handleClick(e: MouseEvent) {
@@ -1854,7 +1862,7 @@ function ContactSearch({ placeholder, onSelect, excludeIds }: {
       setLoading(true)
       const { data } = await supabase
         .from('contacts')
-        .select('id, first_name, last_name, phone_number, email_address')
+        .select('id, first_name, last_name, phone_number, email_address, created_by')
         .or(`first_name.ilike.%${query}%,last_name.ilike.%${query}%,name.ilike.%${query}%`)
         .order('first_name').limit(8)
       setResults((data ?? []).filter(r => !excludeIds.includes(r.id)))
@@ -1877,11 +1885,14 @@ function ContactSearch({ placeholder, onSelect, excludeIds }: {
           {!loading && results.length === 0 && <div className="px-4 py-3 text-sm text-gray-400">No contacts found</div>}
           {!loading && results.map(r => {
             const name = `${r.first_name} ${r.last_name}`.trim()
+            const owner = profiles.find(p => p.id === r.created_by)
+            const ownerName = owner?.full_name ?? owner?.email
             return (
               <button key={r.id} type="button"
                 onMouseDown={() => { onSelect(r.id, name, r.phone_number, r.email_address); setQuery(''); setOpen(false) }}
-                className="w-full text-left px-4 py-2.5 text-sm text-[#1a1a1a] hover:bg-[#f8f7f4] border-b border-gray-100 last:border-b-0 transition-colors">
-                {name}
+                className="w-full text-left px-4 py-2.5 text-sm text-[#1a1a1a] hover:bg-[#f8f7f4] border-b border-gray-100 last:border-b-0 transition-colors flex items-center justify-between gap-2">
+                <span className="truncate">{name}</span>
+                {ownerName && <span className="text-xs text-gray-400 flex-shrink-0">Captured by {ownerName}</span>}
               </button>
             )
           })}

@@ -155,15 +155,14 @@ export default function ContactsPage() {
     setSyncing(true)
     setSyncMessage('')
 
-    // The endpoint only ever processes one page (~200 contacts) per call --
-    // on Vercel's Hobby plan a serverless function hard-stops at 10 seconds,
-    // which a full multi-thousand-contact sync can easily exceed. Looping
-    // it here, one short request at a time, means the sync always finishes
-    // completely regardless of how large the contact list is.
+    // The endpoint only ever processes one page (up to 1000 contacts) per
+    // call -- on Vercel's Hobby plan a serverless function hard-stops at 10
+    // seconds, which a full multi-thousand-contact sync can easily exceed.
+    // Looping it here, one short request at a time, means the sync always
+    // finishes completely regardless of how large the contact list is.
     let pageToken: string | null = null
     let totalCreated = 0
     let totalUpdated = 0
-    let totalSkipped = 0
     for (;;) {
       const res: Response = await fetch('/api/contacts/sync', {
         method:  'POST',
@@ -178,16 +177,12 @@ export default function ContactsPage() {
       }
       totalCreated += json.created
       totalUpdated += json.updated
-      totalSkipped += json.skipped ?? 0
       pageToken = json.nextPageToken
-      setSyncMessage(`Syncing… ${totalCreated + totalUpdated + totalSkipped} contacts so far`)
+      setSyncMessage(`Syncing… ${totalCreated + totalUpdated} contacts so far`)
       if (!pageToken) break
     }
 
-    setSyncMessage(
-      `Synced — ${totalCreated} new, ${totalUpdated} updated` +
-      (totalSkipped > 0 ? `, ${totalSkipped} skipped (already saved by another agent)` : '') + '.'
-    )
+    setSyncMessage(`Synced — ${totalCreated} new, ${totalUpdated} updated.`)
     await fetchContacts()
     setSyncing(false)
   }
@@ -344,7 +339,16 @@ export default function ContactsPage() {
                       {c.status || '—'}
                     </span>
                   </td>
-                  <td className="px-3 py-3 text-[#1a1a1a] font-medium truncate" title={fullName(c)}>{fullName(c)}</td>
+                  <td className="px-3 py-3 overflow-hidden">
+                    <p className="text-[#1a1a1a] font-medium truncate" title={fullName(c)}>{fullName(c)}</p>
+                    {/* Different agents can have their own contact for the
+                        same real person -- shown right here, not just in the
+                        far-right Captured By column, so it's obvious whose
+                        copy this is without scrolling. */}
+                    <p className="text-xs text-gray-400 truncate">
+                      {profiles.find(p => p.id === c.created_by)?.full_name ?? profiles.find(p => p.id === c.created_by)?.email ?? '—'}
+                    </p>
+                  </td>
                   <td className="px-3 py-3 text-gray-500 truncate">{formatPhoneDisplay(c.phone_number)}</td>
                   <td className="px-3 py-3 overflow-hidden">
                     {c.email_address ? (

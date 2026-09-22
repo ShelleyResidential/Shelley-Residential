@@ -4,7 +4,6 @@ import { Suspense, useState, useEffect, useRef } from 'react'
 import { supabase } from '@/lib/supabase'
 import { normalizeToE164 } from '@/lib/phone'
 import { btn, card, input, select, sectionTitle, label as labelCls } from '@/lib/styles'
-import { WarningIcon } from '@/lib/icons'
 import { Breadcrumbs } from '@/lib/Breadcrumbs'
 import { useRouter, useSearchParams } from 'next/navigation'
 
@@ -32,8 +31,6 @@ function AddContactForm() {
   const [error, setError]     = useState('')
   const [userId, setUserId]   = useState<string | null>(null)
   const [form, setForm]       = useState(EMPTY_FORM)
-  const [duplicates, setDuplicates] = useState<{ id: string; first_name: string; last_name: string; phone_number: string | null; email_address: string | null }[]>([])
-  const [checkingDuplicates, setCheckingDuplicates] = useState(false)
 
   useEffect(() => {
     supabase.auth.getUser().then(({ data }) => {
@@ -41,46 +38,6 @@ function AddContactForm() {
       setUserId(data.user.id)
     })
   }, [router])
-
-  // ── Flag potential duplicate contacts as the agent types, matching on
-  // full name, phone number, or email address, so we never end up with
-  // two records for the same person. Phone numbers are stored normalized
-  // (E.164), so the match only fires once a full, valid number has been
-  // typed -- comparing raw partial digits against normalized numbers would
-  // never match anyway.
-  useEffect(() => {
-    const firstName = form.first_name.trim()
-    const lastName = form.last_name.trim()
-    const normalizedPhone = normalizeToE164(form.phone_number)
-    const email = form.email_address.trim()
-
-    const clauses: string[] = []
-    if (firstName && lastName) clauses.push(`and(first_name.ilike.${firstName},last_name.ilike.${lastName})`)
-    if (normalizedPhone) clauses.push(`phone_number.eq.${normalizedPhone}`)
-    if (email) clauses.push(`email_address.eq.${email}`)
-
-    if (clauses.length === 0) { setDuplicates([]); return }
-
-    const timer = setTimeout(async () => {
-      setCheckingDuplicates(true)
-      const { data } = await supabase
-        .from('contacts')
-        .select('id, first_name, last_name, phone_number, email_address')
-        .or(clauses.join(','))
-        .limit(5)
-      setDuplicates(data ?? [])
-      setCheckingDuplicates(false)
-    }, 350)
-    return () => clearTimeout(timer)
-  }, [form.first_name, form.last_name, form.phone_number, form.email_address])
-
-  function useExistingContact(match: { id: string; first_name: string; last_name: string; phone_number: string | null; email_address: string | null }) {
-    if (!returnTo) return
-    const name = `${match.first_name} ${match.last_name}`.trim()
-    const phoneParam = encodeURIComponent(match.phone_number ?? '')
-    const emailParam = encodeURIComponent(match.email_address ?? '')
-    router.push(`${returnTo}?newContactId=${match.id}&newContactName=${encodeURIComponent(name)}&for=${returnFor ?? 'contact'}&phone=${phoneParam}&email=${emailParam}`)
-  }
 
   function set(field: string, value: string) {
     setForm(f => ({ ...f, [field]: value }))
@@ -102,22 +59,6 @@ function AddContactForm() {
     if (!normalizedPhone) { setError("That doesn't look like a valid phone number."); return }
     setError('')
     setSaving(true)
-
-    // Phone numbers can never be duplicated, full stop -- checked fresh
-    // right before saving (not just relying on the debounced banner above,
-    // which could be stale if they saved right after typing) and blocks
-    // the save entirely rather than just warning.
-    const { data: existingMatch } = await supabase
-      .from('contacts')
-      .select('id, first_name, last_name')
-      .eq('phone_number', normalizedPhone)
-      .limit(1)
-    if (existingMatch && existingMatch.length > 0) {
-      const dupe = existingMatch[0]
-      setError(`This number is already saved against ${[dupe.first_name, dupe.last_name].filter(Boolean).join(' ')}. Contacts can't share a phone number.`)
-      setSaving(false)
-      return
-    }
 
     const payload: Record<string, unknown> = {
       title: form.title || null,
@@ -301,41 +242,6 @@ function AddContactForm() {
             </div>
           </Section>
 
-          {checkingDuplicates && (
-            <p className="text-xs text-gray-400 text-center">Checking for existing contacts…</p>
-          )}
-          {!checkingDuplicates && duplicates.length > 0 && (
-            <div className="bg-[#1a1a1a] rounded-lg p-3 space-y-2">
-              <div className="flex items-center gap-2">
-                <WarningIcon className="w-4 h-4 text-white flex-shrink-0" />
-                <p className="text-xs font-medium text-white">
-                  A contact with this name, phone number, or email may already exist:
-                </p>
-              </div>
-              {duplicates.map(m => (
-                <div key={m.id} className="flex items-center justify-between gap-3 px-3 py-2 rounded-md bg-white text-sm">
-                  <div className="min-w-0">
-                    <span className="font-medium text-[#1a1a1a]">{m.first_name} {m.last_name}</span>
-                    {(m.phone_number || m.email_address) && (
-                      <span className="ml-2 text-xs text-gray-400">{[m.phone_number, m.email_address].filter(Boolean).join(' · ')}</span>
-                    )}
-                  </div>
-                  {returnTo ? (
-                    <button type="button" onClick={() => useExistingContact(m)}
-                      className="text-xs text-[#E8266F] hover:opacity-75 font-medium flex-shrink-0 transition-opacity">
-                      Use this contact
-                    </button>
-                  ) : (
-                    <a href={`/dashboard/contacts/${m.id}`} target="_blank" rel="noopener noreferrer"
-                      className="text-xs text-[#E8266F] hover:opacity-75 font-medium flex-shrink-0 transition-opacity">
-                      View →
-                    </a>
-                  )}
-                </div>
-              ))}
-            </div>
-          )}
-
           {error && <p className="text-sm text-red-500 bg-red-50 px-4 py-3 rounded-lg">{error}</p>}
 
           <div className="flex gap-3">
@@ -368,10 +274,18 @@ function ContactSearch({ selectedName, onSelect, onClear }: {
   onClear: () => void
 }) {
   const [query, setQuery]     = useState('')
-  const [results, setResults] = useState<{ id: string; first_name: string; last_name: string; title: string | null }[]>([])
+  const [results, setResults] = useState<{ id: string; first_name: string; last_name: string; title: string | null; created_by: string | null }[]>([])
   const [open, setOpen]       = useState(false)
   const [loading, setLoading] = useState(false)
+  const [profiles, setProfiles] = useState<{ id: string; full_name: string | null; email: string | null }[]>([])
   const containerRef          = useRef<HTMLDivElement>(null)
+
+  // Different agents can each have their own contact for the same real
+  // person -- fetched once so every result can show who captured it,
+  // making it obvious which copy you're picking.
+  useEffect(() => {
+    supabase.from('profiles').select('id, full_name, email').then(({ data }) => setProfiles(data ?? []))
+  }, [])
 
   useEffect(() => {
     function handleClick(e: MouseEvent) {
@@ -387,7 +301,7 @@ function ContactSearch({ selectedName, onSelect, onClear }: {
       setLoading(true)
       const { data } = await supabase
         .from('contacts')
-        .select('id, first_name, last_name, title')
+        .select('id, first_name, last_name, title, created_by')
         .or(`first_name.ilike.%${query}%,last_name.ilike.%${query}%,name.ilike.%${query}%`)
         .order('first_name').limit(8)
       setResults(data ?? [])
@@ -420,11 +334,14 @@ function ContactSearch({ selectedName, onSelect, onClear }: {
           {!loading && results.length === 0 && <div className="px-4 py-3 text-sm text-gray-400">No contacts found</div>}
           {!loading && results.map(r => {
             const name = `${r.title ? r.title + ' ' : ''}${r.first_name} ${r.last_name}`.trim()
+            const owner = profiles.find(p => p.id === r.created_by)
+            const ownerName = owner?.full_name ?? owner?.email
             return (
               <button key={r.id} type="button"
                 onMouseDown={() => { onSelect(r.id, name); setQuery(''); setOpen(false) }}
-                className="w-full text-left px-4 py-2.5 text-sm text-[#1a1a1a] hover:bg-[#f8f7f4] border-b border-gray-100 last:border-b-0 transition-colors">
-                {name}
+                className="w-full text-left px-4 py-2.5 text-sm text-[#1a1a1a] hover:bg-[#f8f7f4] border-b border-gray-100 last:border-b-0 transition-colors flex items-center justify-between gap-2">
+                <span className="truncate">{name}</span>
+                {ownerName && <span className="text-xs text-gray-400 flex-shrink-0">Captured by {ownerName}</span>}
               </button>
             )
           })}

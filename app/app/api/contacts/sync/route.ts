@@ -20,7 +20,6 @@ export async function POST(request: NextRequest) {
   return NextResponse.json({
     created: result.created,
     updated: result.updated,
-    skipped: result.skipped,
     nextPageToken: result.nextPageToken ?? null,
   })
 }
