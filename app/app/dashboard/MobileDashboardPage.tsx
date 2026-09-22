@@ -207,7 +207,7 @@ export function MobileDashboardPage() {
 
       {pageLoading ? (
         <div className="flex items-center justify-center px-4" style={{ minHeight: '50vh' }}>
-          <p className="text-sm text-gray-400">Loading your dashboard…</p>
+          <p className="text-lg font-bold text-[#1a1a1a]">Loading your dashboard…</p>
         </div>
       ) : (
         <>
@@ -375,6 +375,13 @@ const GMAIL_WEB_INBOX_URL = 'https://mail.google.com/mail/u/0/#inbox'
 // standard workaround. Any other platform (e.g. viewing this on a desktop
 // browser) just gets the plain link's default behaviour, since this only
 // intercepts the click on Android/iOS.
+//
+// Deliberately NOT `target="_blank"` on the <a> this is attached to: on
+// mobile browsers a target="_blank" anchor can open its new-tab/window as
+// part of the trusted click gesture itself, racing ahead of (or simply
+// ignoring) preventDefault() called from this handler -- which is exactly
+// what was still landing on the web inbox in a browser tab instead of the
+// app. Same-tab navigation via this handler doesn't have that race.
 function openGmail(e: React.MouseEvent) {
   const ua = navigator.userAgent
   const isAndroid = /Android/.test(ua)
@@ -411,8 +418,6 @@ function TodaysBriefing({ events, connected, errorMsg, unreadCount }: {
         {unreadCount != null && unreadCount > 0 && (
           <a
             href={GMAIL_WEB_INBOX_URL}
-            target="_blank"
-            rel="noopener noreferrer"
             onClick={openGmail}
             className="text-xs font-semibold px-2.5 py-1 rounded-full bg-[#E8266F] text-white flex-shrink-0 active:opacity-80"
           >

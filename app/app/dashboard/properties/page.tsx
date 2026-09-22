@@ -249,9 +249,15 @@ export default function PropertiesPage() {
         )}
       </div>
 
-      <div className="flex items-center justify-end flex-wrap gap-3 mb-6">
-        {rowActionControls}
-      </div>
+      {/* This row only ever holds the Edit/Details buttons once a row is
+          selected -- unconditionally rendering the wrapper (even empty)
+          still applied its own mb-6, leaving a big gap above the property
+          count by default. Only rendered at all once there's something in it. */}
+      {rowActionControls && (
+        <div className="flex items-center justify-end flex-wrap gap-3 mb-3">
+          {rowActionControls}
+        </div>
+      )}
 
       <div className="flex items-center justify-between flex-wrap gap-3 mb-4">
         {!loading && (
