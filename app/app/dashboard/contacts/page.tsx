@@ -230,41 +230,40 @@ export default function ContactsPage() {
             {syncing ? 'Syncing…' : 'Sync Contacts'}
           </button>
           <Link href="/dashboard/contacts/new" className={btn.primary}>+ New Contact</Link>
-        </div>
-      </div>
-      {syncMessage && <p className="text-xs text-gray-400 -mt-2 mb-4">{syncMessage}</p>}
-
-      {/* Search -- collapsed behind an icon on mobile so the records list
-          sits higher up; always expanded on desktop, unchanged. */}
-      <div className="mb-3">
-        <div className="md:hidden flex justify-end mb-2">
+          {/* Search toggle -- mobile only, sits in this same header row
+              instead of a row of its own (which was mostly empty space,
+              defeating the point of collapsing the search box at all). */}
           <button
             type="button"
             onClick={() => setSearchOpen(o => !o)}
             aria-label={searchOpen ? 'Hide search' : 'Show search'}
             aria-expanded={searchOpen}
-            className={`p-2.5 rounded-lg border transition-colors ${
+            className={`md:hidden flex-shrink-0 p-2 rounded-lg border transition-colors ${
               searchOpen || search ? 'border-[#1a1a1a] bg-[#1a1a1a] text-white' : 'border-gray-200 bg-white text-gray-500'
             }`}
           >
             <SearchIcon />
           </button>
         </div>
-        <div className={`${card} p-4 flex gap-3 flex-wrap items-center md:flex ${searchOpen ? 'flex' : 'hidden'}`}>
-          <input
-            ref={searchInputRef}
-            type="text"
-            placeholder="Search by Name…"
-            value={search}
-            onChange={e => setSearch(e.target.value)}
-            className={`${input} flex-1 min-w-[200px]`}
-          />
-          {search && (
-            <button onClick={() => setSearch('')} className={btn.secondary}>
-              Clear
-            </button>
-          )}
-        </div>
+      </div>
+      {syncMessage && <p className="text-xs text-gray-400 -mt-2 mb-4">{syncMessage}</p>}
+
+      {/* Search -- collapsed on mobile (toggled from the header row above)
+          so the records list sits higher up; always expanded on desktop. */}
+      <div className={`${card} p-4 mb-3 flex gap-3 flex-wrap items-center md:flex ${searchOpen ? 'flex' : 'hidden'}`}>
+        <input
+          ref={searchInputRef}
+          type="text"
+          placeholder="Search by Name…"
+          value={search}
+          onChange={e => setSearch(e.target.value)}
+          className={`${input} flex-1 min-w-[200px]`}
+        />
+        {search && (
+          <button onClick={() => setSearch('')} className={btn.secondary}>
+            Clear
+          </button>
+        )}
       </div>
 
       <div className="flex items-center justify-between flex-wrap gap-3 mb-6">

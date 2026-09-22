@@ -279,6 +279,34 @@ function AgentLeaderboard() {
   )
 }
 
+const GMAIL_WEB_INBOX_URL = 'https://mail.google.com/mail/u/0/#inbox'
+
+// A plain https link to Gmail always just opens another browser tab, even
+// on a phone with the Gmail app installed -- there's no way for a normal
+// <a> to prefer the native app. Android's `intent:` URI scheme has a
+// built-in fallback (browser_fallback_url) that the OS itself handles if
+// the app isn't installed, so no timing games needed there. iOS has no
+// equivalent -- googlegmail:// either opens the app immediately (in which
+// case this tab never gets the chance to navigate again) or silently does
+// nothing, so falling back to the web inbox after a short delay is the
+// standard workaround. Any other platform (e.g. viewing this on a desktop
+// browser) just gets the plain link's default behaviour, since this only
+// intercepts the click on Android/iOS.
+function openGmail(e: React.MouseEvent) {
+  const ua = navigator.userAgent
+  const isAndroid = /Android/.test(ua)
+  const isIOS = /iPad|iPhone|iPod/.test(ua)
+  if (!isAndroid && !isIOS) return
+
+  e.preventDefault()
+  if (isAndroid) {
+    window.location.href = `intent://mail.google.com/mail/#Intent;scheme=https;package=com.google.android.gm;S.browser_fallback_url=${encodeURIComponent(GMAIL_WEB_INBOX_URL)};end`
+  } else {
+    window.location.href = 'googlegmail://'
+    setTimeout(() => { window.location.href = GMAIL_WEB_INBOX_URL }, 1200)
+  }
+}
+
 // ── Today's Briefing -- agenda timeline with an unread-email chip ─
 const KIND_BADGE: Record<BriefingEvent['kind'], { label: string; className: string } | null> = {
   evaluation:   { label: 'Evaluation',   className: 'bg-[#E8266F]/10 text-[#E8266F]' },
@@ -335,9 +363,10 @@ function TodaysBriefing({ userId }: { userId: string }) {
         <p className="text-xs font-bold text-[#1a1a1a] uppercase tracking-wide">Today&apos;s Briefing</p>
         {unreadCount != null && unreadCount > 0 && (
           <a
-            href="https://mail.google.com/mail/u/0/#inbox"
+            href={GMAIL_WEB_INBOX_URL}
             target="_blank"
             rel="noopener noreferrer"
+            onClick={openGmail}
             className="text-xs font-semibold px-2.5 py-1 rounded-full bg-[#E8266F] text-white flex-shrink-0 active:opacity-80"
           >
             {unreadCount} unread

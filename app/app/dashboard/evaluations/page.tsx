@@ -382,7 +382,23 @@ export default function EvaluationsPage() {
       <Breadcrumbs items={[{ label: 'Analyse' }, { label: 'Evaluations' }]} />
       <div className="flex items-center justify-between mb-4 gap-2">
         <h1 className="text-lg sm:text-2xl font-bold text-[#1a1a1a]">Evaluations</h1>
-        <Link href="/dashboard/evaluations/new" className={`${btn.primary} md:fixed md:top-8 md:right-10 md:z-40 md:shadow-md`}>+ New Evaluation</Link>
+        <div className="flex items-center gap-2 sm:gap-3">
+          <Link href="/dashboard/evaluations/new" className={`${btn.primary} md:fixed md:top-8 md:right-10 md:z-40 md:shadow-md`}>+ New Evaluation</Link>
+          {/* Search toggle -- mobile only, sits in this same header row
+              instead of a row of its own (which was mostly empty space,
+              defeating the point of collapsing the search box at all). */}
+          <button
+            type="button"
+            onClick={() => setSearchOpen(o => !o)}
+            aria-label={searchOpen ? 'Hide search' : 'Show search'}
+            aria-expanded={searchOpen}
+            className={`md:hidden flex-shrink-0 p-2 rounded-lg border transition-colors ${
+              searchOpen || search ? 'border-[#1a1a1a] bg-[#1a1a1a] text-white' : 'border-gray-200 bg-white text-gray-500'
+            }`}
+          >
+            <SearchIcon />
+          </button>
+        </div>
       </div>
 
       {/* Status filter tabs */}
@@ -400,37 +416,22 @@ export default function EvaluationsPage() {
         ))}
       </div>
 
-      {/* Search -- collapsed behind an icon on mobile so the records list
-          sits higher up; always expanded on desktop, unchanged. */}
-      <div className="mb-3">
-        <div className="md:hidden flex justify-end mb-2">
-          <button
-            type="button"
-            onClick={() => setSearchOpen(o => !o)}
-            aria-label={searchOpen ? 'Hide search' : 'Show search'}
-            aria-expanded={searchOpen}
-            className={`p-2.5 rounded-lg border transition-colors ${
-              searchOpen || search ? 'border-[#1a1a1a] bg-[#1a1a1a] text-white' : 'border-gray-200 bg-white text-gray-500'
-            }`}
-          >
-            <SearchIcon />
+      {/* Search -- collapsed on mobile (toggled from the header row above)
+          so the records list sits higher up; always expanded on desktop. */}
+      <div className={`${card} p-4 mb-3 flex gap-3 flex-wrap items-center md:flex ${searchOpen ? 'flex' : 'hidden'}`}>
+        <input
+          ref={searchInputRef}
+          type="text"
+          placeholder="Search by Address or Seller Name…"
+          value={search}
+          onChange={e => setSearch(e.target.value)}
+          className={`${input} flex-1 min-w-[200px]`}
+        />
+        {search && (
+          <button onClick={() => setSearch('')} className={btn.secondary}>
+            Clear
           </button>
-        </div>
-        <div className={`${card} p-4 flex gap-3 flex-wrap items-center md:flex ${searchOpen ? 'flex' : 'hidden'}`}>
-          <input
-            ref={searchInputRef}
-            type="text"
-            placeholder="Search by Address or Seller Name…"
-            value={search}
-            onChange={e => setSearch(e.target.value)}
-            className={`${input} flex-1 min-w-[200px]`}
-          />
-          {search && (
-            <button onClick={() => setSearch('')} className={btn.secondary}>
-              Clear
-            </button>
-          )}
-        </div>
+        )}
       </div>
 
       <div className="flex items-center justify-between flex-wrap gap-3 mb-6">
