@@ -13,6 +13,13 @@ import type { BriefingEvent } from '@/app/api/calendar/today/route'
 // Status, Agent Leaderboard -- laid out for touch instead of a mouse:
 // horizontally swipeable stat/status strips instead of static grids, an
 // agenda-style briefing, and bigger tap targets throughout.
+//
+// All the fetching for every section lives HERE in the parent, not in the
+// section components themselves, and is gated behind one combined
+// `pageLoading` flag -- Today's Briefing's calendar fetch is a real round
+// trip to Google and noticeably slower than the others' plain Supabase
+// queries, so if each section owned its own loading state they'd each pop
+// in at a different moment instead of the page appearing all at once.
 
 type Stats = {
   contacts: number
@@ -21,13 +28,45 @@ type Stats = {
   evaluationsByStatus: Record<string, number>
 }
 
+type MyEvalRow = {
+  id: string
+  status: string
+  evaluation_outcome: string | null
+  evaluation_price: number | null
+  property_id: string
+}
+
+type LeaderboardEvalRow = { sellers_agent_user_id: string | null; evaluation_outcome: string | null }
+type Profile = { id: string; full_name: string | null; email: string | null }
+
 export function MobileDashboardPage() {
+  const [firstName, setFirstName] = useState('')
+  const [userId, setUserId] = useState<string | null>(null)
+  const [authChecked, setAuthChecked] = useState(false)
+
+  // Company overview
   const [stats, setStats] = useState<Stats>({
     contacts: 0, properties: 0, evaluations: 0, evaluationsByStatus: {},
   })
-  const [loading, setLoading] = useState(true)
-  const [firstName, setFirstName] = useState('')
-  const [userId, setUserId] = useState<string | null>(null)
+  const [statsLoading, setStatsLoading] = useState(true)
+
+  // Today's Briefing
+  const [events, setEvents] = useState<BriefingEvent[]>([])
+  const [connected, setConnected] = useState(true)
+  const [briefingErrorMsg, setBriefingErrorMsg] = useState('')
+  const [briefingLoading, setBriefingLoading] = useState(true)
+  const [unreadCount, setUnreadCount] = useState<number | null>(null)
+
+  // My Performance
+  const [myEvals, setMyEvals] = useState<MyEvalRow[]>([])
+  const [totalContacts, setTotalContacts] = useState(0)
+  const [activeContacts, setActiveContacts] = useState(0)
+  const [myPerfLoading, setMyPerfLoading] = useState(true)
+
+  // Agent Leaderboard
+  const [leaderboardEvals, setLeaderboardEvals] = useState<LeaderboardEvalRow[]>([])
+  const [profiles, setProfiles] = useState<Record<string, Profile>>({})
+  const [leaderboardLoading, setLeaderboardLoading] = useState(true)
 
   useEffect(() => {
     supabase.auth.getUser().then(({ data }) => {
@@ -35,9 +74,11 @@ export function MobileDashboardPage() {
       const name = meta.full_name ?? meta.name ?? data.user?.email?.split('@')[0] ?? ''
       setFirstName(name.split(' ')[0])
       setUserId(data.user?.id ?? null)
+      setAuthChecked(true)
     })
   }, [])
 
+  // Company-wide, so these two don't need to wait on auth at all.
   useEffect(() => {
     async function load() {
       const [
@@ -61,10 +102,102 @@ export function MobileDashboardPage() {
         evaluations: (evData ?? []).length,
         evaluationsByStatus,
       })
-      setLoading(false)
+      setStatsLoading(false)
     }
     load()
   }, [])
+
+  useEffect(() => {
+    let cancelled = false
+    async function load() {
+      const [{ data: evalData }, { data: profileData }] = await Promise.all([
+        supabase.from('evaluations').select('sellers_agent_user_id, evaluation_outcome'),
+        supabase.from('profiles').select('id, full_name, email'),
+      ])
+      if (cancelled) return
+      setLeaderboardEvals((evalData ?? []) as LeaderboardEvalRow[])
+      const map: Record<string, Profile> = {}
+      for (const p of (profileData ?? []) as Profile[]) map[p.id] = p
+      setProfiles(map)
+      setLeaderboardLoading(false)
+    }
+    load()
+    return () => { cancelled = true }
+  }, [])
+
+  // Agent-scoped, so these two wait for userId. If auth comes back with no
+  // user at all there's nothing to fetch, so pageLoading below can never
+  // hang forever -- resolved during render (adjusting state when a prop
+  // changes) rather than as a setState call inside the effects themselves.
+  const [prevAuthChecked, setPrevAuthChecked] = useState(authChecked)
+  if (authChecked !== prevAuthChecked) {
+    setPrevAuthChecked(authChecked)
+    if (authChecked && !userId) {
+      setBriefingLoading(false)
+      setMyPerfLoading(false)
+    }
+  }
+
+  useEffect(() => {
+    if (!userId) return
+    let cancelled = false
+    fetch('/api/calendar/today', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ userId }),
+    })
+      .then(res => res.json())
+      .then(data => {
+        if (cancelled) return
+        setConnected(data.connected ?? true)
+        setEvents(data.events ?? [])
+        if (data.error) setBriefingErrorMsg(data.error)
+      })
+      .catch(() => { if (!cancelled) setBriefingErrorMsg('Could not load your calendar.') })
+      .finally(() => { if (!cancelled) setBriefingLoading(false) })
+    return () => { cancelled = true }
+  }, [userId])
+
+  // Best-effort and deliberately NOT part of pageLoading below -- until an
+  // agent next logs in and picks up the gmail.readonly scope top-up, this
+  // fails fast with an insufficient-scope error, and the count should just
+  // stay hidden rather than holding up the rest of the page.
+  useEffect(() => {
+    if (!userId) return
+    let cancelled = false
+    fetch('/api/gmail/unread', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ userId }),
+    })
+      .then(res => res.json())
+      .then(data => { if (!cancelled) setUnreadCount(typeof data.count === 'number' ? data.count : null) })
+      .catch(() => { if (!cancelled) setUnreadCount(null) })
+    return () => { cancelled = true }
+  }, [userId])
+
+  useEffect(() => {
+    if (!userId) return
+    let cancelled = false
+    async function load() {
+      const [{ data: evalData }, { count: contactCount }, { count: activeCount }] = await Promise.all([
+        supabase.from('evaluations')
+          .select('id, status, evaluation_outcome, evaluation_price, property_id')
+          .eq('sellers_agent_user_id', userId),
+        supabase.from('contacts').select('*', { count: 'exact', head: true }).eq('agent_id', userId),
+        supabase.from('contacts').select('*', { count: 'exact', head: true }).eq('agent_id', userId).eq('status', 'Active'),
+      ])
+      if (cancelled) return
+      setMyEvals((evalData ?? []) as MyEvalRow[])
+      setTotalContacts(contactCount ?? 0)
+      setActiveContacts(activeCount ?? 0)
+      setMyPerfLoading(false)
+    }
+    load()
+    return () => { cancelled = true }
+  }, [userId])
+
+  const pageLoading = statsLoading || leaderboardLoading || briefingLoading || myPerfLoading
 
   return (
     <div className="pb-10">
@@ -72,42 +205,52 @@ export function MobileDashboardPage() {
         <h1 className="text-xl font-bold text-[#1a1a1a]">Good day{firstName ? `, ${firstName}` : ''}</h1>
       </div>
 
-      {userId && <TodaysBriefing userId={userId} />}
-      {userId && <MyPerformance userId={userId} />}
-
-      <SectionLabel>Company Overview</SectionLabel>
-      <div className="grid grid-cols-2 gap-3 px-4 mb-6">
-        <OverviewTile label="Contacts" value={loading ? '—' : stats.contacts} href="/dashboard/contacts" />
-        <OverviewTile label="Properties" value={loading ? '—' : stats.properties} href="/dashboard/properties" />
-        <OverviewTile label="Evaluations" value={loading ? '—' : stats.evaluations} href="/dashboard/evaluations" fullWidth />
-      </div>
-
-      {!loading && stats.evaluations > 0 && (
+      {pageLoading ? (
+        <div className="flex items-center justify-center px-4" style={{ minHeight: '50vh' }}>
+          <p className="text-sm text-gray-400">Loading your dashboard…</p>
+        </div>
+      ) : (
         <>
-          <SectionLabel>Evaluations by Status</SectionLabel>
-          {/* No scroll-snap here -- scroll-snap-align on the first card
-              makes Chrome anchor its snap area to the scrollport start,
-              which visually cancels out that card's own left margin (the
-              gap fix below) even though it's still there in the box model. */}
-          <div className="flex gap-2 overflow-x-auto pb-2 mb-6 [&>*:first-child]:ml-4 [&>*:last-child]:mr-4">
-            {STATUS_ORDER.map(key => {
-              const count = stats.evaluationsByStatus[key] ?? 0
-              return (
-                <Link
-                  key={key}
-                  href={`/dashboard/evaluations?status=${key}`}
-                  className={`flex-shrink-0 flex flex-col items-center justify-center rounded-2xl px-5 py-3 min-w-[92px] ${STATUS_COLOURS[key] ?? 'bg-gray-100 text-gray-500'}`}
-                >
-                  <span className="text-xl font-bold">{count}</span>
-                  <span className="text-xs font-medium mt-0.5 text-center">{STATUS_LABELS[key]}</span>
-                </Link>
-              )
-            })}
+          <TodaysBriefing
+            events={events} connected={connected} errorMsg={briefingErrorMsg} unreadCount={unreadCount}
+          />
+          <MyPerformance myEvals={myEvals} totalContacts={totalContacts} activeContacts={activeContacts} />
+
+          <SectionLabel>Company Overview</SectionLabel>
+          <div className="grid grid-cols-2 gap-3 px-4 mb-6">
+            <OverviewTile label="Contacts" value={stats.contacts} href="/dashboard/contacts" />
+            <OverviewTile label="Properties" value={stats.properties} href="/dashboard/properties" />
+            <OverviewTile label="Evaluations" value={stats.evaluations} href="/dashboard/evaluations" fullWidth />
           </div>
+
+          {stats.evaluations > 0 && (
+            <>
+              <SectionLabel>Evaluations by Status</SectionLabel>
+              {/* No scroll-snap here -- scroll-snap-align on the first card
+                  makes Chrome anchor its snap area to the scrollport start,
+                  which visually cancels out that card's own left margin (the
+                  gap fix below) even though it's still there in the box model. */}
+              <div className="flex gap-2 overflow-x-auto pb-2 mb-6 [&>*:first-child]:ml-4 [&>*:last-child]:mr-4">
+                {STATUS_ORDER.map(key => {
+                  const count = stats.evaluationsByStatus[key] ?? 0
+                  return (
+                    <Link
+                      key={key}
+                      href={`/dashboard/evaluations?status=${key}`}
+                      className={`flex-shrink-0 flex flex-col items-center justify-center rounded-2xl px-5 py-3 min-w-[92px] ${STATUS_COLOURS[key] ?? 'bg-gray-100 text-gray-500'}`}
+                    >
+                      <span className="text-xl font-bold">{count}</span>
+                      <span className="text-xs font-medium mt-0.5 text-center">{STATUS_LABELS[key]}</span>
+                    </Link>
+                  )
+                })}
+              </div>
+            </>
+          )}
+
+          <AgentLeaderboard evals={leaderboardEvals} profiles={profiles} />
         </>
       )}
-
-      <AgentLeaderboard />
     </div>
   )
 }
@@ -135,42 +278,9 @@ function formatCurrency(value: number): string {
   return new Intl.NumberFormat('en-ZA', { style: 'currency', currency: 'ZAR', maximumFractionDigits: 0 }).format(value)
 }
 
-type MyEvalRow = {
-  id: string
-  status: string
-  evaluation_outcome: string | null
-  evaluation_price: number | null
-  property_id: string
-}
-
-function MyPerformance({ userId }: { userId: string }) {
-  const [loading, setLoading]   = useState(true)
-  const [myEvals, setMyEvals]   = useState<MyEvalRow[]>([])
-  const [totalContacts, setTotalContacts]   = useState(0)
-  const [activeContacts, setActiveContacts] = useState(0)
-
-  useEffect(() => {
-    let cancelled = false
-    async function load() {
-      const [{ data: evalData }, { count: contactCount }, { count: activeCount }] = await Promise.all([
-        supabase.from('evaluations')
-          .select('id, status, evaluation_outcome, evaluation_price, property_id')
-          .eq('sellers_agent_user_id', userId),
-        supabase.from('contacts').select('*', { count: 'exact', head: true }).eq('agent_id', userId),
-        supabase.from('contacts').select('*', { count: 'exact', head: true }).eq('agent_id', userId).eq('status', 'Active'),
-      ])
-      if (cancelled) return
-      setMyEvals((evalData ?? []) as MyEvalRow[])
-      setTotalContacts(contactCount ?? 0)
-      setActiveContacts(activeCount ?? 0)
-      setLoading(false)
-    }
-    load()
-    return () => { cancelled = true }
-  }, [userId])
-
-  if (loading) return null
-
+function MyPerformance({ myEvals, totalContacts, activeContacts }: {
+  myEvals: MyEvalRow[]; totalContacts: number; activeContacts: number
+}) {
   const totalEvals = myEvals.length
   const won  = myEvals.filter(e => e.evaluation_outcome === 'won').length
   const lost = myEvals.filter(e => e.evaluation_outcome === 'lost').length
@@ -212,34 +322,7 @@ function MobileStatCard({ label, value, sub }: { label: string; value: string | 
 }
 
 // ── Agent leaderboard -- ranked list with a numbered badge ───────
-type LeaderboardEvalRow = { sellers_agent_user_id: string | null; evaluation_outcome: string | null }
-type Profile = { id: string; full_name: string | null; email: string | null }
-
-function AgentLeaderboard() {
-  const [loading, setLoading] = useState(true)
-  const [evals, setEvals]     = useState<LeaderboardEvalRow[]>([])
-  const [profiles, setProfiles] = useState<Record<string, Profile>>({})
-
-  useEffect(() => {
-    let cancelled = false
-    async function load() {
-      const [{ data: evalData }, { data: profileData }] = await Promise.all([
-        supabase.from('evaluations').select('sellers_agent_user_id, evaluation_outcome'),
-        supabase.from('profiles').select('id, full_name, email'),
-      ])
-      if (cancelled) return
-      setEvals((evalData ?? []) as LeaderboardEvalRow[])
-      const map: Record<string, Profile> = {}
-      for (const p of (profileData ?? []) as Profile[]) map[p.id] = p
-      setProfiles(map)
-      setLoading(false)
-    }
-    load()
-    return () => { cancelled = true }
-  }, [])
-
-  if (loading) return null
-
+function AgentLeaderboard({ evals, profiles }: { evals: LeaderboardEvalRow[]; profiles: Record<string, Profile> }) {
   const agentStats: Record<string, { total: number; won: number }> = {}
   for (const e of evals) {
     if (!e.sellers_agent_user_id) continue
@@ -314,45 +397,9 @@ const KIND_BADGE: Record<BriefingEvent['kind'], { label: string; className: stri
   other:        null,
 }
 
-function TodaysBriefing({ userId }: { userId: string }) {
-  const [events, setEvents]     = useState<BriefingEvent[]>([])
-  const [connected, setConnected] = useState(true)
-  const [loading, setLoading]   = useState(true)
-  const [errorMsg, setErrorMsg] = useState('')
-  const [unreadCount, setUnreadCount] = useState<number | null>(null)
-
-  useEffect(() => {
-    let cancelled = false
-    fetch('/api/calendar/today', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ userId }),
-    })
-      .then(res => res.json())
-      .then(data => {
-        if (cancelled) return
-        setConnected(data.connected ?? true)
-        setEvents(data.events ?? [])
-        if (data.error) setErrorMsg(data.error)
-      })
-      .catch(() => { if (!cancelled) setErrorMsg('Could not load your calendar.') })
-      .finally(() => { if (!cancelled) setLoading(false) })
-    return () => { cancelled = true }
-  }, [userId])
-
-  useEffect(() => {
-    let cancelled = false
-    fetch('/api/gmail/unread', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ userId }),
-    })
-      .then(res => res.json())
-      .then(data => { if (!cancelled) setUnreadCount(typeof data.count === 'number' ? data.count : null) })
-      .catch(() => { if (!cancelled) setUnreadCount(null) })
-    return () => { cancelled = true }
-  }, [userId])
-
+function TodaysBriefing({ events, connected, errorMsg, unreadCount }: {
+  events: BriefingEvent[]; connected: boolean; errorMsg: string; unreadCount: number | null
+}) {
   const todayLabel = new Date().toLocaleDateString('en-ZA', {
     weekday: 'long', day: 'numeric', month: 'long', timeZone: 'Africa/Johannesburg',
   })
@@ -376,9 +423,7 @@ function TodaysBriefing({ userId }: { userId: string }) {
       <p className="text-xs text-gray-400 mb-3">{todayLabel}</p>
 
       <div className={`${card} p-4`}>
-        {loading ? (
-          <p className="text-sm text-gray-400">Loading your calendar…</p>
-        ) : !connected ? (
+        {!connected ? (
           <p className="text-sm text-gray-400">
             Your Google Calendar isn&apos;t connected. Try signing out and back in to reconnect it.
           </p>

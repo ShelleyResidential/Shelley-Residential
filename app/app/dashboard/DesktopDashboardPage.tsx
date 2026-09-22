@@ -372,7 +372,7 @@ function TodaysBriefing({ userId }: { userId: string }) {
                   href="https://mail.google.com/mail/u/0/#inbox"
                   target="_blank"
                   rel="noopener noreferrer"
-                  className="text-sm text-gray-400 mt-0.5 hover:underline inline-block"
+                  className="block text-sm text-gray-400 mt-0.5 hover:underline"
                 >
                   <span className="font-semibold text-[#E8266F]">{unreadCount}</span> unread email{unreadCount === 1 ? '' : 's'}
                 </a>
