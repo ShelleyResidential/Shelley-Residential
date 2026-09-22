@@ -251,19 +251,23 @@ export function MobileDashboardPage() {
           )}
 
           <AgentLeaderboard evals={leaderboardEvals} profiles={profiles} />
+
+          <QuickAddFab />
         </>
       )}
-
-      <AddEvaluationFab />
     </div>
   )
 }
 
-// ── Floating "+ New Evaluation" button -- hides while the page is being
-// scrolled up, out of the way of whatever the agent's trying to read, and
-// reappears once they scroll back down (or stop).
-function AddEvaluationFab() {
+// ── Floating "+" quick-add button -- only rendered once the dashboard has
+// actually loaded (not on top of the loading screen). Hides while the page
+// is being scrolled up, out of the way of whatever the agent's trying to
+// read, reappears scrolling back down, and is always visible once scrolled
+// back to the very top. Tapping it opens two shortcuts instead of
+// navigating straight to one place.
+function QuickAddFab() {
   const [visible, setVisible] = useState(true)
+  const [open, setOpen] = useState(false)
 
   useEffect(() => {
     let lastY = window.scrollY
@@ -273,7 +277,8 @@ function AddEvaluationFab() {
       ticking = true
       requestAnimationFrame(() => {
         const y = window.scrollY
-        if (y < lastY - 4) setVisible(false)
+        if (y <= 0) setVisible(true)
+        else if (y < lastY - 4) setVisible(false)
         else if (y > lastY + 4) setVisible(true)
         lastY = y
         ticking = false
@@ -283,15 +288,53 @@ function AddEvaluationFab() {
     return () => window.removeEventListener('scroll', onScroll)
   }, [])
 
+  const shown = visible || open
+
+  return (
+    <>
+      {open && (
+        <div className="fixed inset-0 z-40 bg-black/20" onClick={() => setOpen(false)} />
+      )}
+
+      <div
+        className={`fixed bottom-6 left-1/2 -translate-x-1/2 z-50 flex flex-col items-center gap-3 transition-transform duration-200 ${
+          shown ? 'translate-y-0' : 'translate-y-32'
+        }`}
+      >
+        {open && (
+          <div className="flex flex-col items-stretch gap-2 mb-1">
+            <QuickAddOption href="/dashboard/contacts/new" onNavigate={() => setOpen(false)}>New Contact</QuickAddOption>
+            <QuickAddOption href="/dashboard/evaluations/new" onNavigate={() => setOpen(false)}>Add New Evaluation</QuickAddOption>
+          </div>
+        )}
+
+        <button
+          type="button"
+          onClick={() => setOpen(o => !o)}
+          aria-label={open ? 'Close quick add menu' : 'Open quick add menu'}
+          aria-expanded={open}
+          className="w-14 h-14 rounded-full bg-[#E8266F] text-white flex items-center justify-center shadow-lg self-center"
+        >
+          <span
+            className="text-3xl font-light leading-none transition-transform duration-200"
+            style={{ marginTop: -2, transform: open ? 'rotate(45deg)' : 'rotate(0deg)' }}
+          >
+            +
+          </span>
+        </button>
+      </div>
+    </>
+  )
+}
+
+function QuickAddOption({ href, onNavigate, children }: { href: string; onNavigate: () => void; children: React.ReactNode }) {
   return (
     <Link
-      href="/dashboard/evaluations/new"
-      aria-label="Add new evaluation"
-      className={`fixed bottom-6 left-1/2 -translate-x-1/2 z-50 w-14 h-14 rounded-full bg-[#E8266F] text-white flex items-center justify-center shadow-lg transition-transform duration-200 ${
-        visible ? 'translate-y-0' : 'translate-y-32'
-      }`}
+      href={href}
+      onClick={onNavigate}
+      className="whitespace-nowrap text-sm font-semibold text-[#1a1a1a] bg-white px-4 py-2.5 rounded-full shadow-lg text-center active:bg-gray-50"
     >
-      <span className="text-3xl font-light leading-none" style={{ marginTop: -2 }}>+</span>
+      {children}
     </Link>
   )
 }
