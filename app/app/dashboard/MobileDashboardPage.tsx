@@ -334,9 +334,14 @@ function TodaysBriefing({ userId }: { userId: string }) {
       <div className="flex items-center justify-between mb-1">
         <p className="text-xs font-bold text-[#1a1a1a] uppercase tracking-wide">Today&apos;s Briefing</p>
         {unreadCount != null && unreadCount > 0 && (
-          <span className="text-xs font-semibold px-2.5 py-1 rounded-full bg-[#E8266F] text-white flex-shrink-0">
+          <a
+            href="https://mail.google.com/mail/u/0/#inbox"
+            target="_blank"
+            rel="noopener noreferrer"
+            className="text-xs font-semibold px-2.5 py-1 rounded-full bg-[#E8266F] text-white flex-shrink-0 active:opacity-80"
+          >
             {unreadCount} unread
-          </span>
+          </a>
         )}
       </div>
       <p className="text-xs text-gray-400 mb-3">{todayLabel}</p>

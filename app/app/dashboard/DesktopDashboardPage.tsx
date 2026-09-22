@@ -367,9 +367,20 @@ function TodaysBriefing({ userId }: { userId: string }) {
               {events.length} {events.length === 1 ? 'appointment' : 'appointments'}
             </span>
             {unreadCount != null && (
-              <p className="text-sm text-gray-400 mt-0.5">
-                <span className={unreadCount > 0 ? 'font-semibold text-[#E8266F]' : ''}>{unreadCount}</span> unread email{unreadCount === 1 ? '' : 's'}
-              </p>
+              unreadCount > 0 ? (
+                <a
+                  href="https://mail.google.com/mail/u/0/#inbox"
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  className="text-sm text-gray-400 mt-0.5 hover:underline inline-block"
+                >
+                  <span className="font-semibold text-[#E8266F]">{unreadCount}</span> unread email{unreadCount === 1 ? '' : 's'}
+                </a>
+              ) : (
+                <p className="text-sm text-gray-400 mt-0.5">
+                  {unreadCount} unread emails
+                </p>
+              )
             )}
           </div>
         )}

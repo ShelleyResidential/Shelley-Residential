@@ -6,7 +6,7 @@ import { btn, card, input } from '@/lib/styles'
 import { Breadcrumbs } from '@/lib/Breadcrumbs'
 import { REPORT_TYPES } from '@/lib/evaluation-documents'
 import { STATUS_LABELS, STATUS_COLOURS } from '@/lib/pipeline'
-import { useRouter } from 'next/navigation'
+import { useRouter, useSearchParams } from 'next/navigation'
 import Link from 'next/link'
 
 const PAGE_SIZE = 50
@@ -174,13 +174,18 @@ const STATUS_TABS = [
 
 export default function EvaluationsPage() {
   const router = useRouter()
+  const searchParams = useSearchParams()
   const [evaluations, setEvaluations] = useState<Evaluation[]>([])
   const [profiles, setProfiles]       = useState<Record<string, Profile>>({})
   const [loading, setLoading]         = useState(true)
   const [search, setSearch]           = useState('')
   const [searchOpen, setSearchOpen]   = useState(false)
   const searchInputRef = useRef<HTMLInputElement>(null)
-  const [filterStatus, setFilterStatus] = useState('')
+  // Pre-filtered on load by a ?status=... link (e.g. the Dashboard's
+  // Evaluations by Status tiles) -- re-synced below if that query param
+  // changes while already on this page (browser back/forward between two
+  // such links).
+  const [filterStatus, setFilterStatus] = useState(() => searchParams.get('status') ?? '')
   const [myOnly, setMyOnly]           = useState(false)
   const [userId, setUserId]           = useState<string | null>(null)
   const [page, setPage]               = useState(1)
@@ -306,6 +311,19 @@ export default function EvaluationsPage() {
   useEffect(() => {
     setPage(1)
   }, [search, filterStatus, myOnly])
+
+  // Re-sync if the ?status=... query param itself changes while already on
+  // this page (e.g. navigating between two different status-filtered
+  // dashboard links) -- doesn't touch filterStatus when the param is simply
+  // absent, so it never clobbers a manual status-tab click. Adjusted during
+  // render (React's recommended pattern for "reset state when a prop
+  // changes") rather than in an effect, to avoid the extra render pass.
+  const statusParam = searchParams.get('status')
+  const [prevStatusParam, setPrevStatusParam] = useState(statusParam)
+  if (statusParam !== prevStatusParam) {
+    setPrevStatusParam(statusParam)
+    if (statusParam !== null) setFilterStatus(statusParam)
+  }
 
   // Focus the input the moment it's revealed on mobile, so tapping the
   // search icon doesn't need a second tap to start typing.

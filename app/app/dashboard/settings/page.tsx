@@ -15,6 +15,17 @@ const DESIGNATIONS = [
 const PP_STATUSES = ['Candidate Property Practitioner', 'Property Practitioner', 'Principal Property Practitioner']
 const PP_QUALIFICATIONS = ['NQF4', 'NQF5']
 
+function ChevronIcon({ open }: { open: boolean }) {
+  return (
+    <svg
+      width="12" height="12" viewBox="0 0 10 10"
+      style={{ transform: open ? 'rotate(0deg)' : 'rotate(-90deg)', transition: 'transform 0.2s ease', flexShrink: 0 }}
+    >
+      <path d="M2 3.5L5 6.5L8 3.5" stroke="#1a1a1a" strokeWidth="1.5" fill="none" strokeLinecap="round" strokeLinejoin="round" />
+    </svg>
+  )
+}
+
 export default function SettingsPage() {
   const router = useRouter()
   const [userId, setUserId]       = useState<string | null>(null)
@@ -30,6 +41,7 @@ export default function SettingsPage() {
   const [saving, setSaving]           = useState(false)
   const [saved, setSaved]             = useState(false)
   const [saveError, setSaveError]     = useState('')
+  const [professionalOpen, setProfessionalOpen] = useState(false)
 
   useEffect(() => {
     supabase.auth.getUser().then(({ data }) => {
@@ -130,46 +142,60 @@ export default function SettingsPage() {
         </div>
 
         {/* Professional Details -- used on generated documents like the
-            evaluation Cover Letter (designation + phone under your name). */}
-        <div className={`${card} p-6`}>
-          <h3 className={sectionTitle}>Professional Details</h3>
-          <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 mb-4">
-            <div>
-              <label className={labelCls}>Phone Number</label>
-              <input value={phoneNumber} onChange={e => setPhoneNumber(e.target.value)}
-                placeholder="e.g. 082 123 4567" className={input} />
-            </div>
-            <div>
-              <label className={labelCls}>Designation *</label>
-              <select value={designation} onChange={e => setDesignation(e.target.value)} className={select}>
-                <option value="">—</option>
-                {DESIGNATIONS.map(d => <option key={d} value={d}>{d}</option>)}
-              </select>
-            </div>
-            <div>
-              <label className={labelCls}>FFC Number</label>
-              <input value={ffcNumber} onChange={e => setFfcNumber(e.target.value)}
-                placeholder="e.g. 2024/123456" className={input} />
-            </div>
-            <div>
-              <label className={labelCls}>Property Practitioner Status</label>
-              <select value={ppStatus} onChange={e => setPpStatus(e.target.value)} className={select}>
-                <option value="">—</option>
-                {PP_STATUSES.map(s => <option key={s} value={s}>{s}</option>)}
-              </select>
-            </div>
-            <div>
-              <label className={labelCls}>Property Practitioner Qualification</label>
-              <select value={ppQualification} onChange={e => setPpQualification(e.target.value)} className={select}>
-                <option value="">—</option>
-                {PP_QUALIFICATIONS.map(q => <option key={q} value={q}>{q}</option>)}
-              </select>
-            </div>
-          </div>
-          {saveError && <p className="text-sm text-red-500 mb-3">{saveError}</p>}
-          <button onClick={saveProfile} disabled={saving} className={btn.primary}>
-            {saving ? 'Saving…' : saved ? '✓ Saved' : 'Save'}
+            evaluation Cover Letter (designation + phone under your name).
+            Collapsed by default so it's not all exposed on the account
+            page; tapping the heading reveals the fields. */}
+        <div className={`${card} overflow-hidden`}>
+          <button
+            type="button"
+            onClick={() => setProfessionalOpen(o => !o)}
+            aria-expanded={professionalOpen}
+            className="w-full flex items-center justify-between p-6 text-left"
+          >
+            <h3 className="text-sm font-bold text-[#1a1a1a] uppercase tracking-wide">Professional Details</h3>
+            <ChevronIcon open={professionalOpen} />
           </button>
+          {professionalOpen && (
+            <div className="px-6 pb-6">
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 mb-4">
+                <div>
+                  <label className={labelCls}>Phone Number</label>
+                  <input value={phoneNumber} onChange={e => setPhoneNumber(e.target.value)}
+                    placeholder="e.g. 082 123 4567" className={input} />
+                </div>
+                <div>
+                  <label className={labelCls}>Designation *</label>
+                  <select value={designation} onChange={e => setDesignation(e.target.value)} className={select}>
+                    <option value="">—</option>
+                    {DESIGNATIONS.map(d => <option key={d} value={d}>{d}</option>)}
+                  </select>
+                </div>
+                <div>
+                  <label className={labelCls}>FFC Number</label>
+                  <input value={ffcNumber} onChange={e => setFfcNumber(e.target.value)}
+                    placeholder="e.g. 2024/123456" className={input} />
+                </div>
+                <div>
+                  <label className={labelCls}>Property Practitioner Status</label>
+                  <select value={ppStatus} onChange={e => setPpStatus(e.target.value)} className={select}>
+                    <option value="">—</option>
+                    {PP_STATUSES.map(s => <option key={s} value={s}>{s}</option>)}
+                  </select>
+                </div>
+                <div>
+                  <label className={labelCls}>Property Practitioner Qualification</label>
+                  <select value={ppQualification} onChange={e => setPpQualification(e.target.value)} className={select}>
+                    <option value="">—</option>
+                    {PP_QUALIFICATIONS.map(q => <option key={q} value={q}>{q}</option>)}
+                  </select>
+                </div>
+              </div>
+              {saveError && <p className="text-sm text-red-500 mb-3">{saveError}</p>}
+              <button onClick={saveProfile} disabled={saving} className={btn.primary}>
+                {saving ? 'Saving…' : saved ? '✓ Saved' : 'Save'}
+              </button>
+            </div>
+          )}
         </div>
       </div>
     </div>
