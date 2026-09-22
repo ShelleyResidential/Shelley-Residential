@@ -152,6 +152,19 @@ export default function ContactDetailPage() {
       setSaveError("That doesn't look like a valid phone number.")
       return
     }
+    // Phone numbers can never be duplicated, full stop -- blocks the save
+    // entirely rather than just warning, same as the New Contact form.
+    const { data: existingMatch } = await supabase
+      .from('contacts')
+      .select('id, first_name, last_name')
+      .eq('phone_number', normalizedPhone)
+      .neq('id', id)
+      .limit(1)
+    if (existingMatch && existingMatch.length > 0) {
+      const dupe = existingMatch[0]
+      setSaveError(`This number is already saved against ${[dupe.first_name, dupe.last_name].filter(Boolean).join(' ')}. Contacts can't share a phone number.`)
+      return
+    }
     setSaving(true); setSaveError('')
     const updated = {
       ...editForm,

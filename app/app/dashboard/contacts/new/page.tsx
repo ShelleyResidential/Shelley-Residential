@@ -30,7 +30,6 @@ function AddContactForm() {
   const returnFor = searchParams.get('for')
   const [saving, setSaving]   = useState(false)
   const [error, setError]     = useState('')
-  const [success, setSuccess] = useState(false)
   const [userId, setUserId]   = useState<string | null>(null)
   const [form, setForm]       = useState(EMPTY_FORM)
   const [duplicates, setDuplicates] = useState<{ id: string; first_name: string; last_name: string; phone_number: string | null; email_address: string | null }[]>([])
@@ -104,6 +103,22 @@ function AddContactForm() {
     setError('')
     setSaving(true)
 
+    // Phone numbers can never be duplicated, full stop -- checked fresh
+    // right before saving (not just relying on the debounced banner above,
+    // which could be stale if they saved right after typing) and blocks
+    // the save entirely rather than just warning.
+    const { data: existingMatch } = await supabase
+      .from('contacts')
+      .select('id, first_name, last_name')
+      .eq('phone_number', normalizedPhone)
+      .limit(1)
+    if (existingMatch && existingMatch.length > 0) {
+      const dupe = existingMatch[0]
+      setError(`This number is already saved against ${[dupe.first_name, dupe.last_name].filter(Boolean).join(' ')}. Contacts can't share a phone number.`)
+      setSaving(false)
+      return
+    }
+
     const payload: Record<string, unknown> = {
       title: form.title || null,
       first_name: form.first_name.trim(),
@@ -135,24 +150,6 @@ function AddContactForm() {
       return
     }
 
-    // The inline banner above is just a heads-up while typing and never
-    // blocks saving -- if the agent ignores it and saves anyway, confirm
-    // after the fact (once, via a fresh check -- the debounced banner
-    // state could be stale if they saved right after typing) which
-    // existing contact shares this phone number.
-    if (contact) {
-      const { data: phoneDupes } = await supabase
-        .from('contacts')
-        .select('id, first_name, last_name')
-        .eq('phone_number', normalizedPhone)
-        .neq('id', contact.id)
-        .limit(1)
-      if (phoneDupes && phoneDupes.length > 0) {
-        const dupe = phoneDupes[0]
-        alert(`Heads up: this phone number is already saved against ${[dupe.first_name, dupe.last_name].filter(Boolean).join(' ')}. This contact was saved anyway, in case they're different people -- worth checking they aren't duplicates.`)
-      }
-    }
-
     if (form.linked_contact_id && form.relationship_type && contact) {
       await supabase.from('contact_relationships').insert({
         contact_id: contact.id,
@@ -169,30 +166,10 @@ function AddContactForm() {
       return
     }
 
-    setSuccess(true)
-    setSaving(false)
-  }
-
-  if (success) {
-    return (
-      <div className="min-h-screen bg-[#f8f7f4] flex items-center justify-center">
-        <div className={`${card} p-10 text-center max-w-sm w-full`}>
-          <div className="text-4xl mb-4">✓</div>
-          <h2 className="text-xl font-bold text-[#1a1a1a] mb-2">Contact saved</h2>
-          <p className="text-[#1a1a1a] text-sm mb-6">
-            {[form.first_name, form.last_name].filter(Boolean).join(' ')} has been added to your contacts.
-          </p>
-          <div className="flex flex-col gap-3">
-            <button onClick={() => { setSuccess(false); setForm(EMPTY_FORM) }} className={btn.primary}>
-              Add another contact
-            </button>
-            <button onClick={() => router.push('/dashboard')} className={btn.secondary}>
-              Back to dashboard
-            </button>
-          </div>
-        </div>
-      </div>
-    )
+    // Came straight from the Contacts records table (not the evaluation
+    // flow above) -- go straight back to it instead of an intermediate
+    // "contact saved" screen.
+    router.push('/dashboard/contacts')
   }
 
   return (
