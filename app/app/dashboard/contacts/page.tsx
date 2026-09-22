@@ -1,6 +1,6 @@
 'use client'
 
-import { useState, useEffect, useCallback } from 'react'
+import { useState, useEffect, useCallback, useRef } from 'react'
 import { supabase } from '@/lib/supabase'
 import { btn, card, input } from '@/lib/styles'
 import { formatPhoneDisplay } from '@/lib/phone'
@@ -44,6 +44,8 @@ export default function ContactsPage() {
   const [profiles, setProfiles]       = useState<Profile[]>([])
   const [loading, setLoading]         = useState(true)
   const [search, setSearch]           = useState('')
+  const [searchOpen, setSearchOpen]   = useState(false)
+  const searchInputRef = useRef<HTMLInputElement>(null)
   const [myOnly, setMyOnly]           = useState(false)
   const [userId, setUserId]           = useState<string | null>(null)
   const [page, setPage]               = useState(1)
@@ -132,6 +134,12 @@ export default function ContactsPage() {
   useEffect(() => {
     setPage(1)
   }, [search, myOnly])
+
+  // Focus the input the moment it's revealed on mobile, so tapping the
+  // search icon doesn't need a second tap to start typing.
+  useEffect(() => {
+    if (searchOpen) searchInputRef.current?.focus()
+  }, [searchOpen])
 
   useEffect(() => {
     const timer = setTimeout(fetchContacts, 300)
@@ -226,20 +234,37 @@ export default function ContactsPage() {
       </div>
       {syncMessage && <p className="text-xs text-gray-400 -mt-2 mb-4">{syncMessage}</p>}
 
-      {/* Search */}
-      <div className={`${card} p-4 mb-3 flex gap-3 flex-wrap items-center`}>
-        <input
-          type="text"
-          placeholder="Search by Name…"
-          value={search}
-          onChange={e => setSearch(e.target.value)}
-          className={`${input} flex-1 min-w-[200px]`}
-        />
-        {search && (
-          <button onClick={() => setSearch('')} className={btn.secondary}>
-            Clear
+      {/* Search -- collapsed behind an icon on mobile so the records list
+          sits higher up; always expanded on desktop, unchanged. */}
+      <div className="mb-3">
+        <div className="md:hidden flex justify-end mb-2">
+          <button
+            type="button"
+            onClick={() => setSearchOpen(o => !o)}
+            aria-label={searchOpen ? 'Hide search' : 'Show search'}
+            aria-expanded={searchOpen}
+            className={`p-2.5 rounded-lg border transition-colors ${
+              searchOpen || search ? 'border-[#1a1a1a] bg-[#1a1a1a] text-white' : 'border-gray-200 bg-white text-gray-500'
+            }`}
+          >
+            <SearchIcon />
           </button>
-        )}
+        </div>
+        <div className={`${card} p-4 flex gap-3 flex-wrap items-center md:flex ${searchOpen ? 'flex' : 'hidden'}`}>
+          <input
+            ref={searchInputRef}
+            type="text"
+            placeholder="Search by Name…"
+            value={search}
+            onChange={e => setSearch(e.target.value)}
+            className={`${input} flex-1 min-w-[200px]`}
+          />
+          {search && (
+            <button onClick={() => setSearch('')} className={btn.secondary}>
+              Clear
+            </button>
+          )}
+        </div>
       </div>
 
       <div className="flex items-center justify-between flex-wrap gap-3 mb-6">
@@ -418,6 +443,15 @@ function TableHeaderRow({ sortColumn, sortDirection, onSort, sticky }: {
         </th>
       ))}
     </tr>
+  )
+}
+
+function SearchIcon() {
+  return (
+    <svg width="18" height="18" viewBox="0 0 18 18" fill="none">
+      <circle cx="8" cy="8" r="6" stroke="currentColor" strokeWidth="1.8" />
+      <path d="M16 16L12.5 12.5" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" />
+    </svg>
   )
 }
 

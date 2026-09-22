@@ -178,6 +178,8 @@ export default function EvaluationsPage() {
   const [profiles, setProfiles]       = useState<Record<string, Profile>>({})
   const [loading, setLoading]         = useState(true)
   const [search, setSearch]           = useState('')
+  const [searchOpen, setSearchOpen]   = useState(false)
+  const searchInputRef = useRef<HTMLInputElement>(null)
   const [filterStatus, setFilterStatus] = useState('')
   const [myOnly, setMyOnly]           = useState(false)
   const [userId, setUserId]           = useState<string | null>(null)
@@ -305,6 +307,12 @@ export default function EvaluationsPage() {
     setPage(1)
   }, [search, filterStatus, myOnly])
 
+  // Focus the input the moment it's revealed on mobile, so tapping the
+  // search icon doesn't need a second tap to start typing.
+  useEffect(() => {
+    if (searchOpen) searchInputRef.current?.focus()
+  }, [searchOpen])
+
   useEffect(() => {
     const timer = setTimeout(fetchEvaluations, 300)
     return () => clearTimeout(timer)
@@ -374,20 +382,37 @@ export default function EvaluationsPage() {
         ))}
       </div>
 
-      {/* Search */}
-      <div className={`${card} p-4 mb-3 flex gap-3 flex-wrap items-center`}>
-        <input
-          type="text"
-          placeholder="Search by Address or Seller Name…"
-          value={search}
-          onChange={e => setSearch(e.target.value)}
-          className={`${input} flex-1 min-w-[200px]`}
-        />
-        {search && (
-          <button onClick={() => setSearch('')} className={btn.secondary}>
-            Clear
+      {/* Search -- collapsed behind an icon on mobile so the records list
+          sits higher up; always expanded on desktop, unchanged. */}
+      <div className="mb-3">
+        <div className="md:hidden flex justify-end mb-2">
+          <button
+            type="button"
+            onClick={() => setSearchOpen(o => !o)}
+            aria-label={searchOpen ? 'Hide search' : 'Show search'}
+            aria-expanded={searchOpen}
+            className={`p-2.5 rounded-lg border transition-colors ${
+              searchOpen || search ? 'border-[#1a1a1a] bg-[#1a1a1a] text-white' : 'border-gray-200 bg-white text-gray-500'
+            }`}
+          >
+            <SearchIcon />
           </button>
-        )}
+        </div>
+        <div className={`${card} p-4 flex gap-3 flex-wrap items-center md:flex ${searchOpen ? 'flex' : 'hidden'}`}>
+          <input
+            ref={searchInputRef}
+            type="text"
+            placeholder="Search by Address or Seller Name…"
+            value={search}
+            onChange={e => setSearch(e.target.value)}
+            className={`${input} flex-1 min-w-[200px]`}
+          />
+          {search && (
+            <button onClick={() => setSearch('')} className={btn.secondary}>
+              Clear
+            </button>
+          )}
+        </div>
       </div>
 
       <div className="flex items-center justify-between flex-wrap gap-3 mb-6">
@@ -575,6 +600,15 @@ function TableHeaderRow({ sortColumn, sortDirection, onSort }: {
   )
 }
 
+
+function SearchIcon() {
+  return (
+    <svg width="18" height="18" viewBox="0 0 18 18" fill="none">
+      <circle cx="8" cy="8" r="6" stroke="currentColor" strokeWidth="1.8" />
+      <path d="M16 16L12.5 12.5" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" />
+    </svg>
+  )
+}
 
 // ── Row action buttons (Edit / Details / Download), shown once a row is
 // selected. Rendered independently at both the top and bottom of the
