@@ -484,10 +484,10 @@ function DocumentsTab({ evaluationId, userId, propertyType, pipelineSteps, userD
                 <>
                   <p className="text-xs text-gray-500 truncate" title={doc.file_name}>{doc.file_name}</p>
                   <div className="flex gap-2">
-                    <a href={`/api/documents/${doc.id}/download`} className={`${btn.primary} flex-1 text-center`}>
+                    <a href={`/api/documents/${doc.id}/download`} className={`${btn.primary} flex-1 min-w-0 text-center`}>
                       Download
                     </a>
-                    <label className={`${btn.secondary} flex-1 text-center cursor-pointer ${uploading ? 'opacity-50 pointer-events-none' : ''}`}>
+                    <label className={`${btn.secondary} flex-1 min-w-0 text-center cursor-pointer ${uploading ? 'opacity-50 pointer-events-none' : ''}`}>
                       {uploading ? 'Uploading…' : 'Replace'}
                       <input type="file" className="hidden"
                         onChange={e => e.target.files?.[0] && handleUpload(rt.key, e.target.files[0])} />
@@ -512,7 +512,11 @@ function DocumentsTab({ evaluationId, userId, propertyType, pipelineSteps, userD
 
     <div className={`${card} p-6 mt-6`}>
       <h3 className={sectionTitle}>Evaluation Pack</h3>
-      <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
+      {/* Only 2 cards live here, unlike Transfer Reports' 3 -- grid-cols-3
+          left a phantom empty column and squeezed the Cover Letter card
+          narrow enough that "Regenerate"/"Regenerating…" overflowed its
+          border into the Mark Complete card next to it. */}
+      <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
         <CoverLetterCard
           evaluationId={evaluationId}
           userId={userId}
@@ -603,11 +607,11 @@ function CoverLetterCard({ evaluationId, userId, doc, onGenerated }: {
         <>
           <p className="text-xs text-gray-500 truncate" title={doc.file_name}>{doc.file_name}</p>
           <div className="flex gap-2">
-            <a href={`/api/documents/${doc.id}/download`} className={`${btn.primary} flex-1 text-center`}>
+            <a href={`/api/documents/${doc.id}/download`} className={`${btn.primary} flex-1 min-w-0 text-center`}>
               Download
             </a>
             <button type="button" onClick={generate} disabled={generating}
-              className={`${btn.secondary} flex-1 ${generating ? 'opacity-50 cursor-not-allowed' : ''}`}>
+              className={`${btn.secondary} flex-1 min-w-0 ${generating ? 'opacity-50 cursor-not-allowed' : ''}`}>
               {generating ? 'Regenerating…' : 'Regenerate'}
             </button>
           </div>
