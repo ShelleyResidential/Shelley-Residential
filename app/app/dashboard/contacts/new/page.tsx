@@ -2,6 +2,7 @@
 
 import { Suspense, useState, useEffect, useRef } from 'react'
 import { supabase } from '@/lib/supabase'
+import { normalizeToE164 } from '@/lib/phone'
 import { btn, card, input, select, sectionTitle, label as labelCls } from '@/lib/styles'
 import { WarningIcon } from '@/lib/icons'
 import { Breadcrumbs } from '@/lib/Breadcrumbs'
@@ -44,16 +45,19 @@ function AddContactForm() {
 
   // ── Flag potential duplicate contacts as the agent types, matching on
   // full name, phone number, or email address, so we never end up with
-  // two records for the same person.
+  // two records for the same person. Phone numbers are stored normalized
+  // (E.164), so the match only fires once a full, valid number has been
+  // typed -- comparing raw partial digits against normalized numbers would
+  // never match anyway.
   useEffect(() => {
     const firstName = form.first_name.trim()
     const lastName = form.last_name.trim()
-    const phone = form.phone_number.trim()
+    const normalizedPhone = normalizeToE164(form.phone_number)
     const email = form.email_address.trim()
 
     const clauses: string[] = []
     if (firstName && lastName) clauses.push(`and(first_name.ilike.${firstName},last_name.ilike.${lastName})`)
-    if (phone) clauses.push(`phone_number.eq.${phone}`)
+    if (normalizedPhone) clauses.push(`phone_number.eq.${normalizedPhone}`)
     if (email) clauses.push(`email_address.eq.${email}`)
 
     if (clauses.length === 0) { setDuplicates([]); return }
@@ -95,6 +99,8 @@ function AddContactForm() {
     e.preventDefault()
     if (!form.first_name.trim()) { setError('First name is required.'); return }
     if (!form.phone_number.trim()) { setError('Phone number is required.'); return }
+    const normalizedPhone = normalizeToE164(form.phone_number)
+    if (!normalizedPhone) { setError("That doesn't look like a valid phone number."); return }
     setError('')
     setSaving(true)
 
@@ -104,7 +110,7 @@ function AddContactForm() {
       last_name: form.last_name.trim(),
       name: [form.first_name.trim(), form.last_name.trim()].filter(Boolean).join(' '),
       status: form.status || 'Active',
-      phone_number: form.phone_number || null, email_address: form.email_address || null,
+      phone_number: normalizedPhone, email_address: form.email_address || null,
       contact_preference: form.contact_preference || null,
       marital_status: form.marital_status || null, occupation: form.occupation || null,
       company_name: form.company_name || null, division: form.division || null,
@@ -117,7 +123,35 @@ function AddContactForm() {
     const { data: contact, error: insertError } = await supabase
       .from('contacts').insert(payload).select('id').single()
 
-    if (insertError) { setError(insertError.message); setSaving(false); return }
+    if (insertError) {
+      // Never surface a raw Postgres error to the agent -- translate the
+      // ones we expect into plain language, and fall back to something
+      // generic (not the driver's own wording) for anything else.
+      const friendly = insertError.code === '23514' && insertError.message.includes('phone')
+        ? "That phone number doesn't look valid. Double-check the digits and try again."
+        : 'Something went wrong saving this contact. Please try again.'
+      setError(friendly)
+      setSaving(false)
+      return
+    }
+
+    // The inline banner above is just a heads-up while typing and never
+    // blocks saving -- if the agent ignores it and saves anyway, confirm
+    // after the fact (once, via a fresh check -- the debounced banner
+    // state could be stale if they saved right after typing) which
+    // existing contact shares this phone number.
+    if (contact) {
+      const { data: phoneDupes } = await supabase
+        .from('contacts')
+        .select('id, first_name, last_name')
+        .eq('phone_number', normalizedPhone)
+        .neq('id', contact.id)
+        .limit(1)
+      if (phoneDupes && phoneDupes.length > 0) {
+        const dupe = phoneDupes[0]
+        alert(`Heads up: this phone number is already saved against ${[dupe.first_name, dupe.last_name].filter(Boolean).join(' ')}. This contact was saved anyway, in case they're different people -- worth checking they aren't duplicates.`)
+      }
+    }
 
     if (form.linked_contact_id && form.relationship_type && contact) {
       await supabase.from('contact_relationships').insert({
