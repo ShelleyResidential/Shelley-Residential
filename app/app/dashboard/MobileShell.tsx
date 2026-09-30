@@ -134,9 +134,11 @@ export function MobileShell({ children }: { children: React.ReactNode }) {
         </button>
       </div>
 
-      {/* ── Full-screen nav overlay ── */}
+      {/* ── Full-screen nav overlay -- z-[60], above the dashboard's
+          floating quick-add button (z-50), which otherwise painted on top
+          of this since it comes later in the DOM at the same z-index. ── */}
       {menuOpen && (
-        <div className="fixed inset-0 z-50 flex flex-col" style={{ background: '#2A2A2A' }}>
+        <div className="fixed inset-0 z-[60] flex flex-col" style={{ background: '#2A2A2A' }}>
           <div className="flex items-center justify-between px-4 py-3 flex-shrink-0">
             <button type="button" aria-label="Close menu" onClick={() => setMenuOpen(false)} className="p-1 -ml-1">
               <CloseIcon />
