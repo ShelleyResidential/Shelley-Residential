@@ -704,7 +704,7 @@ function ActivityTab({ evaluationId, profiles }: { evaluationId: string; profile
 const PATIO_OPTIONS     = ['Covered', 'Open / Sundeck', 'Fully Enclosed', 'Large', 'Epic']
 const SECURITY_OPTIONS  = ['Standard', 'CCTV', 'Electric Fencing']
 const CONDITION_ITEMS   = ['Flooring', 'Windows / Doors', 'Flow / Layout', 'Architecture']
-const ADDITIONAL_OPTS   = ['Jungle Gym', 'Water Storage / Filtration', 'Storeroom', 'Solar Panels', 'Inverter', 'Batteries']
+const ADDITIONAL_OPTS   = ['Water Storage / Filtration', 'Storeroom', 'Solar Panels', 'Inverter', 'Batteries']
 
 // Architecture reads better as a style judgement ("Notable"/"Standard")
 // than the generic "Good"/"Poor" every other General Condition item uses --
@@ -1434,7 +1434,7 @@ function InspectionTab({ evaluationId, userDesignation, onSaved, editing, setEdi
               return (
                 <div key={item} className="flex items-center gap-3 text-sm">
                   <span className="text-[#1a1a1a] font-medium">{item}</span>
-                  <span className={entry.condition === 'good' ? 'text-green-600' : 'text-red-500'}>
+                  <span className="text-[#1a1a1a]">
                     {entry.condition === 'good' || entry.condition === 'poor' ? conditionLabel(item, entry.condition) : '—'}
                   </span>
                 </div>
@@ -1457,7 +1457,7 @@ function InspectionTab({ evaluationId, userDesignation, onSaved, editing, setEdi
                     <button key={c} type="button" onClick={() => setConditionFeature(item, c)}
                       className={`px-3 py-1 rounded-lg text-xs font-medium border transition-colors ${
                         entry?.condition === c
-                          ? c === 'good' ? 'bg-green-600 text-white border-green-600' : 'bg-red-500 text-white border-red-500'
+                          ? 'bg-[#1a1a1a] text-white border-[#1a1a1a]'
                           : 'bg-white text-gray-500 border-gray-200 hover:border-gray-400'
                       }`}>
                       {conditionLabel(item, c)}
