@@ -701,7 +701,7 @@ function ActivityTab({ evaluationId, profiles }: { evaluationId: string; profile
 }
 
 // ── InspectionTab ─────────────────────────────────────────────
-const PATIO_OPTIONS     = ['Covered', 'Open', 'Sundeck', 'Fully Enclosed']
+const PATIO_OPTIONS     = ['Covered', 'Open / Sundeck', 'Fully Enclosed', 'Large', 'Epic']
 const SECURITY_OPTIONS  = ['Standard', 'CCTV', 'Electric Fencing']
 const CONDITION_ITEMS   = ['Flooring', 'Windows / Doors', 'Flow / Layout', 'Architecture']
 const ADDITIONAL_OPTS   = ['Jungle Gym', 'Jojo Tank', 'Storeroom', 'Solar Panels', 'Inverter', 'Batteries']
@@ -777,7 +777,7 @@ type InspectionForm = {
   garden_size: string
   garden_description: string
   patio_quantity: number
-  patio_selections: string[]
+  patio_selections: string[][]
   pool_present: boolean | null
   pool_condition: string
   jacuzzi_present: boolean | null
@@ -862,7 +862,6 @@ function InspectionTab({ evaluationId, userDesignation, onSaved, editing, setEdi
   const [saved, setSaved]               = useState(false)
   const [error, setError]               = useState('')
   const [userId, setUserId]             = useState<string | null>(null)
-  const [picklists, setPicklists]       = useState<Record<string, { id: string; label: string }[]>>({})
 
   // Pulled out of the mount effect so "Cancel" can call it again to discard
   // any unsaved edits, reverting the form back to whatever's actually saved
@@ -871,15 +870,20 @@ function InspectionTab({ evaluationId, userDesignation, onSaved, editing, setEdi
   const loadInspection = useCallback(async () => {
     setLoading(true)
     const { data } = await supabase.from('property_inspections')
-      .select('*, inspection_feature_selections(feature_key, picklist_option_id, picklist_options(label))')
+      .select('*')
       .eq('evaluation_id', evaluationId)
       .maybeSingle()
 
     if (data) {
       setInspectionId(data.id)
-      const sels = (data.inspection_feature_selections ?? []) as { feature_key: string; picklist_options: { label: string } | null }[]
       let gc: ConditionItem[] = []
       try { gc = data.general_condition ? JSON.parse(data.general_condition) : [] } catch { gc = [] }
+      // One array of description tags per patio unit, same JSON-text
+      // pattern as General Condition -- no per-unit "which patio is this"
+      // concept exists in the old picklist-linked feature-selections table,
+      // so patio descriptions moved off it entirely.
+      let patioDescs: string[][] = []
+      try { patioDescs = data.patio_descriptions ? JSON.parse(data.patio_descriptions) : [] } catch { patioDescs = [] }
       setForm({
         appointment_outcome:           data.appointment_outcome ?? '',
         road_level_position:           data.road_level_position ?? '',
@@ -894,7 +898,7 @@ function InspectionTab({ evaluationId, userDesignation, onSaved, editing, setEdi
         garden_size:                   data.garden_size ?? '',
         garden_description:            data.garden_description ?? '',
         patio_quantity:                data.patio_quantity ?? 0,
-        patio_selections:              sels.filter(s => s.feature_key === 'patio_description').map(s => s.picklist_options?.label ?? '').filter(Boolean),
+        patio_selections:              patioDescs,
         pool_present:                  data.pool_present ?? null,
         pool_condition:                data.pool_condition ?? '',
         jacuzzi_present:               data.jacuzzi_present ?? null,
@@ -941,19 +945,6 @@ function InspectionTab({ evaluationId, userDesignation, onSaved, editing, setEdi
   useEffect(() => {
     supabase.auth.getUser().then(({ data }) => setUserId(data.user?.id ?? null))
 
-    supabase.from('picklist_options')
-      .select('id, list_name, label')
-      .in('list_name', ['patio_description'])
-      .order('sort_order')
-      .then(({ data }) => {
-        const map: Record<string, { id: string; label: string }[]> = {}
-        for (const row of data ?? []) {
-          if (!map[row.list_name]) map[row.list_name] = []
-          map[row.list_name].push({ id: row.id, label: row.label })
-        }
-        setPicklists(map)
-      })
-
     loadInspection()
   }, [evaluationId, loadInspection])
 
@@ -970,7 +961,7 @@ function InspectionTab({ evaluationId, userDesignation, onSaved, editing, setEdi
     setForm(f => ({ ...f, [field]: value }))
   }
 
-  function toggleStr(field: 'patio_selections' | 'security_features' | 'additional_features', label: string) {
+  function toggleStr(field: 'security_features' | 'additional_features', label: string) {
     setForm(f => {
       const cur = f[field] as string[]
       return { ...f, [field]: cur.includes(label) ? cur.filter(v => v !== label) : [...cur, label] }
@@ -981,6 +972,20 @@ function InspectionTab({ evaluationId, userDesignation, onSaved, editing, setEdi
     const next = current.slice(0, newLen)
     while (next.length < newLen) next.push('')
     return next
+  }
+
+  function resizeArrArr(current: string[][], newLen: number): string[][] {
+    const next = current.slice(0, newLen)
+    while (next.length < newLen) next.push([])
+    return next
+  }
+
+  function togglePatioSelection(index: number, label: string) {
+    setForm(f => {
+      const next = resizeArrArr(f.patio_selections, Math.max(f.patio_selections.length, index + 1))
+      next[index] = next[index].includes(label) ? next[index].filter(v => v !== label) : [...next[index], label]
+      return { ...f, patio_selections: next }
+    })
   }
 
   function setConditionFeature(feature: string, condition: string) {
@@ -1026,6 +1031,7 @@ function InspectionTab({ evaluationId, userDesignation, onSaved, editing, setEdi
       garden_size:                   form.garden_present ? (form.garden_size || null) : null,
       garden_description:            form.garden_present ? (form.garden_description || null) : null,
       patio_quantity:                form.patio_quantity,
+      patio_descriptions:            form.patio_quantity > 0 && form.patio_selections.some(tags => tags.length > 0) ? JSON.stringify(form.patio_selections) : null,
       pool_present:                  form.pool_present,
       pool_condition:                form.pool_present ? (form.pool_condition || null) : null,
       jacuzzi_present:               form.jacuzzi_present,
@@ -1072,16 +1078,6 @@ function InspectionTab({ evaluationId, userDesignation, onSaved, editing, setEdi
     }
 
     if (newInspectionId) {
-      await supabase.from('inspection_feature_selections').delete().eq('property_inspection_id', newInspectionId)
-      const patioOpts  = picklists['patio_description'] ?? []
-      const selections = [
-        ...(form.patio_quantity > 0 ? form.patio_selections.map(label => {
-          const opt = patioOpts.find(o => o.label === label)
-          return opt ? { property_inspection_id: newInspectionId!, feature_key: 'patio_description', picklist_option_id: opt.id } : null
-        }).filter(Boolean) : []),
-      ]
-      if (selections.length > 0) await supabase.from('inspection_feature_selections').insert(selections as object[])
-
       // "Property Inspection Completed" only actually completes -- and
       // advances the evaluation to Inspected -- once the Appointment
       // Outcome says the visit happened. Any other recorded outcome
@@ -1226,16 +1222,24 @@ function InspectionTab({ evaluationId, userDesignation, onSaved, editing, setEdi
         )}
 
         <Divider />
-        <RoField label="Entertainment Patio" editing={editing}
-          display={`${form.patio_quantity}${form.patio_quantity > 0 && form.patio_selections.length ? ` — ${form.patio_selections.join(', ')}` : ''}`}>
-          <Counter value={form.patio_quantity} onChange={v => set('patio_quantity', v)} />
-          {form.patio_quantity > 0 && (
-            <div className="mt-3">
-              <label className={fieldLabelCls}>Patio Description</label>
-              <MultiSelect options={PATIO_OPTIONS} selected={form.patio_selections} onToggle={l => toggleStr('patio_selections', l)} />
-            </div>
-          )}
-        </RoField>
+        <SubHeading readOnly={!editing}>Entertainment Patio</SubHeading>
+        <Counter readOnly={!editing}
+          value={form.patio_quantity}
+          onChange={v => { set('patio_quantity', v); set('patio_selections', resizeArrArr(form.patio_selections, v)) }}
+        />
+        {form.patio_quantity > 0 && (
+          <div className="space-y-3 mt-2">
+            {Array.from({ length: form.patio_quantity }).map((_, i) => (
+              <div key={i}>
+                <span className="text-sm text-gray-500">Entertainment Patio {i + 1}</span>
+                <div className="mt-1">
+                  {editing && <label className={fieldLabelCls}>Patio Description</label>}
+                  <MultiSelect options={PATIO_OPTIONS} selected={form.patio_selections[i] ?? []} onToggle={l => togglePatioSelection(i, l)} readOnly={!editing} />
+                </div>
+              </div>
+            ))}
+          </div>
+        )}
 
         <Divider />
         <YesNo label="Views" value={form.views_present} onChange={v => set('views_present', v)} readOnly={!editing} />
