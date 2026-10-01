@@ -1438,7 +1438,7 @@ function InspectionTab({ evaluationId, userDesignation, onSaved, editing, setEdi
 
         <Divider />
         <SubHeading readOnly={!editing}>General Condition</SubHeading>
-        {editing && <p className="text-xs text-gray-400 -mt-2">Select items to rate, then choose Good or Poor for each.</p>}
+        {editing && <p className="text-xs text-gray-400 -mt-2">Choose a rating for each item -- tap the item name to clear a rating.</p>}
         {!editing && form.general_condition.length === 0 && <p className="text-sm text-[#1a1a1a]">—</p>}
         <div className="space-y-3">
           {CONDITION_ITEMS.map(item => {
@@ -1457,26 +1457,28 @@ function InspectionTab({ evaluationId, userDesignation, onSaved, editing, setEdi
             }
             return (
               <div key={item} className="flex items-center gap-3 flex-wrap">
+                {/* Good/Poor (Notable/Standard for Architecture) are always
+                    shown now, not gated behind selecting the item first --
+                    picking one selects it in the same motion. The item name
+                    stays clickable as the way to clear a mistaken rating. */}
                 <button type="button" onClick={() => toggleConditionItem(item)}
                   className={`px-3 py-1.5 rounded-full text-xs font-medium border transition-colors flex-shrink-0 ${
                     selected ? 'bg-[#1a1a1a] text-white border-[#1a1a1a]' : 'bg-white text-[#1a1a1a] border-gray-200 hover:border-gray-400'
                   }`}>
                   {item}
                 </button>
-                {selected && (
-                  <div className="flex gap-2">
-                    {(['good','poor'] as const).map(c => (
-                      <button key={c} type="button" onClick={() => setConditionFeature(item, c)}
-                        className={`px-3 py-1 rounded-lg text-xs font-medium border transition-colors ${
-                          entry.condition === c
-                            ? c === 'good' ? 'bg-green-600 text-white border-green-600' : 'bg-red-500 text-white border-red-500'
-                            : 'bg-white text-gray-500 border-gray-200 hover:border-gray-400'
-                        }`}>
-                        {conditionLabel(item, c)}
-                      </button>
-                    ))}
-                  </div>
-                )}
+                <div className="flex gap-2">
+                  {(['good','poor'] as const).map(c => (
+                    <button key={c} type="button" onClick={() => setConditionFeature(item, c)}
+                      className={`px-3 py-1 rounded-lg text-xs font-medium border transition-colors ${
+                        entry?.condition === c
+                          ? c === 'good' ? 'bg-green-600 text-white border-green-600' : 'bg-red-500 text-white border-red-500'
+                          : 'bg-white text-gray-500 border-gray-200 hover:border-gray-400'
+                      }`}>
+                      {conditionLabel(item, c)}
+                    </button>
+                  ))}
+                </div>
               </div>
             )
           })}
