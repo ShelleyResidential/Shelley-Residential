@@ -183,7 +183,7 @@ export default function PropertyDetailPage() {
 
       {/* ── Header ── */}
       <div className="mb-8">
-        <Breadcrumbs items={[{ label: 'Analyse' }, { label: 'Properties', href: '/dashboard/properties' }, { label: address }]} />
+        <Breadcrumbs items={[{ label: 'Analyse' }, { label: 'Homes', href: '/dashboard/properties' }, { label: address }]} />
         <div className="flex items-start justify-between gap-4">
           <div className="min-w-0">
             <div className="flex items-center gap-2 flex-wrap">

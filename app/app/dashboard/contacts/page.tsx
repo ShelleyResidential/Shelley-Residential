@@ -268,7 +268,7 @@ export default function ContactsPage() {
 
   return (
     <div className="p-4 md:p-10">
-      <Breadcrumbs items={[{ label: 'Analyse' }, { label: 'Contacts' }]} />
+      <Breadcrumbs items={[{ label: 'Analyse' }, { label: 'People' }]} />
       <div className="flex items-center justify-between mb-4 gap-2">
         <h1 className="text-lg sm:text-2xl font-bold text-[#1a1a1a]">Contacts</h1>
         <div className="flex items-center gap-2 sm:gap-3">

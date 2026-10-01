@@ -117,7 +117,7 @@ function AddContactForm() {
     <div className="p-4 md:p-10 max-w-4xl">
       <Breadcrumbs items={returnTo
         ? [{ label: 'Analyse' }, { label: 'Evaluations', href: '/dashboard/evaluations' }, { label: 'Back to Evaluation', href: `${returnTo}?resume=1` }, { label: 'New Contact' }]
-        : [{ label: 'Analyse' }, { label: 'Contacts', href: '/dashboard/contacts' }, { label: 'New Contact' }]
+        : [{ label: 'Analyse' }, { label: 'People', href: '/dashboard/contacts' }, { label: 'New Contact' }]
       } />
       <h1 className="text-lg sm:text-2xl font-bold text-[#1a1a1a] mb-8">New Contact</h1>
       <form onSubmit={handleSubmit} className="space-y-6">

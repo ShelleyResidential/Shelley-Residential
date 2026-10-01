@@ -202,7 +202,7 @@ export default function PropertiesPage() {
 
   return (
     <div className="p-4 md:p-10">
-      <Breadcrumbs items={[{ label: 'Analyse' }, { label: 'Properties' }]} />
+      <Breadcrumbs items={[{ label: 'Analyse' }, { label: 'Homes' }]} />
       <div className="flex items-center justify-between mb-4 gap-2">
         <h1 className="text-lg sm:text-2xl font-bold text-[#1a1a1a]">Properties</h1>
         {/* Search toggle -- mobile only, sits in this same header row
