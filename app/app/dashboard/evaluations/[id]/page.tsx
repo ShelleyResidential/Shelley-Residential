@@ -1428,7 +1428,6 @@ function InspectionTab({ evaluationId, userDesignation, onSaved, editing, setEdi
         <div className="space-y-3">
           {CONDITION_ITEMS.map(item => {
             const entry = form.general_condition.find(c => c.feature === item)
-            const selected = !!entry
             if (!editing) {
               if (!entry) return null
               return (
@@ -1445,11 +1444,10 @@ function InspectionTab({ evaluationId, userDesignation, onSaved, editing, setEdi
                 {/* Good/Poor (Notable/Standard for Architecture) are always
                     shown now, not gated behind selecting the item first --
                     picking one selects it in the same motion. The item name
-                    stays clickable as the way to clear a mistaken rating. */}
+                    stays clickable (plain text, no pill) as the way to
+                    clear a mistaken rating. */}
                 <button type="button" onClick={() => toggleConditionItem(item)}
-                  className={`px-3 py-1.5 rounded-full text-xs font-medium border transition-colors flex-shrink-0 ${
-                    selected ? 'bg-[#1a1a1a] text-white border-[#1a1a1a]' : 'bg-white text-[#1a1a1a] border-gray-200 hover:border-gray-400'
-                  }`}>
+                  className="text-sm font-medium text-[#1a1a1a] flex-shrink-0">
                   {item}
                 </button>
                 <div className="flex gap-2">
