@@ -710,7 +710,7 @@ function ActivityTab({ evaluationId, profiles }: { evaluationId: string; profile
 // ── InspectionTab ─────────────────────────────────────────────
 const PATIO_OPTIONS     = ['Covered', 'Open', 'Sundeck', 'Fully Enclosed']
 const SECURITY_OPTIONS  = ['Standard', 'CCTV', 'Electric Fencing']
-const CONDITION_ITEMS   = ['Flooring', 'Windows / Doors', 'Architecture', 'Flow / Layout']
+const CONDITION_ITEMS   = ['Flooring', 'Windows / Doors', 'Flow / Layout', 'Architecture']
 const ADDITIONAL_OPTS   = ['Jungle Gym', 'Jojo Tank', 'Storeroom', 'Solar Panels', 'Inverter', 'Batteries']
 
 // Architecture reads better as a style judgement ("Notable"/"Standard")
