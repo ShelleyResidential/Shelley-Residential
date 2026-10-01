@@ -4,7 +4,6 @@ import { useState, useEffect, useCallback, useRef } from 'react'
 import { supabase } from '@/lib/supabase'
 import { btn, card, input, select } from '@/lib/styles'
 import { Breadcrumbs } from '@/lib/Breadcrumbs'
-import { useMobileLoadingGate } from '@/lib/MobileLoadingGate'
 import { useRouter } from 'next/navigation'
 import Link from 'next/link'
 
@@ -200,8 +199,6 @@ export default function PropertiesPage() {
       </div>
     </div>
   )
-
-  useMobileLoadingGate('properties-list', loading)
 
   return (
     <div className="p-4 md:p-10">

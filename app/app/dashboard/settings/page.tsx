@@ -6,7 +6,6 @@ import { card, btn, sectionTitle, label as labelCls } from '@/lib/styles'
 import { useRouter } from 'next/navigation'
 import Image from 'next/image'
 import Link from 'next/link'
-import { useMobileLoadingGate } from '@/lib/MobileLoadingGate'
 import { ProfessionalDetailsForm } from './ProfessionalDetailsForm'
 
 function ChevronIcon({ open }: { open: boolean }) {
@@ -26,7 +25,6 @@ export default function SettingsPage() {
   const [fullName, setFullName]   = useState('')
   const [avatarUrl, setAvatarUrl] = useState<string | null>(null)
   const [professionalOpen, setProfessionalOpen] = useState(false)
-  const [loading, setLoading]     = useState(true)
 
   useEffect(() => {
     supabase.auth.getUser().then(({ data }) => {
@@ -35,11 +33,8 @@ export default function SettingsPage() {
       setUserEmail(data.user.email ?? '')
       setFullName(meta.full_name ?? meta.name ?? '')
       setAvatarUrl(meta.avatar_url ?? meta.picture ?? null)
-      setLoading(false)
     })
   }, [router])
-
-  useMobileLoadingGate('settings', loading)
 
   async function signOut() {
     await supabase.auth.signOut()
