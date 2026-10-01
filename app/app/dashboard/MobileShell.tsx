@@ -159,10 +159,10 @@ export function MobileShell({ children }: { children: React.ReactNode }) {
             {analyseOpen && (
               <div className="pl-4">
                 <button type="button" onClick={() => go('/dashboard/contacts')} className={subNavItemCls(pathname.startsWith('/dashboard/contacts'))}>
-                  Contacts
+                  People
                 </button>
                 <button type="button" onClick={() => go('/dashboard/properties')} className={subNavItemCls(pathname.startsWith('/dashboard/properties'))}>
-                  Properties
+                  Homes
                 </button>
                 <button type="button" onClick={() => go('/dashboard/evaluations')} className={subNavItemCls(pathname.startsWith('/dashboard/evaluations'))}>
                   Evaluations

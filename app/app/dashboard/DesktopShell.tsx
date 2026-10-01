@@ -191,10 +191,10 @@ export function DesktopShell({ children }: { children: React.ReactNode }) {
           {analyseOpen && (
             <div>
               <NavLink href="/dashboard/contacts" active={pathname.startsWith('/dashboard/contacts')} indented>
-                Contacts
+                People
               </NavLink>
               <NavLink href="/dashboard/properties" active={pathname.startsWith('/dashboard/properties')} indented>
-                Properties
+                Homes
               </NavLink>
               <NavLink href="/dashboard/evaluations" active={pathname.startsWith('/dashboard/evaluations')} indented>
                 Evaluations
