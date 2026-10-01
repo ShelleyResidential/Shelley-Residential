@@ -710,8 +710,16 @@ function ActivityTab({ evaluationId, profiles }: { evaluationId: string; profile
 // ── InspectionTab ─────────────────────────────────────────────
 const PATIO_OPTIONS     = ['Covered', 'Open', 'Sundeck', 'Fully Enclosed']
 const SECURITY_OPTIONS  = ['Standard', 'CCTV', 'Electric Fencing']
-const CONDITION_ITEMS   = ['Flooring', 'Windows / Doors', 'Architecture']
+const CONDITION_ITEMS   = ['Flooring', 'Windows / Doors', 'Architecture', 'Flow / Layout']
 const ADDITIONAL_OPTS   = ['Jungle Gym', 'Jojo Tank', 'Storeroom', 'Solar Panels', 'Inverter', 'Batteries']
+
+// Architecture reads better as a style judgement ("Notable"/"Standard")
+// than the generic "Good"/"Poor" every other General Condition item uses --
+// the underlying stored value is still 'good'/'poor' either way.
+function conditionLabel(item: string, value: 'good' | 'poor'): string {
+  if (item === 'Architecture') return value === 'good' ? 'Notable' : 'Standard'
+  return value === 'good' ? 'Good' : 'Poor'
+}
 
 // The shared `label` style from lib/styles is gray-500 -- too light next
 // to YesNo's dark labels (Garden, Security, etc.), which is what stood out
@@ -788,6 +796,8 @@ type InspectionForm = {
   bedroom_sizes: string[]
   bathrooms_quantity: number
   bathroom_conditions: string[]
+  guest_loo_quantity: number
+  guest_loo_conditions: string[]
   kitchen_present: boolean | null
   kitchen_size: string
   kitchen_finish: string
@@ -823,6 +833,7 @@ const EMPTY_INSPECTION: InspectionForm = {
   tennis_court_present: null, tennis_court_condition: '',
   bedrooms_quantity: 0, bedroom_sizes: [],
   bathrooms_quantity: 0, bathroom_conditions: [],
+  guest_loo_quantity: 0, guest_loo_conditions: [],
   kitchen_present: null, kitchen_size: '', kitchen_finish: '', kitchen_position: '',
   lounges_quantity: 0, dining_room_quantity: 0,
   other_reception_present: null, other_reception_type: '', other_reception_type_other: '',
@@ -901,6 +912,8 @@ function InspectionTab({ evaluationId, userDesignation, onSaved, editing, setEdi
         bedroom_sizes:                 data.bedroom_sizes ? data.bedroom_sizes.split(',') : [],
         bathrooms_quantity:            data.bathrooms_quantity ?? 0,
         bathroom_conditions:           data.bathroom_conditions ? data.bathroom_conditions.split(',') : [],
+        guest_loo_quantity:            data.guest_loo_quantity ?? 0,
+        guest_loo_conditions:          data.guest_loo_conditions ? data.guest_loo_conditions.split(',') : [],
         kitchen_present:               data.kitchen_present ?? null,
         kitchen_size:                  data.kitchen_size ?? '',
         kitchen_finish:                data.kitchen_finish ?? '',
@@ -1030,6 +1043,8 @@ function InspectionTab({ evaluationId, userDesignation, onSaved, editing, setEdi
       bedroom_sizes:                 form.bedrooms_quantity > 0 ? form.bedroom_sizes.join(',') : null,
       bathrooms_quantity:            form.bathrooms_quantity,
       bathroom_conditions:           form.bathrooms_quantity > 0 ? form.bathroom_conditions.join(',') : null,
+      guest_loo_quantity:            form.guest_loo_quantity,
+      guest_loo_conditions:          form.guest_loo_quantity > 0 ? form.guest_loo_conditions.join(',') : null,
       kitchen_present:               form.kitchen_present,
       kitchen_size:                  form.kitchen_present ? (form.kitchen_size || null) : null,
       kitchen_finish:                form.kitchen_present ? (form.kitchen_finish || null) : null,
@@ -1390,6 +1405,29 @@ function InspectionTab({ evaluationId, userDesignation, onSaved, editing, setEdi
         )}
 
         <Divider />
+        <SubHeading readOnly={!editing}>Guest Loo</SubHeading>
+        <Counter readOnly={!editing}
+          value={form.guest_loo_quantity}
+          onChange={v => { set('guest_loo_quantity', v); set('guest_loo_conditions', resizeArr(form.guest_loo_conditions, v)) }}
+        />
+        {form.guest_loo_quantity > 0 && (
+          <div className="space-y-2 mt-2">
+            {Array.from({ length: form.guest_loo_quantity }).map((_, i) => (
+              <div key={i} className="flex items-center gap-3">
+                <span className="text-sm text-gray-500 w-24 flex-shrink-0">Guest Loo {i + 1}</span>
+                {editing ? (
+                  <select value={form.guest_loo_conditions[i] ?? ''} onChange={e => { const n = [...form.guest_loo_conditions]; n[i] = e.target.value; set('guest_loo_conditions', n) }} className={`${select} flex-1`}>
+                    <option value="">Condition…</option>{FINISH_OPTS.map(o => <option key={o.value} value={o.value}>{o.label}</option>)}
+                  </select>
+                ) : (
+                  <span className="text-sm text-[#1a1a1a]">{optLabel(FINISH_OPTS, form.guest_loo_conditions[i])}</span>
+                )}
+              </div>
+            ))}
+          </div>
+        )}
+
+        <Divider />
         <YesNo label="Security" value={form.security_present} onChange={v => set('security_present', v)} readOnly={!editing} />
         {form.security_present && (
           <div>
@@ -1412,7 +1450,7 @@ function InspectionTab({ evaluationId, userDesignation, onSaved, editing, setEdi
                 <div key={item} className="flex items-center gap-3 text-sm">
                   <span className="text-[#1a1a1a] font-medium">{item}</span>
                   <span className={entry.condition === 'good' ? 'text-green-600' : 'text-red-500'}>
-                    {entry.condition === 'good' ? 'Good' : entry.condition === 'poor' ? 'Poor' : '—'}
+                    {entry.condition === 'good' || entry.condition === 'poor' ? conditionLabel(item, entry.condition) : '—'}
                   </span>
                 </div>
               )
@@ -1427,14 +1465,14 @@ function InspectionTab({ evaluationId, userDesignation, onSaved, editing, setEdi
                 </button>
                 {selected && (
                   <div className="flex gap-2">
-                    {(['Good','Poor'] as const).map(c => (
-                      <button key={c} type="button" onClick={() => setConditionFeature(item, c.toLowerCase())}
+                    {(['good','poor'] as const).map(c => (
+                      <button key={c} type="button" onClick={() => setConditionFeature(item, c)}
                         className={`px-3 py-1 rounded-lg text-xs font-medium border transition-colors ${
-                          entry.condition === c.toLowerCase()
-                            ? c === 'Good' ? 'bg-green-600 text-white border-green-600' : 'bg-red-500 text-white border-red-500'
+                          entry.condition === c
+                            ? c === 'good' ? 'bg-green-600 text-white border-green-600' : 'bg-red-500 text-white border-red-500'
                             : 'bg-white text-gray-500 border-gray-200 hover:border-gray-400'
                         }`}>
-                        {c}
+                        {conditionLabel(item, c)}
                       </button>
                     ))}
                   </div>
