@@ -704,7 +704,7 @@ function ActivityTab({ evaluationId, profiles }: { evaluationId: string; profile
 const PATIO_OPTIONS     = ['Covered', 'Open / Sundeck', 'Fully Enclosed', 'Large', 'Epic']
 const SECURITY_OPTIONS  = ['Standard', 'CCTV', 'Electric Fencing']
 const CONDITION_ITEMS   = ['Flooring', 'Windows / Doors', 'Flow / Layout', 'Architecture']
-const ADDITIONAL_OPTS   = ['Jungle Gym', 'Jojo Tank', 'Storeroom', 'Solar Panels', 'Inverter', 'Batteries']
+const ADDITIONAL_OPTS   = ['Jungle Gym', 'Water Storage / Filtration', 'Storeroom', 'Solar Panels', 'Inverter', 'Batteries']
 
 // Architecture reads better as a style judgement ("Notable"/"Standard")
 // than the generic "Good"/"Poor" every other General Condition item uses --
@@ -741,7 +741,7 @@ const FINISH_OPTS          = [{ value: 'modern', label: 'Modern' }, { value: 'ne
 const KITCHEN_POS_OPTS     = [{ value: 'open_plan', label: 'Open Plan' }, { value: 'down_passage', label: 'Down Passage' }, { value: 'separate', label: 'Separate' }]
 const RECEPTION_TYPE_OPTS  = [{ value: 'pub', label: 'Pub' }, { value: 'gym', label: 'Gym' }, { value: 'library', label: 'Library' }, { value: 'other', label: 'Other' }]
 const STUDY_TYPE_OPTS      = [{ value: 'nook', label: 'Nook' }, { value: 'separate_room', label: 'Separate Room' }]
-const FLATLET_BED_OPTS     = [{ value: 'one_bed', label: '1 Bedroom' }, { value: 'two_bed', label: '2 Bedroom' }, { value: 'three_bed', label: '3 Bedroom' }]
+const FLATLET_BED_OPTS     = [{ value: 'studio', label: 'Studio' }, { value: 'one_bed', label: '1 Bedroom' }, { value: 'two_bed', label: '2 Bedroom' }]
 
 const optLabel = (opts: { value: string; label: string }[], v: string | null | undefined) =>
   opts.find(o => o.value === v)?.label ?? '—'
@@ -791,7 +791,6 @@ type InspectionForm = {
   bathroom_conditions: string[]
   guest_loo_quantity: number
   guest_loo_conditions: string[]
-  kitchen_present: boolean | null
   kitchen_size: string
   kitchen_finish: string
   kitchen_position: string
@@ -803,7 +802,6 @@ type InspectionForm = {
   study_quantity: number
   study_types: string[]
   domestic_quarters_quantity: number
-  domestic_quarters_toilet_only: boolean
   flatlet_quantity: number
   flatlet_bedroom_types: string[]
   scullery_laundry_present: boolean | null
@@ -827,11 +825,11 @@ const EMPTY_INSPECTION: InspectionForm = {
   bedrooms_quantity: 0, bedroom_sizes: [],
   bathrooms_quantity: 0, bathroom_conditions: [],
   guest_loo_quantity: 0, guest_loo_conditions: [],
-  kitchen_present: null, kitchen_size: '', kitchen_finish: '', kitchen_position: '',
+  kitchen_size: '', kitchen_finish: '', kitchen_position: '',
   lounges_quantity: 0, dining_room_quantity: 0,
   other_reception_present: null, other_reception_type: '', other_reception_type_other: '',
   study_quantity: 0, study_types: [],
-  domestic_quarters_quantity: 0, domestic_quarters_toilet_only: false,
+  domestic_quarters_quantity: 0,
   flatlet_quantity: 0, flatlet_bedroom_types: [],
   scullery_laundry_present: null,
   security_present: null, security_features: [],
@@ -911,7 +909,6 @@ function InspectionTab({ evaluationId, userDesignation, onSaved, editing, setEdi
         bathroom_conditions:           data.bathroom_conditions ? data.bathroom_conditions.split(',') : [],
         guest_loo_quantity:            data.guest_loo_quantity ?? 0,
         guest_loo_conditions:          data.guest_loo_conditions ? data.guest_loo_conditions.split(',') : [],
-        kitchen_present:               data.kitchen_present ?? null,
         kitchen_size:                  data.kitchen_size ?? '',
         kitchen_finish:                data.kitchen_finish ?? '',
         kitchen_position:              data.kitchen_position ?? '',
@@ -923,7 +920,6 @@ function InspectionTab({ evaluationId, userDesignation, onSaved, editing, setEdi
         study_quantity:                data.study_quantity ?? 0,
         study_types:                   data.study_types ? data.study_types.split(',') : [],
         domestic_quarters_quantity:    data.domestic_quarters_quantity ?? 0,
-        domestic_quarters_toilet_only: data.domestic_quarters_toilet_only ?? false,
         flatlet_quantity:              data.flatlet_quantity ?? 0,
         flatlet_bedroom_types:         data.flatlet_bedroom_type ? data.flatlet_bedroom_type.split(',') : [],
         scullery_laundry_present:      data.scullery_laundry_present ?? null,
@@ -1044,10 +1040,12 @@ function InspectionTab({ evaluationId, userDesignation, onSaved, editing, setEdi
       bathroom_conditions:           form.bathrooms_quantity > 0 ? form.bathroom_conditions.join(',') : null,
       guest_loo_quantity:            form.guest_loo_quantity,
       guest_loo_conditions:          form.guest_loo_quantity > 0 ? form.guest_loo_conditions.join(',') : null,
-      kitchen_present:               form.kitchen_present,
-      kitchen_size:                  form.kitchen_present ? (form.kitchen_size || null) : null,
-      kitchen_finish:                form.kitchen_present ? (form.kitchen_finish || null) : null,
-      kitchen_position:              form.kitchen_present ? (form.kitchen_position || null) : null,
+      // Every property gets a kitchen -- there's no longer a Yes/No toggle
+      // for it, so this just stays true going forward instead of null.
+      kitchen_present:               true,
+      kitchen_size:                  form.kitchen_size || null,
+      kitchen_finish:                form.kitchen_finish || null,
+      kitchen_position:              form.kitchen_position || null,
       lounges_quantity:              form.lounges_quantity,
       dining_room_quantity:          form.dining_room_quantity,
       other_reception_present:       form.other_reception_present,
@@ -1056,7 +1054,6 @@ function InspectionTab({ evaluationId, userDesignation, onSaved, editing, setEdi
       study_quantity:                form.study_quantity,
       study_types:                   form.study_quantity > 0 ? form.study_types.join(',') : null,
       domestic_quarters_quantity:    form.domestic_quarters_quantity,
-      domestic_quarters_toilet_only: form.domestic_quarters_toilet_only,
       flatlet_quantity:              form.flatlet_quantity,
       flatlet_bedroom_type:          form.flatlet_quantity > 0 ? form.flatlet_bedroom_types.join(',') : null,
       scullery_laundry_present:      form.scullery_laundry_present,
@@ -1245,15 +1242,8 @@ function InspectionTab({ evaluationId, userDesignation, onSaved, editing, setEdi
         <YesNo label="Views" value={form.views_present} onChange={v => set('views_present', v)} readOnly={!editing} />
 
         <Divider />
-        <RoField label="Domestic Accommodation" editing={editing}
-          display={`${form.domestic_quarters_quantity}${form.domestic_quarters_toilet_only ? ' (toilet only)' : ''}`}>
+        <RoField label="Domestic Accommodation" editing={editing} display={String(form.domestic_quarters_quantity)}>
           <Counter value={form.domestic_quarters_quantity} onChange={v => set('domestic_quarters_quantity', v)} />
-          {form.domestic_quarters_quantity > 0 && (
-            <label className="flex items-center gap-2 mt-3 cursor-pointer select-none">
-              <input type="checkbox" checked={form.domestic_quarters_toilet_only} onChange={e => set('domestic_quarters_toilet_only', e.target.checked)} className="w-4 h-4 rounded border-gray-300 accent-[#1a1a1a]" />
-              <span className="text-sm text-gray-600">Toilet only (not a full room)</span>
-            </label>
-          )}
         </RoField>
         <RoField label="Flatlet" editing={editing}
           display={form.flatlet_quantity === 0 ? '0'
@@ -1308,26 +1298,24 @@ function InspectionTab({ evaluationId, userDesignation, onSaved, editing, setEdi
         )}
 
         <Divider />
-        <YesNo label="Kitchen" value={form.kitchen_present} onChange={v => set('kitchen_present', v)} readOnly={!editing} />
-        {form.kitchen_present && (
-          <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
-            <RoField label="Kitchen Size" editing={editing} display={optLabel(SIZE_OPTS, form.kitchen_size)}>
-              <select value={form.kitchen_size} onChange={e => set('kitchen_size', e.target.value)} className={select}>
-                <option value="">—</option>{SIZE_OPTS.map(o => <option key={o.value} value={o.value}>{o.label}</option>)}
-              </select>
-            </RoField>
-            <RoField label="Kitchen Finish" editing={editing} display={optLabel(FINISH_OPTS, form.kitchen_finish)}>
-              <select value={form.kitchen_finish} onChange={e => set('kitchen_finish', e.target.value)} className={select}>
-                <option value="">—</option>{FINISH_OPTS.map(o => <option key={o.value} value={o.value}>{o.label}</option>)}
-              </select>
-            </RoField>
-            <RoField label="Kitchen Position" editing={editing} display={optLabel(KITCHEN_POS_OPTS, form.kitchen_position)}>
-              <select value={form.kitchen_position} onChange={e => set('kitchen_position', e.target.value)} className={select}>
-                <option value="">—</option>{KITCHEN_POS_OPTS.map(o => <option key={o.value} value={o.value}>{o.label}</option>)}
-              </select>
-            </RoField>
-          </div>
-        )}
+        <SubHeading readOnly={!editing}>Kitchen</SubHeading>
+        <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
+          <RoField label="Kitchen Size" editing={editing} display={optLabel(SIZE_OPTS, form.kitchen_size)}>
+            <select value={form.kitchen_size} onChange={e => set('kitchen_size', e.target.value)} className={select}>
+              <option value="">—</option>{SIZE_OPTS.map(o => <option key={o.value} value={o.value}>{o.label}</option>)}
+            </select>
+          </RoField>
+          <RoField label="Kitchen Finish" editing={editing} display={optLabel(FINISH_OPTS, form.kitchen_finish)}>
+            <select value={form.kitchen_finish} onChange={e => set('kitchen_finish', e.target.value)} className={select}>
+              <option value="">—</option>{FINISH_OPTS.map(o => <option key={o.value} value={o.value}>{o.label}</option>)}
+            </select>
+          </RoField>
+          <RoField label="Kitchen Position" editing={editing} display={optLabel(KITCHEN_POS_OPTS, form.kitchen_position)}>
+            <select value={form.kitchen_position} onChange={e => set('kitchen_position', e.target.value)} className={select}>
+              <option value="">—</option>{KITCHEN_POS_OPTS.map(o => <option key={o.value} value={o.value}>{o.label}</option>)}
+            </select>
+          </RoField>
+        </div>
 
         <Divider />
         <YesNo label="Scullery / Laundry" value={form.scullery_laundry_present} onChange={v => set('scullery_laundry_present', v)} readOnly={!editing} />
