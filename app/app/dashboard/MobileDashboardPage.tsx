@@ -3,10 +3,10 @@
 import { useEffect, useState } from 'react'
 import { supabase } from '@/lib/supabase'
 import Link from 'next/link'
-import Image from 'next/image'
 import { STATUS_ORDER, STATUS_LABELS, STATUS_COLOURS } from '@/lib/pipeline'
 import { formatPhoneDisplay } from '@/lib/phone'
 import { card } from '@/lib/styles'
+import { useMobileLoadingGate } from '@/lib/MobileLoadingGate'
 import type { BriefingEvent } from '@/app/api/calendar/today/route'
 
 // Same data and functions as the desktop dashboard (DesktopDashboardPage.tsx)
@@ -200,15 +200,16 @@ export function MobileDashboardPage() {
 
   const pageLoading = statsLoading || leaderboardLoading || briefingLoading || myPerfLoading
 
+  // MobileShell holds a full-screen splash over the whole app (header
+  // included) until this reports done, so there's no "header appears, then
+  // this page's own loading text catches up underneath it" step -- it all
+  // reveals at once. This page always renders its real content (hidden
+  // behind that splash while pageLoading is true) rather than branching on
+  // its own loading state, so nothing has to pop in again once revealed.
+  useMobileLoadingGate('mobile-dashboard', pageLoading)
+
   return (
     <div className="pb-10">
-      {pageLoading ? (
-        <div className="flex flex-col items-center justify-center px-4" style={{ minHeight: '70vh' }}>
-          <Image src="/logo.png" alt="Shelley Residential" width={140} height={70} priority className="mb-5" />
-          <p className="text-lg font-bold text-[#1a1a1a]">Loading your dashboard…</p>
-        </div>
-      ) : (
-        <>
           <div className="px-4 pt-5 pb-3">
             <h1 className="text-xl font-bold text-[#1a1a1a]">Good day{firstName ? `, ${firstName}` : ''}</h1>
           </div>
@@ -253,14 +254,13 @@ export function MobileDashboardPage() {
           <AgentLeaderboard evals={leaderboardEvals} profiles={profiles} />
 
           <QuickAddFab />
-        </>
-      )}
     </div>
   )
 }
 
-// ── Floating "+" quick-add button -- only rendered once the dashboard has
-// actually loaded (not on top of the loading screen). Hides while the page
+// ── Floating "+" quick-add button -- hidden behind MobileShell's splash
+// along with the rest of this page's content while pageLoading is true.
+// Hides while the page
 // is being scrolled up, out of the way of whatever the agent's trying to
 // read, reappears scrolling back down, and is always visible once scrolled
 // back to the very top. Tapping it opens two shortcuts instead of

@@ -4,6 +4,7 @@ import { useEffect, useRef, useState } from 'react'
 import { supabase } from '@/lib/supabase'
 import { useRouter, usePathname } from 'next/navigation'
 import Image from 'next/image'
+import { MobileLoadingProvider, useMobileLoadingGate } from '@/lib/MobileLoadingGate'
 
 const ANALYSE_ROUTES = ['/dashboard/analytics', '/dashboard/contacts', '/dashboard/properties', '/dashboard/evaluations']
 
@@ -49,6 +50,11 @@ export function MobileShell({ children }: { children: React.ReactNode }) {
   const [email, setEmail] = useState('')
   const [displayName, setDisplayName] = useState('')
   const [avatarUrl, setAvatarUrl] = useState<string | null>(null)
+  const [authResolved, setAuthResolved] = useState(false)
+  // Latches true once nothing registered with the loading gate is still
+  // loading -- see MobileLoadingGate for why this never goes back to
+  // false, so only the very first open shows the full splash.
+  const [appReady, setAppReady] = useState(false)
 
   useEffect(() => {
     supabase.auth.getUser().then(({ data }) => {
@@ -57,6 +63,7 @@ export function MobileShell({ children }: { children: React.ReactNode }) {
       setEmail(data.user.email ?? '')
       setDisplayName(meta.full_name ?? meta.name ?? (data.user.email ?? '').split('@')[0])
       setAvatarUrl(meta.avatar_url ?? meta.picture ?? null)
+      setAuthResolved(true)
     })
   }, [router])
 
@@ -111,7 +118,22 @@ export function MobileShell({ children }: { children: React.ReactNode }) {
     `w-full text-left py-3.5 text-lg border-b border-white/10 ${active ? 'font-bold text-white' : 'font-normal text-white/70'}`
 
   return (
+    <MobileLoadingProvider onReady={() => setAppReady(true)}>
     <div className="min-h-screen" style={{ background: '#FAFAF9' }}>
+      <AuthLoadingReporter loading={!authResolved} />
+
+      {/* ── Full-screen splash -- held over EVERYTHING (header included)
+          until every loader registered with the gate (this auth fetch,
+          plus whatever the current page registers) reports done, so the
+          app reveals all at once instead of the header appearing first
+          and the page's own loading text catching up underneath it a
+          moment later. z-[100]: above the nav overlay (z-[60]). ── */}
+      {!appReady && (
+        <div className="fixed inset-0 z-[100] flex flex-col items-center justify-center px-4" style={{ background: '#FAFAF9' }}>
+          <Image src="/logo.png" alt="Shelley Residential" width={140} height={70} priority className="mb-5" />
+          <p className="text-lg font-bold text-[#1a1a1a]">Loading your dashboard…</p>
+        </div>
+      )}
 
       {/* ── Top bar -- fixed + translated, not sticky, so it can slide
           fully out of view on scroll-down and back in on scroll-up. ── */}
@@ -200,5 +222,15 @@ export function MobileShell({ children }: { children: React.ReactNode }) {
 
       <main style={{ paddingTop: HEADER_HEIGHT }}>{children}</main>
     </div>
+    </MobileLoadingProvider>
   )
+}
+
+// Registers MobileShell's own auth/profile fetch with the loading gate --
+// has to be a separate component rendered INSIDE MobileLoadingProvider,
+// since useMobileLoadingGate reads the provider via context and MobileShell
+// itself renders above/outside the provider it creates.
+function AuthLoadingReporter({ loading }: { loading: boolean }) {
+  useMobileLoadingGate('mobile-shell-auth', loading)
+  return null
 }

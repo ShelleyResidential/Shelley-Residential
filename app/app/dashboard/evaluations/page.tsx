@@ -4,6 +4,7 @@ import { useState, useEffect, useCallback, useRef } from 'react'
 import { supabase } from '@/lib/supabase'
 import { btn, card, input } from '@/lib/styles'
 import { Breadcrumbs } from '@/lib/Breadcrumbs'
+import { useMobileLoadingGate } from '@/lib/MobileLoadingGate'
 import { REPORT_TYPES } from '@/lib/evaluation-documents'
 import { STATUS_LABELS, STATUS_COLOURS } from '@/lib/pipeline'
 import { useRouter, useSearchParams } from 'next/navigation'
@@ -376,6 +377,8 @@ export default function EvaluationsPage() {
       </div>
     </div>
   )
+
+  useMobileLoadingGate('evaluations-list', loading)
 
   return (
     <div className="p-4 md:p-10">

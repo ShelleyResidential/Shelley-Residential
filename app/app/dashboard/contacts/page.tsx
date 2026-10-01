@@ -5,6 +5,7 @@ import { supabase } from '@/lib/supabase'
 import { btn, card, input } from '@/lib/styles'
 import { formatPhoneDisplay } from '@/lib/phone'
 import { Breadcrumbs } from '@/lib/Breadcrumbs'
+import { useMobileLoadingGate } from '@/lib/MobileLoadingGate'
 import { useRouter } from 'next/navigation'
 import Link from 'next/link'
 
@@ -232,6 +233,11 @@ export default function ContactsPage() {
     await fetchContacts()
     setSyncing(false)
   }
+
+  // No-op on desktop (no MobileShell/provider there) -- on mobile, lets
+  // this page's own loading state gate the app-wide splash instead of the
+  // header appearing before "Loading contacts…" catches up underneath it.
+  useMobileLoadingGate('contacts-list', loading)
 
   const rowActionControls = selectedId && (
     <RowActionButtons

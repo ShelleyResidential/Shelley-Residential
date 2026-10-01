@@ -6,6 +6,7 @@ import { btn, card, input, select, sectionTitle, label as labelCls } from '@/lib
 import { canDelete } from '@/lib/permissions'
 import { normalizeToE164, formatPhoneDisplay } from '@/lib/phone'
 import { Breadcrumbs } from '@/lib/Breadcrumbs'
+import { useMobileLoadingGate } from '@/lib/MobileLoadingGate'
 import { useRouter, useParams, useSearchParams } from 'next/navigation'
 import Link from 'next/link'
 
@@ -201,6 +202,8 @@ export default function ContactDetailPage() {
     setNoteHistory(h => ({ ...h, [noteId]: data ?? [] }))
     setShowHistoryFor(noteId)
   }
+
+  useMobileLoadingGate('contact-detail', loading)
 
   if (loading) return <div className="flex items-center justify-center h-64 text-gray-400 text-sm">Loading…</div>
   if (!contact) return null

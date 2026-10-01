@@ -5,6 +5,7 @@ import { supabase } from '@/lib/supabase'
 import { btn, card, input, select, sectionTitle } from '@/lib/styles'
 import { canDelete } from '@/lib/permissions'
 import { Breadcrumbs } from '@/lib/Breadcrumbs'
+import { useMobileLoadingGate } from '@/lib/MobileLoadingGate'
 import { useRouter, useParams, useSearchParams } from 'next/navigation'
 import Link from 'next/link'
 import { EvaluationForm } from '../EvaluationForm'
@@ -163,6 +164,12 @@ export default function EvaluationDetailPage() {
     }
     fetchEvaluation()
   }
+
+  // Only this outer shell's own loading gates the app-wide splash -- the
+  // Documents/Activity/Inspection tabs below load independently and only
+  // one is ever visible at a time, so waiting on all of them would hold
+  // the splash open for tabs the agent isn't even looking at yet.
+  useMobileLoadingGate('evaluation-detail', loading)
 
   if (loading) return <div className="p-10 text-gray-400 text-sm">Loading…</div>
   if (!evaluation) return <div className="p-10 text-gray-400 text-sm">Evaluation not found.</div>
