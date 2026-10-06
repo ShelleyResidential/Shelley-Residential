@@ -6,7 +6,7 @@ import { generateCoverLetter } from '@/lib/cover-letter'
 export const maxDuration = 60
 
 // Used both by the automatic "generate on evaluation creation" call and the
-// Cover Letter card's Generate/Regenerate button.
+// Cover Letter card's Download button (which regenerates before downloading).
 export async function POST(request: NextRequest, { params }: { params: Promise<{ id: string }> }) {
   const { id: evaluationId } = await params
   const { userId } = await request.json()
@@ -20,5 +20,5 @@ export async function POST(request: NextRequest, { params }: { params: Promise<{
     return NextResponse.json({ error: result.error ?? 'Generation failed' }, { status: 400 })
   }
 
-  return NextResponse.json({ ok: true })
+  return NextResponse.json({ ok: true, documentId: result.documentId })
 }

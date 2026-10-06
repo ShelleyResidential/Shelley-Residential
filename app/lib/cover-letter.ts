@@ -5,7 +5,7 @@ import { DOCUMENTS_BUCKET } from '@/lib/evaluation-documents'
 
 const TEMPLATE_DOC_ID = process.env.GOOGLE_COVER_LETTER_TEMPLATE_ID
 
-type Result = { ok: boolean; error?: string }
+type Result = { ok: boolean; error?: string; documentId?: string }
 
 // Generates (or regenerates) an evaluation's Cover Letter: copies the
 // Google Doc template, fills in the seller/agent merge fields, exports the
@@ -123,7 +123,7 @@ export async function generateCoverLetter(evaluationId: string, userId: string):
 
   if (uploadError) return { ok: false, error: uploadError.message }
 
-  const { error: dbError } = await supabaseAdmin.from('evaluation_documents').upsert(
+  const { data: saved, error: dbError } = await supabaseAdmin.from('evaluation_documents').upsert(
     {
       evaluation_id:       evaluationId,
       report_type:         'cover_letter',
@@ -133,9 +133,9 @@ export async function generateCoverLetter(evaluationId: string, userId: string):
       uploaded_at:         new Date().toISOString(),
     },
     { onConflict: 'evaluation_id,report_type' },
-  )
+  ).select('id').single()
 
   if (dbError) return { ok: false, error: dbError.message }
 
-  return { ok: true }
+  return { ok: true, documentId: saved.id }
 }

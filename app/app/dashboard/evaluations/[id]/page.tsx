@@ -411,8 +411,7 @@ function DocumentsTab({ evaluationId, userId, propertyType, pipelineSteps, userD
 
   const canTC = canActOnRole(userDesignation, 'tc')
   const step  = (key: string) => pipelineSteps.find(s => s.step_key === key)
-  const evaluationPackComplete = step('evaluation_pack_prepared')?.status === 'complete'
-  const mandatePackComplete    = step('mandate_pack_prepared')?.status === 'complete'
+  const mandatePackComplete = step('mandate_pack_prepared')?.status === 'complete'
 
   const fetchDocuments = useCallback(async () => {
     const { data } = await supabase
@@ -518,7 +517,7 @@ function DocumentsTab({ evaluationId, userId, propertyType, pipelineSteps, userD
 
     <div className={`${card} p-6 mt-6`}>
       <h3 className={sectionTitle}>Evaluation Pack</h3>
-      <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
+      <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
         {FORM_TYPES.map(ft => (
           <FormCard
             key={ft.key}
@@ -529,12 +528,6 @@ function DocumentsTab({ evaluationId, userId, propertyType, pipelineSteps, userD
             onGenerated={fetchDocuments}
           />
         ))}
-        <ManualCompleteCard
-          title="Mark Complete"
-          complete={evaluationPackComplete}
-          canAct={canTC}
-          onToggle={() => toggleManualStep('evaluation_pack_prepared', evaluationPackComplete, 'prepared')}
-        />
       </div>
     </div>
 
@@ -576,10 +569,11 @@ function ManualCompleteCard({ title, complete, canAct, onToggle }: {
 }
 
 // A card that generates its own file server-side instead of taking an
-// upload -- same look as the Transfer Report cards, but Generate/
-// Regenerate instead of Upload/Replace. Generic across FORM_TYPES (Cover
-// Letter, Inspection Form, ...) -- each hits its own API route (apiPath)
-// but otherwise behaves identically.
+// upload -- same look as the Transfer Report cards, but a single Download
+// button that regenerates from the evaluation's current data before every
+// download, so it's never possible to download a stale copy. Generic across
+// FORM_TYPES (Cover Letter, Inspection Form, ...) -- each hits its own API
+// route (apiPath) but otherwise behaves identically.
 function FormCard({ evaluationId, userId, formType, doc, onGenerated }: {
   evaluationId: string
   userId: string | null
@@ -587,53 +581,39 @@ function FormCard({ evaluationId, userId, formType, doc, onGenerated }: {
   doc: EvaluationDocument | undefined
   onGenerated: () => void
 }) {
-  const [generating, setGenerating] = useState(false)
-  const [error, setError]           = useState('')
+  const [working, setWorking] = useState(false)
+  const [error, setError]     = useState('')
 
-  async function generate() {
+  async function regenerateAndDownload() {
     if (!userId) return
-    setGenerating(true)
+    setWorking(true)
     setError('')
     const res = await fetch(`/api/evaluations/${evaluationId}/${formType.apiPath}`, {
       method:  'POST',
       headers: { 'Content-Type': 'application/json' },
       body:    JSON.stringify({ userId }),
     })
+    const json = await res.json().catch(() => ({}))
     if (!res.ok) {
-      const json = await res.json().catch(() => ({}))
       setError(json.error ?? 'Generation failed.')
     } else {
       onGenerated()
+      window.location.href = `/api/documents/${json.documentId}/download`
     }
-    setGenerating(false)
+    setWorking(false)
   }
 
   return (
     <div className="border border-gray-200 rounded-xl p-4 flex flex-col gap-3">
       <h4 className="text-sm font-bold text-[#1a1a1a]">{formType.label}</h4>
       {error && <p className="text-xs text-red-500">{error}</p>}
-      {doc ? (
-        <>
-          <p className="text-xs text-gray-500 truncate" title={doc.file_name}>{doc.file_name}</p>
-          <div className="flex gap-2">
-            <a href={`/api/documents/${doc.id}/download`} className={`${btn.primary} flex-1 min-w-0 text-center`}>
-              Download
-            </a>
-            <button type="button" onClick={generate} disabled={generating}
-              className={`${btn.secondary} flex-1 min-w-0 ${generating ? 'opacity-50 cursor-not-allowed' : ''}`}>
-              {generating ? 'Regenerating…' : 'Regenerate'}
-            </button>
-          </div>
-        </>
-      ) : (
-        <>
-          <p className="text-xs text-gray-400">Not generated yet.</p>
-          <button type="button" onClick={generate} disabled={generating}
-            className={`${btn.primary} ${generating ? 'opacity-50 cursor-not-allowed' : ''}`}>
-            {generating ? 'Generating…' : 'Generate'}
-          </button>
-        </>
-      )}
+      <p className="text-xs text-gray-500 truncate" title={doc?.file_name}>
+        {doc ? doc.file_name : 'Not generated yet.'}
+      </p>
+      <button type="button" onClick={regenerateAndDownload} disabled={working}
+        className={`${btn.primary} text-center ${working ? 'opacity-50 cursor-not-allowed' : ''}`}>
+        {working ? 'Downloading…' : 'Download'}
+      </button>
     </div>
   )
 }

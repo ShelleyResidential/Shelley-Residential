@@ -7,9 +7,10 @@ import { generateInspectionForm } from '@/lib/inspection-form'
 // headroom than the platform default.
 export const maxDuration = 90
 
-// Only ever called from the Inspection Form card's Generate/Regenerate
-// button -- unlike Cover Letter, this never auto-generates, since there's
-// nothing to fill in until the agent has saved an inspection.
+// Only ever called from the Inspection Form card's Download button (which
+// regenerates before downloading) -- unlike Cover Letter, this never
+// auto-generates, since there's nothing to fill in until the agent has
+// saved an inspection.
 export async function POST(request: NextRequest, { params }: { params: Promise<{ id: string }> }) {
   const { id: evaluationId } = await params
   const { userId } = await request.json()
@@ -23,5 +24,5 @@ export async function POST(request: NextRequest, { params }: { params: Promise<{
     return NextResponse.json({ error: result.error ?? 'Generation failed' }, { status: 400 })
   }
 
-  return NextResponse.json({ ok: true })
+  return NextResponse.json({ ok: true, documentId: result.documentId })
 }

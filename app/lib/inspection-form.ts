@@ -14,7 +14,7 @@ import {
 
 const TEMPLATE_DOC_ID = process.env.GOOGLE_INSPECTION_FORM_TEMPLATE_ID
 
-type Result = { ok: boolean; error?: string }
+type Result = { ok: boolean; error?: string; documentId?: string }
 type Opt = { value: string; label: string }
 
 // A ☑/❏ line for every option, matching the printed template's own
@@ -339,7 +339,7 @@ export async function generateInspectionForm(evaluationId: string, userId: strin
 
   if (uploadError) return { ok: false, error: uploadError.message }
 
-  const { error: dbError } = await supabaseAdmin.from('evaluation_documents').upsert(
+  const { data: saved, error: dbError } = await supabaseAdmin.from('evaluation_documents').upsert(
     {
       evaluation_id:       evaluationId,
       report_type:         'inspection_form',
@@ -349,9 +349,9 @@ export async function generateInspectionForm(evaluationId: string, userId: strin
       uploaded_at:         new Date().toISOString(),
     },
     { onConflict: 'evaluation_id,report_type' },
-  )
+  ).select('id').single()
 
   if (dbError) return { ok: false, error: dbError.message }
 
-  return { ok: true }
+  return { ok: true, documentId: saved.id }
 }
