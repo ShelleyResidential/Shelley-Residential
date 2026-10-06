@@ -2,7 +2,7 @@ import { supabaseAdmin } from '@/lib/supabase-admin'
 import { getValidAccessToken } from '@/lib/calendar-tokens'
 import {
   copyDriveFile, replaceTextInDoc, exportDocAsPdf, deleteDriveFile,
-  getDocument, findParagraphsByText, deleteParagraphRanges,
+  getDocument, findParagraphsByText, applyTextOps,
 } from '@/lib/google-docs'
 import { DOCUMENTS_BUCKET } from '@/lib/evaluation-documents'
 import {
@@ -153,26 +153,53 @@ export async function generateInspectionForm(evaluationId: string, userId: strin
     return { ok: false, error: docResult.error?.message ?? 'Failed to read the inspection form template structure' }
   }
 
-  const deleteTargets: string[] = []
+  // For each section, trim its content cell AND its label cell down to
+  // `keepSlot` paragraphs each (always >=1 -- slot 1 structurally survives
+  // even at 0 units, just blanked below, since a table cell can never have
+  // zero paragraphs). Google's API won't delete a range that reaches a
+  // cell's own final terminating newline, even one about to be replaced in
+  // the same request -- so trimming away slots (keepSlot+1)..slots means
+  // deleting from the keepSlot paragraph's start through to (not
+  // including) the cell's true last paragraph's own newline, then
+  // reinserting the keepSlot paragraph's text right before that preserved
+  // newline, so it becomes the new terminator instead of a stray blank
+  // line. See applyTextOps in google-docs.ts.
+  const searchTexts: string[] = []
   for (const section of REPEATING_SECTIONS) {
     const actual = actualByPrefix[section.prefix]
-    const filledCount = Math.min(actual, section.slots)
-    const firstToDelete = actual === 0 ? 2 : filledCount + 1
-    for (let slot = firstToDelete; slot <= section.slots; slot++) {
-      deleteTargets.push(`{{${section.prefix}_${slot}}}`)
-      deleteTargets.push(`${section.label} ${slot}`)
+    const keepSlot = Math.max(1, Math.min(actual, section.slots))
+    if (keepSlot < section.slots) {
+      searchTexts.push(`{{${section.prefix}_${keepSlot}}}`, `{{${section.prefix}_${section.slots}}}`)
+      searchTexts.push(`${section.label} ${keepSlot}`, `${section.label} ${section.slots}`)
     }
   }
 
-  const ranges = findParagraphsByText(docResult.document, deleteTargets)
-    .sort((a, b) => b.startIndex - a.startIndex)
-    .map(r => ({ startIndex: r.startIndex, endIndex: r.endIndex }))
+  if (searchTexts.length > 0) {
+    const found = findParagraphsByText(docResult.document, searchTexts)
+    const byText = new Map(found.map(p => [p.text, p]))
 
-  if (ranges.length > 0) {
-    const delResult = await deleteParagraphRanges(accessToken, copy.id, ranges)
-    if (delResult.error) {
+    const trimOps: { startIndex: number; endIndex: number; text: string }[] = []
+    for (const section of REPEATING_SECTIONS) {
+      const actual = actualByPrefix[section.prefix]
+      const keepSlot = Math.max(1, Math.min(actual, section.slots))
+      if (keepSlot >= section.slots) continue
+
+      for (const [keepKey, lastKey] of [
+        [`{{${section.prefix}_${keepSlot}}}`, `{{${section.prefix}_${section.slots}}}`],
+        [`${section.label} ${keepSlot}`, `${section.label} ${section.slots}`],
+      ]) {
+        const keepPara = byText.get(keepKey)
+        const lastPara = byText.get(lastKey)
+        if (!keepPara || !lastPara || keepPara.startIndex === lastPara.startIndex) continue
+        trimOps.push({ startIndex: keepPara.startIndex, endIndex: lastPara.endIndex - 1, text: keepPara.text })
+      }
+    }
+
+    trimOps.sort((a, b) => b.startIndex - a.startIndex)
+    const trimResult = await applyTextOps(accessToken, copy.id, trimOps)
+    if (trimResult.error) {
       await deleteDriveFile(accessToken, copy.id)
-      return { ok: false, error: delResult.error.message }
+      return { ok: false, error: trimResult.error.message }
     }
   }
 
@@ -196,7 +223,15 @@ export async function generateInspectionForm(evaluationId: string, userId: strin
     '{{carports_quantity}}':  String(insp.carports_quantity ?? 0),
     '{{parking_capacity}}':   checkLine(PARKING_OPTS, insp.parking_capacity ?? ''),
 
-    '{{garden}}':       `${yesNo(insp.garden_present)}   Size: ${checkLine(SIZE_OPTS, insp.garden_size ?? '')}   Description: ${checkLine(GARDEN_DESC_OPTS, insp.garden_description ?? '')}`,
+    // Garden/Other Reception/Kitchen/Security are each laid out across
+    // several physical lines in the template (not one combined cell), so
+    // each line gets its own placeholder rather than one composite -- the
+    // line's own fixed prefix ("Size:", "Finish:", "Type:", ...) is baked
+    // into the computed value here, since the template line it replaces is
+    // gone, placeholder and all.
+    '{{garden_present}}':     yesNo(insp.garden_present),
+    '{{garden_size}}':        `Size: ${checkLine(SIZE_OPTS, insp.garden_size ?? '')}`,
+    '{{garden_description}}': `Description: ${checkLine(GARDEN_DESC_OPTS, insp.garden_description ?? '')}`,
     '{{tennis_court}}': `${yesNo(insp.tennis_court_present)}   Condition: ${checkLine(GOOD_POOR_OPTS, insp.tennis_court_condition ?? '')}`,
     '{{pool}}':         `${yesNo(insp.pool_present)}   Condition: ${checkLine(GOOD_POOR_OPTS, insp.pool_condition ?? '')}`,
     '{{jacuzzi}}':      `${yesNo(insp.jacuzzi_present)}   Condition: ${checkLine(GOOD_POOR_OPTS, insp.jacuzzi_status ?? '')}`,
@@ -208,8 +243,12 @@ export async function generateInspectionForm(evaluationId: string, userId: strin
 
     '{{lounges_quantity}}':     String(insp.lounges_quantity ?? 0),
     '{{dining_room_quantity}}': String(insp.dining_room_quantity ?? 0),
-    '{{other_reception}}': `${yesNo(insp.other_reception_present)}   Type: ${checkLine(RECEPTION_TYPE_OPTS, insp.other_reception_type ?? '')}   If Other: ${insp.other_reception_type === 'other' ? (insp.other_reception_type_other || '') : '________________'}`,
-    '{{kitchen}}': `Size: ${checkLine(SIZE_OPTS, insp.kitchen_size ?? '')}   Finish: ${checkLine(FINISH_OPTS, insp.kitchen_finish ?? '')}   Position: ${checkLine(KITCHEN_POS_OPTS, insp.kitchen_position ?? '')}`,
+    '{{other_reception_present}}': yesNo(insp.other_reception_present),
+    '{{other_reception_type}}':    `Type: ${checkLine(RECEPTION_TYPE_OPTS, insp.other_reception_type ?? '')}`,
+    '{{other_reception_other}}':   `If Other: ${insp.other_reception_type === 'other' ? (insp.other_reception_type_other || '') : '________________'}`,
+    '{{kitchen_size}}':     `Size: ${checkLine(SIZE_OPTS, insp.kitchen_size ?? '')}`,
+    '{{kitchen_finish}}':   `Finish: ${checkLine(FINISH_OPTS, insp.kitchen_finish ?? '')}`,
+    '{{kitchen_position}}': `Position: ${checkLine(KITCHEN_POS_OPTS, insp.kitchen_position ?? '')}`,
     '{{scullery_laundry_present}}': yesNo(insp.scullery_laundry_present),
 
     '{{bedrooms_quantity}}':  String(insp.bedrooms_quantity ?? 0),
@@ -217,16 +256,23 @@ export async function generateInspectionForm(evaluationId: string, userId: strin
     '{{bathrooms_quantity}}': String(insp.bathrooms_quantity ?? 0),
     '{{guest_loo_quantity}}': String(insp.guest_loo_quantity ?? 0),
 
-    '{{security}}': `${yesNo(insp.security_present)}   ${checkLineStrings(SECURITY_OPTIONS, securityFeatures)}`,
-    '{{general_condition}}': CONDITION_ITEMS.map(item => {
+    '{{security_present}}':  yesNo(insp.security_present),
+    '{{security_features}}': checkLineStrings(SECURITY_OPTIONS, securityFeatures),
+    // General Condition is one line per item in the template (item name +
+    // its own checkboxes), not one combined block -- same per-paragraph
+    // placeholder treatment, item name baked into the computed value.
+    ...Object.fromEntries(CONDITION_ITEMS.map(item => {
       const entry = generalCondition.find(c => c.feature === item)
       const opts: Opt[] = [
         { value: 'good', label: conditionLabel(item, 'good') },
         { value: 'poor', label: conditionLabel(item, 'poor') },
       ]
-      return `${item} ${checkLine(opts, entry?.condition ?? '')}`
-    }).join('   '),
-    '{{additional_features}}': checkLineStrings(ADDITIONAL_OPTS, additionalFeatures),
+      const key = `{{general_condition_${item.toLowerCase().replace(/[^a-z]+/g, '_')}}}`
+      return [key, `${item}\t${checkLine(opts, entry?.condition ?? '')}`]
+    })),
+    // Shares its line with the "Additional Features" label in the
+    // template, so that label text is baked in here too.
+    '{{additional_features}}': `Additional Features ${checkLineStrings(ADDITIONAL_OPTS, additionalFeatures)}`,
   }
 
   for (let i = 0; i < Math.min(actualByPrefix.patio, 2); i++) {

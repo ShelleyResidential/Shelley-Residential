@@ -94,8 +94,8 @@ function paragraphText(p: GoogleDocParagraph): string {
 // that's where every field in this app's templates lives) and returns the
 // start/endIndex of every paragraph whose text exactly matches one of
 // `texts` -- in document order. endIndex includes the paragraph's own
-// trailing newline, so deleting [startIndex, endIndex) collapses the whole
-// line rather than leaving an empty one behind.
+// trailing newline -- see applyTextOps for why that can't always be
+// deleted outright.
 export function findParagraphsByText(doc: GoogleDoc, texts: string[]): { text: string; startIndex: number; endIndex: number }[] {
   const wanted = new Set(texts)
   const found: { text: string; startIndex: number; endIndex: number }[] = []
@@ -121,15 +121,35 @@ export function findParagraphsByText(doc: GoogleDoc, texts: string[]): { text: s
   return found
 }
 
-// Deletes a batch of structural ranges (e.g. unused repeating-section
-// paragraph lines) in one batchUpdate. `ranges` MUST already be sorted
-// highest-startIndex-first by the caller: the Docs API applies batchUpdate
-// requests strictly in array order, each re-indexing the document before
-// the next is interpreted, so deleting a lower range first would shift the
-// indices of higher ranges still queued.
-export async function deleteParagraphRanges(accessToken: string, documentId: string, ranges: { startIndex: number; endIndex: number }[]) {
-  if (ranges.length === 0) return {}
-  const requests = ranges.map(range => ({ deleteContentRange: { range } }))
+// Applies a batch of (delete-range, then optionally insert-text-at-that-
+// position) structural edits in one batchUpdate. `ops` MUST already be
+// sorted highest-startIndex-first by the caller: the Docs API applies
+// batchUpdate requests strictly in array order, each re-indexing the
+// document before the next is interpreted, so acting on a lower position
+// first would shift the indices of higher ones still queued.
+//
+// IMPORTANT constraint this exists to work around: the Docs API refuses to
+// delete a range that includes a table cell's own final paragraph-
+// terminating newline, even transiently within a request that's about to
+// restore one -- there is no way to "delete everything in a cell and
+// replace it" in one shot if that range reaches the cell's last character.
+// Trimming a cell down to fewer paragraphs therefore has to delete UP TO
+// (not including) the true last paragraph's own trailing newline, and if
+// real content needs to survive at that position, re-insert it there so
+// that preserved final newline ends up terminating it instead of sitting
+// as a stray blank line. See inspection-form.ts's trimRepeatingSection for
+// the caller that builds ops this way.
+export async function applyTextOps(accessToken: string, documentId: string, ops: { startIndex: number; endIndex: number; text: string }[]) {
+  if (ops.length === 0) return {}
+  const requests: object[] = []
+  for (const op of ops) {
+    if (op.endIndex > op.startIndex) {
+      requests.push({ deleteContentRange: { range: { startIndex: op.startIndex, endIndex: op.endIndex } } })
+    }
+    if (op.text) {
+      requests.push({ insertText: { location: { index: op.startIndex }, text: op.text } })
+    }
+  }
   const res = await fetch(`${DOCS_BASE_URL}/${encodeURIComponent(documentId)}:batchUpdate`, {
     method: 'POST',
     headers: {
