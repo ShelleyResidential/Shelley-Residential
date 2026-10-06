@@ -7,9 +7,12 @@ export const REPORT_TYPES = [
 ] as const
 
 // System-generated (not user-uploaded) -- rendered under its own "Forms"
-// section with Generate/Regenerate instead of an upload control.
+// section with Generate/Regenerate instead of an upload control. apiPath is
+// separate from key since the two don't share a URL-safe transform of it
+// (cover-letter vs cover_letter, inspection-form vs inspection_form).
 export const FORM_TYPES = [
-  { key: 'cover_letter', label: 'Cover Letter' },
+  { key: 'cover_letter',    label: 'Cover Letter',    apiPath: 'cover-letter' },
+  { key: 'inspection_form', label: 'Inspection Form', apiPath: 'inspection-form' },
 ] as const
 
 export type ReportType = typeof REPORT_TYPES[number]['key']

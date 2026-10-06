@@ -8,11 +8,17 @@ import { Breadcrumbs } from '@/lib/Breadcrumbs'
 import { useRouter, useParams, useSearchParams } from 'next/navigation'
 import Link from 'next/link'
 import { EvaluationForm } from '../EvaluationForm'
-import { REPORT_TYPES } from '@/lib/evaluation-documents'
+import { REPORT_TYPES, FORM_TYPES } from '@/lib/evaluation-documents'
 import {
   STATUS_LABELS, STATUS_COLOURS, stepLabel, stepOwnerRole, canActOnRole, roleLabel, getNextAction,
   markStepComplete, promoteStatus, checkPreparedGate, checkPresentationReadyGate,
 } from '@/lib/pipeline'
+import {
+  PATIO_OPTIONS, SECURITY_OPTIONS, CONDITION_ITEMS, ADDITIONAL_OPTS, conditionLabel,
+  ROAD_LEVEL_OPTS, LAND_SIZE_OPTS, GATE_FENCING_OPTS, GARAGE_DESC_OPTS, PARKING_OPTS,
+  SIZE_OPTS, GARDEN_DESC_OPTS, GOOD_POOR_OPTS, FINISH_OPTS, KITCHEN_POS_OPTS,
+  RECEPTION_TYPE_OPTS, STUDY_TYPE_OPTS, FLATLET_BED_OPTS, optLabel,
+} from '@/lib/inspection-options'
 
 // ── Types ─────────────────────────────────────────────────────
 type Property = {
@@ -512,17 +518,17 @@ function DocumentsTab({ evaluationId, userId, propertyType, pipelineSteps, userD
 
     <div className={`${card} p-6 mt-6`}>
       <h3 className={sectionTitle}>Evaluation Pack</h3>
-      {/* Only 2 cards live here, unlike Transfer Reports' 3 -- grid-cols-3
-          left a phantom empty column and squeezed the Cover Letter card
-          narrow enough that "Regenerate"/"Regenerating…" overflowed its
-          border into the Mark Complete card next to it. */}
-      <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-        <CoverLetterCard
-          evaluationId={evaluationId}
-          userId={userId}
-          doc={documents.find(d => d.report_type === 'cover_letter')}
-          onGenerated={fetchDocuments}
-        />
+      <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
+        {FORM_TYPES.map(ft => (
+          <FormCard
+            key={ft.key}
+            evaluationId={evaluationId}
+            userId={userId}
+            formType={ft}
+            doc={documents.find(d => d.report_type === ft.key)}
+            onGenerated={fetchDocuments}
+          />
+        ))}
         <ManualCompleteCard
           title="Mark Complete"
           complete={evaluationPackComplete}
@@ -571,10 +577,13 @@ function ManualCompleteCard({ title, complete, canAct, onToggle }: {
 
 // A card that generates its own file server-side instead of taking an
 // upload -- same look as the Transfer Report cards, but Generate/
-// Regenerate instead of Upload/Replace.
-function CoverLetterCard({ evaluationId, userId, doc, onGenerated }: {
+// Regenerate instead of Upload/Replace. Generic across FORM_TYPES (Cover
+// Letter, Inspection Form, ...) -- each hits its own API route (apiPath)
+// but otherwise behaves identically.
+function FormCard({ evaluationId, userId, formType, doc, onGenerated }: {
   evaluationId: string
   userId: string | null
+  formType: typeof FORM_TYPES[number]
   doc: EvaluationDocument | undefined
   onGenerated: () => void
 }) {
@@ -585,7 +594,7 @@ function CoverLetterCard({ evaluationId, userId, doc, onGenerated }: {
     if (!userId) return
     setGenerating(true)
     setError('')
-    const res = await fetch(`/api/evaluations/${evaluationId}/cover-letter`, {
+    const res = await fetch(`/api/evaluations/${evaluationId}/${formType.apiPath}`, {
       method:  'POST',
       headers: { 'Content-Type': 'application/json' },
       body:    JSON.stringify({ userId }),
@@ -601,7 +610,7 @@ function CoverLetterCard({ evaluationId, userId, doc, onGenerated }: {
 
   return (
     <div className="border border-gray-200 rounded-xl p-4 flex flex-col gap-3">
-      <h4 className="text-sm font-bold text-[#1a1a1a]">Cover Letter</h4>
+      <h4 className="text-sm font-bold text-[#1a1a1a]">{formType.label}</h4>
       {error && <p className="text-xs text-red-500">{error}</p>}
       {doc ? (
         <>
@@ -701,18 +710,9 @@ function ActivityTab({ evaluationId, profiles }: { evaluationId: string; profile
 }
 
 // ── InspectionTab ─────────────────────────────────────────────
-const PATIO_OPTIONS     = ['Covered', 'Open / Sundeck', 'Fully Enclosed', 'Large', 'Epic']
-const SECURITY_OPTIONS  = ['Standard', 'CCTV', 'Electric Fencing']
-const CONDITION_ITEMS   = ['Flooring', 'Windows / Doors', 'Flow / Layout', 'Architecture']
-const ADDITIONAL_OPTS   = ['Water Storage / Filtration', 'Storeroom', 'Solar Panels', 'Inverter', 'Batteries']
-
-// Architecture reads better as a style judgement ("Notable"/"Standard")
-// than the generic "Good"/"Poor" every other General Condition item uses --
-// the underlying stored value is still 'good'/'poor' either way.
-function conditionLabel(item: string, value: 'good' | 'poor'): string {
-  if (item === 'Architecture') return value === 'good' ? 'Notable' : 'Standard'
-  return value === 'good' ? 'Good' : 'Poor'
-}
+// Option lists (and conditionLabel/optLabel) live in lib/inspection-options
+// -- shared with the server-side Inspection Form PDF generator, which can't
+// import from this 'use client' file.
 
 // The shared `label` style from lib/styles is gray-500 -- too light next
 // to YesNo's dark labels (Garden, Security, etc.), which is what stood out
@@ -724,27 +724,6 @@ const fieldLabelCls = 'block text-sm font-medium text-[#1a1a1a] mb-1'
 // byte-for-byte the shared `label` style from lib/styles. Edit mode keeps
 // the darker fieldLabelCls above.
 const roLabelCls    = 'block text-sm font-medium text-gray-500 mb-1'
-
-// Option lists for the Inspection selects, pulled out so the same list
-// renders the <option>s in edit mode AND resolves the stored value to a
-// label in read-only mode (a saved inspection shows plain text, like the
-// Details tab does).
-const ROAD_LEVEL_OPTS      = [{ value: 'above_road_level', label: 'Above Road Level' }, { value: 'on_road_level', label: 'On Road Level' }, { value: 'below_road_level', label: 'Below Road Level' }]
-const LAND_SIZE_OPTS       = [{ value: 'subdivisible', label: 'Subdivisible' }, { value: 'not_subdivisible', label: 'Not Subdivisible' }]
-const GATE_FENCING_OPTS    = [{ value: 'auto_gate', label: 'Auto Gate' }, { value: 'fully_fenced_walled', label: 'Fully Fenced/Walled' }, { value: 'none', label: 'None' }]
-const GARAGE_DESC_OPTS     = [{ value: 'tandem', label: 'Tandem' }]
-const PARKING_OPTS         = [{ value: '2_cars', label: '2 Cars' }, { value: '3_9_cars', label: '3-9 Cars' }, { value: '10_plus_cars', label: '10+ Cars' }]
-const SIZE_OPTS            = [{ value: 'large', label: 'Large' }, { value: 'medium', label: 'Medium' }, { value: 'small', label: 'Small' }]
-const GARDEN_DESC_OPTS     = [{ value: 'level', label: 'Level' }, { value: 'slope_terrace', label: 'Slope/Terrace' }]
-const GOOD_POOR_OPTS       = [{ value: 'good', label: 'Good' }, { value: 'poor', label: 'Poor' }]
-const FINISH_OPTS          = [{ value: 'modern', label: 'Modern' }, { value: 'neat', label: 'Neat' }, { value: 'outdated', label: 'Outdated' }]
-const KITCHEN_POS_OPTS     = [{ value: 'open_plan', label: 'Open Plan' }, { value: 'down_passage', label: 'Down Passage' }, { value: 'separate', label: 'Separate' }]
-const RECEPTION_TYPE_OPTS  = [{ value: 'pub', label: 'Pub' }, { value: 'gym', label: 'Gym' }, { value: 'library', label: 'Library' }, { value: 'other', label: 'Other' }]
-const STUDY_TYPE_OPTS      = [{ value: 'nook', label: 'Nook' }, { value: 'separate_room', label: 'Separate Room' }]
-const FLATLET_BED_OPTS     = [{ value: 'studio', label: 'Studio' }, { value: 'one_bed', label: '1 Bedroom' }, { value: 'two_bed', label: '2 Bedroom' }]
-
-const optLabel = (opts: { value: string; label: string }[], v: string | null | undefined) =>
-  opts.find(o => o.value === v)?.label ?? '—'
 
 // Label + control (edit mode) or label + plain text (read-only), matching
 // the Details tab's Field component.
