@@ -270,7 +270,7 @@ export default function ContactsPage() {
     <div className="p-4 md:p-10">
       <Breadcrumbs items={[{ label: 'Analyse' }, { label: 'People' }]} />
       <div className="flex items-center justify-between mb-4 gap-2">
-        <h1 className="text-lg sm:text-2xl font-bold text-[#1a1a1a]">Contacts</h1>
+        <h1 className="text-lg sm:text-2xl font-bold text-[#1a1a1a]">People</h1>
         <div className="flex items-center gap-2 sm:gap-3">
           <button onClick={syncContacts} disabled={syncing} className={btn.primary}>
             {syncing ? 'Syncing…' : 'Sync Contacts'}
@@ -330,7 +330,7 @@ export default function ContactsPage() {
       <div className="flex items-center justify-between flex-wrap gap-3 mb-4">
         {!loading && (
           <p className="text-sm text-gray-400">
-            {totalCount.toLocaleString('en-US')} {totalCount === 1 ? 'Contact' : 'Contacts'}
+            {totalCount.toLocaleString('en-US')} {totalCount === 1 ? 'Person' : 'People'}
           </p>
         )}
         {paginationControls}

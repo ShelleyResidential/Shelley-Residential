@@ -204,7 +204,7 @@ export default function PropertiesPage() {
     <div className="p-4 md:p-10">
       <Breadcrumbs items={[{ label: 'Analyse' }, { label: 'Homes' }]} />
       <div className="flex items-center justify-between mb-4 gap-2">
-        <h1 className="text-lg sm:text-2xl font-bold text-[#1a1a1a]">Properties</h1>
+        <h1 className="text-lg sm:text-2xl font-bold text-[#1a1a1a]">Homes</h1>
         {/* Search toggle -- mobile only, sits in this same header row
             instead of a row of its own (which was mostly empty space,
             defeating the point of collapsing the filters at all). */}
@@ -262,7 +262,7 @@ export default function PropertiesPage() {
       <div className="flex items-center justify-between flex-wrap gap-3 mb-4">
         {!loading && (
           <p className="text-sm text-gray-400">
-            {totalCount} {totalCount === 1 ? 'Property' : 'Properties'}
+            {totalCount} {totalCount === 1 ? 'Home' : 'Homes'}
           </p>
         )}
         {paginationControls}
