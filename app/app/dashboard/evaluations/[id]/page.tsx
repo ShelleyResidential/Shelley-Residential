@@ -517,7 +517,7 @@ function DocumentsTab({ evaluationId, userId, propertyType, pipelineSteps, userD
 
     <div className={`${card} p-6 mt-6`}>
       <h3 className={sectionTitle}>Evaluation Pack</h3>
-      <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+      <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
         {FORM_TYPES.map(ft => (
           <FormCard
             key={ft.key}
