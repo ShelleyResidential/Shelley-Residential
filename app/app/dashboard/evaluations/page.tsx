@@ -653,9 +653,7 @@ function RowActionButtons({ evaluationId, propertyType, onEdit, onDetails }: {
 
   // Sectional titles also need an SS (Sectional Scheme) report; freehold
   // and vacant land only need Property + Suburb -- same split as the
-  // evaluation's own Transfer Reports card. Downloaded as one zip rather
-  // than one click per file: browsers silently drop automatic downloads
-  // after the first when a page fires off several at once.
+  // evaluation's own Transfer Reports card.
   async function handleTransferReportsDownload() {
     setDownloadMenuOpen(false)
     if (!evaluationId) return
@@ -666,7 +664,7 @@ function RowActionButtons({ evaluationId, propertyType, onEdit, onDetails }: {
 
     const { data } = await supabase
       .from('evaluation_documents')
-      .select('report_type')
+      .select('id, report_type')
       .eq('evaluation_id', evaluationId)
       .in('report_type', requiredTypes)
 
@@ -679,7 +677,18 @@ function RowActionButtons({ evaluationId, propertyType, onEdit, onDetails }: {
       return
     }
 
-    window.location.href = `/api/evaluations/${evaluationId}/transfer-reports`
+    // Each report downloads as its own file, spaced out so the browser
+    // treats them as separate downloads. The first time, Chrome may ask to
+    // allow multiple downloads from this site -- choosing Allow is
+    // remembered afterwards.
+    for (const doc of found) {
+      const a = document.createElement('a')
+      a.href = `/api/documents/${doc.id}/download`
+      document.body.appendChild(a)
+      a.click()
+      a.remove()
+      await new Promise(resolve => setTimeout(resolve, 1000))
+    }
   }
 
   // Same as the Evaluation Pack's Inspection Form card: regenerates from the
