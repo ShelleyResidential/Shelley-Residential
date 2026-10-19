@@ -80,6 +80,9 @@ export default function EvaluationDetailPage() {
   // form's -- a saved inspection is read-only until the header Edit button
   // is clicked while that tab is active.
   const [inspectionEditing, setInspectionEditing] = useState(false)
+  // Documents tab: Transfer Report cards show a single Download button
+  // until the header Edit button is clicked, which reveals Replace/Upload.
+  const [documentsEditing, setDocumentsEditing] = useState(false)
   const [deleting, setDeleting]     = useState(false)
   // Looked up separately rather than embedded via a PostgREST relationship
   // join -- completed_by_user_id has no foreign key constraint, so an
@@ -217,7 +220,14 @@ export default function EvaluationDetailPage() {
             <span className={`text-sm px-3 py-1 rounded-full font-medium whitespace-nowrap ${STATUS_COLOURS[ev.status] ?? 'bg-gray-100 text-gray-500'}`}>
               {STATUS_LABELS[ev.status] ?? ev.status}
             </span>
-            {!(activeTab === 'inspection' ? inspectionEditing : editing) && (
+            {activeTab === 'documents' ? (
+              <button
+                onClick={() => setDocumentsEditing(v => !v)}
+                className={`${btn.secondary} whitespace-nowrap`}
+              >
+                {documentsEditing ? 'Done' : 'Edit'}
+              </button>
+            ) : !(activeTab === 'inspection' ? inspectionEditing : editing) && (
               <button
                 onClick={() => {
                   if (activeTab === 'inspection') setInspectionEditing(true)
@@ -277,7 +287,7 @@ export default function EvaluationDetailPage() {
         <DocumentsTab
           evaluationId={id} userId={userId} propertyType={ev.properties?.property_type ?? null}
           pipelineSteps={ev.evaluation_pipeline_steps} userDesignation={userDesignation}
-          onStepChanged={fetchEvaluation}
+          onStepChanged={fetchEvaluation} editing={documentsEditing}
         />
       )}
 
@@ -393,10 +403,10 @@ type EvaluationDocument = {
   uploaded_at: string
 }
 
-function DocumentsTab({ evaluationId, userId, propertyType, pipelineSteps, userDesignation, onStepChanged }: {
+function DocumentsTab({ evaluationId, userId, propertyType, pipelineSteps, userDesignation, onStepChanged, editing }: {
   evaluationId: string; userId: string | null; propertyType: string | null
   pipelineSteps: PipelineStep[]; userDesignation: string | null
-  onStepChanged: () => void
+  onStepChanged: () => void; editing: boolean
 }) {
   // Sectional titles get an SS (Sectional Scheme) report; freehold and
   // vacant land don't have one to upload.
@@ -488,25 +498,33 @@ function DocumentsTab({ evaluationId, userId, propertyType, pipelineSteps, userD
               {doc ? (
                 <>
                   <p className="text-xs text-gray-500 truncate" title={doc.file_name}>{doc.file_name}</p>
-                  <div className="flex gap-2">
-                    <a href={`/api/documents/${doc.id}/download`} className={`${btn.primary} flex-1 min-w-0 text-center`}>
+                  {editing ? (
+                    <div className="flex gap-2">
+                      <a href={`/api/documents/${doc.id}/download`} className={`${btn.primary} flex-1 min-w-0 text-center`}>
+                        Download
+                      </a>
+                      <label className={`${btn.secondary} flex-1 min-w-0 text-center cursor-pointer ${uploading ? 'opacity-50 pointer-events-none' : ''}`}>
+                        {uploading ? 'Uploading…' : 'Replace'}
+                        <input type="file" className="hidden"
+                          onChange={e => e.target.files?.[0] && handleUpload(rt.key, e.target.files[0])} />
+                      </label>
+                    </div>
+                  ) : (
+                    <a href={`/api/documents/${doc.id}/download`} className={`${btn.primary} text-center`}>
                       Download
                     </a>
-                    <label className={`${btn.secondary} flex-1 min-w-0 text-center cursor-pointer ${uploading ? 'opacity-50 pointer-events-none' : ''}`}>
-                      {uploading ? 'Uploading…' : 'Replace'}
-                      <input type="file" className="hidden"
-                        onChange={e => e.target.files?.[0] && handleUpload(rt.key, e.target.files[0])} />
-                    </label>
-                  </div>
+                  )}
                 </>
               ) : (
                 <>
                   <p className="text-xs text-gray-400">No file uploaded yet.</p>
-                  <label className={`${btn.primary} text-center cursor-pointer ${uploading ? 'opacity-50 pointer-events-none' : ''}`}>
-                    {uploading ? 'Uploading…' : '+ Upload'}
-                    <input type="file" className="hidden"
-                      onChange={e => e.target.files?.[0] && handleUpload(rt.key, e.target.files[0])} />
-                  </label>
+                  {editing && (
+                    <label className={`${btn.primary} text-center cursor-pointer ${uploading ? 'opacity-50 pointer-events-none' : ''}`}>
+                      {uploading ? 'Uploading…' : '+ Upload'}
+                      <input type="file" className="hidden"
+                        onChange={e => e.target.files?.[0] && handleUpload(rt.key, e.target.files[0])} />
+                    </label>
+                  )}
                 </>
               )}
             </div>
