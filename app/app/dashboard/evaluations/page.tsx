@@ -654,20 +654,34 @@ function RowActionButtons({ evaluationId, propertyType, onEdit, onDetails }: {
   // Sectional titles also need an SS (Sectional Scheme) report; freehold
   // and vacant land only need Property + Suburb -- same split as the
   // evaluation's own Transfer Reports card.
-  // Each report is its own menu item: browsers only allow one download per
-  // click, so downloading several at once silently drops all but the first.
-  const reportTypes = propertyType === 'sectional_title'
-    ? REPORT_TYPES
-    : REPORT_TYPES.filter(rt => rt.key !== 'ss_report')
-  const [reportDocs, setReportDocs] = useState<{ id: string; report_type: string }[]>([])
+  // Downloaded as one zip rather than one click per file: browsers silently
+  // drop automatic downloads after the first when a page fires off several
+  // at once.
+  async function handleTransferReportsDownload() {
+    setDownloadMenuOpen(false)
+    if (!evaluationId) return
 
-  useEffect(() => {
-    if (!downloadMenuOpen || !evaluationId) return
-    supabase.from('evaluation_documents')
-      .select('id, report_type')
+    const requiredTypes = propertyType === 'sectional_title'
+      ? REPORT_TYPES.map(rt => rt.key)
+      : REPORT_TYPES.filter(rt => rt.key !== 'ss_report').map(rt => rt.key)
+
+    const { data } = await supabase
+      .from('evaluation_documents')
+      .select('report_type')
       .eq('evaluation_id', evaluationId)
-      .then(({ data }) => setReportDocs(data ?? []))
-  }, [downloadMenuOpen, evaluationId])
+      .in('report_type', requiredTypes)
+
+    const found   = data ?? []
+    const missing = requiredTypes.filter(rt => !found.some(d => d.report_type === rt))
+
+    if (missing.length > 0) {
+      const missingLabels = missing.map(rt => REPORT_TYPES.find(r => r.key === rt)?.label ?? rt).join(', ')
+      alert(`These Transfer Reports still need to be uploaded before you can download them: ${missingLabels}`)
+      return
+    }
+
+    window.location.href = `/api/evaluations/${evaluationId}/transfer-reports`
+  }
 
   // Same as the Evaluation Pack's Inspection Form card: regenerates from the
   // evaluation's current data, then downloads that fresh copy.
@@ -712,20 +726,9 @@ function RowActionButtons({ evaluationId, propertyType, onEdit, onDetails }: {
             <button onClick={handleFormDownload} className="w-full text-left px-4 py-2 text-sm text-[#1a1a1a] hover:bg-gray-50 transition-colors cursor-pointer">
               Form
             </button>
-            <p className="px-4 pt-2 pb-1 text-xs font-semibold uppercase tracking-wide text-gray-400">Transfer Reports</p>
-            {reportTypes.map(rt => {
-              const doc = reportDocs.find(d => d.report_type === rt.key)
-              return doc ? (
-                <a key={rt.key} href={`/api/documents/${doc.id}/download`} onClick={() => setDownloadMenuOpen(false)}
-                  className="block w-full text-left px-4 py-2 text-sm text-[#1a1a1a] hover:bg-gray-50 transition-colors cursor-pointer">
-                  {rt.label}
-                </a>
-              ) : (
-                <span key={rt.key} className="block px-4 py-2 text-sm text-gray-300 cursor-not-allowed">
-                  {rt.label} (not uploaded)
-                </span>
-              )
-            })}
+            <button onClick={handleTransferReportsDownload} className="w-full text-left px-4 py-2 text-sm text-[#1a1a1a] hover:bg-gray-50 transition-colors cursor-pointer">
+              Transfer Reports
+            </button>
             <button onClick={() => handleDownload('Market Report')} className="w-full text-left px-4 py-2 text-sm text-[#1a1a1a] hover:bg-gray-50 transition-colors cursor-pointer">
               Market Report
             </button>
