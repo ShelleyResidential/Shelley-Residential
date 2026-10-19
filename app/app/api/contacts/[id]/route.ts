@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from 'next/server'
 import { supabaseAdmin } from '@/lib/supabase-admin'
 import { getValidAccessToken } from '@/lib/calendar-tokens'
 import { updateGoogleContact } from '@/lib/google-contacts'
+import { sendPendingSellerInvites } from '@/lib/seller-invites'
 
 // The subset of a contact's fields that also live in Google Contacts --
 // editing any of these on a Google-linked contact needs to push out to
@@ -73,5 +74,12 @@ export async function PATCH(request: NextRequest, { params }: { params: Promise<
     return NextResponse.json({ error: dbError.message }, { status: 500 })
   }
 
-  return NextResponse.json({ ok: true, googlePushError })
+  // A seller email added after the evaluation was already scheduled
+  // releases the seller's calendar invite that was being held back.
+  let sellerInvitesSent = 0
+  if (updates.email_address && !existingRow.email_address) {
+    sellerInvitesSent = await sendPendingSellerInvites(id, userId ?? null, request.nextUrl.origin).catch(() => 0)
+  }
+
+  return NextResponse.json({ ok: true, googlePushError, sellerInvitesSent })
 }
