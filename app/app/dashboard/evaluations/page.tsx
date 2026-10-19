@@ -682,6 +682,27 @@ function RowActionButtons({ evaluationId, propertyType, onEdit, onDetails }: {
     window.location.href = `/api/evaluations/${evaluationId}/transfer-reports`
   }
 
+  // Same as the Evaluation Pack's Inspection Form card: regenerates from the
+  // evaluation's current data, then downloads that fresh copy.
+  async function handleFormDownload() {
+    setDownloadMenuOpen(false)
+    if (!evaluationId) return
+    const { data: { user } } = await supabase.auth.getUser()
+    if (!user) return
+
+    const res = await fetch(`/api/evaluations/${evaluationId}/inspection-form`, {
+      method:  'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body:    JSON.stringify({ userId: user.id }),
+    })
+    const json = await res.json().catch(() => ({}))
+    if (!res.ok) {
+      alert(json.error ?? 'Could not generate the form.')
+      return
+    }
+    window.location.href = `/api/documents/${json.documentId}/download`
+  }
+
   function handleDownload(docName: string) {
     setDownloadMenuOpen(false)
     alert(`"${docName}" isn't set up yet — let us know what this document should contain and we'll wire it up.`)
@@ -701,7 +722,7 @@ function RowActionButtons({ evaluationId, propertyType, onEdit, onDetails }: {
         </button>
         {downloadMenuOpen && (
           <div className="absolute right-0 top-full mt-1 w-48 bg-white border border-gray-200 rounded-lg shadow-md py-1 z-20">
-            <button onClick={() => handleDownload('Form')} className="w-full text-left px-4 py-2 text-sm text-[#1a1a1a] hover:bg-gray-50 transition-colors cursor-pointer">
+            <button onClick={handleFormDownload} className="w-full text-left px-4 py-2 text-sm text-[#1a1a1a] hover:bg-gray-50 transition-colors cursor-pointer">
               Form
             </button>
             <button onClick={handleTransferReportsDownload} className="w-full text-left px-4 py-2 text-sm text-[#1a1a1a] hover:bg-gray-50 transition-colors cursor-pointer">
