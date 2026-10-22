@@ -1558,6 +1558,15 @@ export function EvaluationForm({ evaluationId, readOnly = false, calendarEventLi
             </div>
           </div>
         )}
+
+        {selectedProperty && (
+          <Field label="Ownership Type" readOnly={readOnly} value={ownership || undefined}>
+            <select value={ownership} onChange={e => setOwnership(e.target.value)} className={select}>
+              <option value="">—</option>
+              {OWNERSHIP_OPTIONS.map(o => <option key={o} value={o}>{o}</option>)}
+            </select>
+          </Field>
+        )}
       </Section>
 
       {/* ── Evaluation Details ── */}
@@ -1574,13 +1583,6 @@ export function EvaluationForm({ evaluationId, readOnly = false, calendarEventLi
             </p>
           </div>
         </div>
-
-        <Field label="Ownership" readOnly={readOnly} value={ownership || undefined}>
-          <select value={ownership} onChange={e => setOwnership(e.target.value)} className={select}>
-            <option value="">—</option>
-            {OWNERSHIP_OPTIONS.map(o => <option key={o} value={o}>{o}</option>)}
-          </select>
-        </Field>
 
         {/* Status is entirely gate-derived, never a manual choice -- no
             editable control here, ever, regardless of edit mode. */}
