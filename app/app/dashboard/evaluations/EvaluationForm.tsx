@@ -56,7 +56,7 @@ function QuarterHourSelect({ value, onChange, id }: { value: string; onChange: (
   const rounded = value ? roundToQuarterHour(value) : ''
   const [hour, minute] = rounded ? rounded.split(':') : ['', '']
   return (
-    <div className="flex items-center gap-2">
+    <div className="flex items-center gap-1">
       <select id={id} value={hour} onChange={e => onChange(e.target.value ? `${e.target.value}:${minute || '00'}` : '')}
         className={select} aria-label="Hour">
         <option value="">Hour</option>
