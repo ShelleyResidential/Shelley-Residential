@@ -28,10 +28,20 @@ const EVALUATION_OUTCOMES = [
   { value: 'cancelled', label: 'Cancelled' },
 ]
 
+// Prices are held as plain digit strings and shown with comma grouping
+// (2000000 -> 2,000,000) while typing and when read-only.
+function withCommas(value: string): string {
+  return value.replace(/\B(?=(\d{3})+(?!\d))/g, ',')
+}
+
+function digitsOnly(value: string): string {
+  return value.replace(/\D/g, '')
+}
+
 function formatZAR(value: string): string {
   const n = Number(value)
   if (!value || Number.isNaN(n)) return value
-  return new Intl.NumberFormat('en-ZA', { style: 'currency', currency: 'ZAR', maximumFractionDigits: 0 }).format(n)
+  return 'R ' + withCommas(String(Math.round(n)))
 }
 
 // Evaluation times may only land on the hour or a quarter past/half/quarter
@@ -1701,11 +1711,11 @@ export function EvaluationForm({ evaluationId, readOnly = false, calendarEventLi
 
         <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
           <Field label="Evaluation Price" readOnly={readOnly} highlight={hl('evaluation_price')} value={evaluationPrice ? formatZAR(evaluationPrice) : undefined}>
-            <input type="number" value={evaluationPrice} onChange={e => setEvaluationPrice(e.target.value)}
+            <input type="text" inputMode="numeric" value={withCommas(evaluationPrice)} onChange={e => setEvaluationPrice(digitsOnly(e.target.value))}
               className={input} placeholder="0" />
           </Field>
           <Field label="Marketing Price" readOnly={readOnly} highlight={hl('marketing_price')} value={marketingPrice ? formatZAR(marketingPrice) : undefined}>
-            <input type="number" value={marketingPrice} onChange={e => setMarketingPrice(e.target.value)}
+            <input type="text" inputMode="numeric" value={withCommas(marketingPrice)} onChange={e => setMarketingPrice(digitsOnly(e.target.value))}
               className={input} placeholder="0" />
           </Field>
         </div>
