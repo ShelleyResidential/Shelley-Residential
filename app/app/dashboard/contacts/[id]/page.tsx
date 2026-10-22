@@ -368,14 +368,21 @@ export default function ContactDetailPage() {
               </div>
             </div>
 
-            <div className="flex items-center justify-between gap-3">
+            <div className="flex items-center justify-between flex-wrap gap-3">
+              <label className="flex items-center gap-2 text-sm text-[#1a1a1a] cursor-pointer select-none w-fit">
+                <input
+                  type="radio"
+                  name="my-notes-only"
+                  checked={myNotesOnly}
+                  onClick={() => setMyNotesOnly(o => !o)}
+                  onChange={() => setMyNotesOnly(true)}
+                  className="w-4 h-4 border-gray-300 accent-[#E8266F] cursor-pointer"
+                />
+                My Notes Only
+              </label>
               <p className="text-sm text-gray-400">
                 {visibleNotes.length} {visibleNotes.length === 1 ? 'note' : 'notes'}
               </p>
-              <button type="button" onClick={() => setMyNotesOnly(v => !v)} aria-pressed={myNotesOnly}
-                className={myNotesOnly ? btn.primary : btn.secondary}>
-                My Notes only
-              </button>
             </div>
 
             {visibleNotes.length === 0 ? (
