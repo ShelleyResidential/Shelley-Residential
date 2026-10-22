@@ -33,7 +33,7 @@ type Contact = {
 
 type Profile = { id: string; full_name: string | null; email: string | null }
 
-type Note = { id: string; note_text: string; created_at: string; last_edited_at: string }
+type Note = { id: string; agent_id: string; note_text: string; created_at: string; last_edited_at: string }
 type NoteHistory = { id: string; note_text: string; edited_at: string }
 
 function fullName(c: Pick<Contact, 'first_name' | 'last_name'>) {
@@ -78,11 +78,15 @@ export default function ContactDetailPage() {
   const [editNoteText, setEditNoteText]   = useState('')
   const [noteHistory, setNoteHistory]     = useState<Record<string, NoteHistory[]>>({})
   const [showHistoryFor, setShowHistoryFor] = useState<string | null>(null)
+  // Everyone's notes on a contact are visible to everyone; this narrows the
+  // list to just the viewer's own.
+  const [myNotesOnly, setMyNotesOnly] = useState(false)
 
   // Only the agent who captured this contact can edit it -- everyone else
   // is view-only. Contacts with no recorded creator (legacy data) stay
   // editable by anyone, since there's no owner to restrict to.
   const canEditContact = !!contact && (!contact.created_by || userId === contact.created_by)
+  const visibleNotes = myNotesOnly ? notes.filter(n => n.agent_id === userId) : notes
 
   // Guards against `?edit=1` forcing edit mode open for a non-creator --
   // flips editing back off once we actually know who the contact belongs
@@ -99,7 +103,7 @@ export default function ContactDetailPage() {
 
   const fetchNotes = useCallback(async () => {
     const { data } = await supabase
-      .from('contact_notes').select('id, note_text, created_at, last_edited_at')
+      .from('contact_notes').select('id, agent_id, note_text, created_at, last_edited_at')
       .eq('contact_id', id).order('created_at', { ascending: false })
     setNotes(data ?? [])
   }, [id])
@@ -364,9 +368,25 @@ export default function ContactDetailPage() {
               </div>
             </div>
 
-            {notes.length === 0 ? (
-              <p className="text-center text-gray-400 text-sm py-8">No notes yet. Add one above.</p>
-            ) : notes.map(note => (
+            <div className="flex items-center justify-between gap-3">
+              <p className="text-sm text-gray-400">
+                {visibleNotes.length} {visibleNotes.length === 1 ? 'note' : 'notes'}
+              </p>
+              <button type="button" onClick={() => setMyNotesOnly(v => !v)} aria-pressed={myNotesOnly}
+                className={myNotesOnly ? btn.primary : btn.secondary}>
+                My Notes only
+              </button>
+            </div>
+
+            {visibleNotes.length === 0 ? (
+              <p className="text-center text-gray-400 text-sm py-8">
+                {myNotesOnly ? "You haven't written any notes on this contact." : 'No notes yet. Add one above.'}
+              </p>
+            ) : visibleNotes.map(note => {
+              const isMine = note.agent_id === userId
+              const author = profiles.find(p => p.id === note.agent_id)
+              const authorName = author?.full_name ?? author?.email ?? 'Unknown agent'
+              return (
               <div key={note.id} className={`${card} p-5`}>
                 {editingNoteId === note.id ? (
                   <>
@@ -382,9 +402,10 @@ export default function ContactDetailPage() {
                     <p className="text-sm text-[#1a1a1a] whitespace-pre-wrap">{note.note_text}</p>
                     <div className="flex items-center justify-between mt-3 flex-wrap gap-2">
                       <div className="text-xs text-gray-400">
-                        {timeAgo(note.created_at)}
+                        <span className="font-semibold text-[#1a1a1a]">{authorName}</span>
+                        {' · '}{new Date(note.created_at).toLocaleString('en-ZA', { dateStyle: 'medium', timeStyle: 'short' })}
                         {note.last_edited_at !== note.created_at && (
-                          <span className="ml-2 italic">· edited {timeAgo(note.last_edited_at)}</span>
+                          <span className="ml-2 italic">· edited {new Date(note.last_edited_at).toLocaleString('en-ZA', { dateStyle: 'medium', timeStyle: 'short' })}</span>
                         )}
                       </div>
                       <div className="flex gap-2">
@@ -393,8 +414,12 @@ export default function ContactDetailPage() {
                             {showHistoryFor === note.id ? 'Hide history' : 'View history'}
                           </button>
                         )}
-                        <button onClick={() => { setEditingNoteId(note.id); setEditNoteText(note.note_text) }} className={btn.ghost}>Edit</button>
-                        <button onClick={() => deleteNote(note.id)} className="inline-flex items-center px-3 py-1.5 rounded-lg text-xs font-medium text-gray-400 hover:text-red-500 hover:bg-red-50 transition-colors">Delete</button>
+                        {isMine && (
+                          <>
+                            <button onClick={() => { setEditingNoteId(note.id); setEditNoteText(note.note_text) }} className={btn.ghost}>Edit</button>
+                            <button onClick={() => deleteNote(note.id)} className="inline-flex items-center px-3 py-1.5 rounded-lg text-xs font-medium text-gray-400 hover:text-red-500 hover:bg-red-50 transition-colors">Delete</button>
+                          </>
+                        )}
                       </div>
                     </div>
                     {showHistoryFor === note.id && noteHistory[note.id] && (
@@ -411,7 +436,8 @@ export default function ContactDetailPage() {
                   </>
                 )}
               </div>
-            ))}
+              )
+            })}
           </div>
         )}
     </div>
