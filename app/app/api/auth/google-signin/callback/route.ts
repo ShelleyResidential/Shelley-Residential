@@ -1,4 +1,4 @@
-import { NextRequest, NextResponse } from 'next/server'
+import { NextRequest, NextResponse, after } from 'next/server'
 import { createClient } from '@supabase/supabase-js'
 import { exchangeCodeForTokens, REQUIRED_GOOGLE_SCOPES } from '@/lib/google-calendar'
 import { verifyGoogleIdToken } from '@/lib/google-signin'
@@ -91,14 +91,16 @@ export async function GET(request: NextRequest) {
     return NextResponse.redirect(`${appUrl}/?error=signin_failed`)
   }
 
-  // Persist verified name/photo
-  const { error: metaError } = await supabaseAdmin.auth.admin.updateUserById(data.user.id, {
+  // Persist verified name/photo -- started now, awaited alongside the token
+  // writes below, since the two don't depend on each other.
+  const metaUpdate = supabaseAdmin.auth.admin.updateUserById(data.user.id, {
     user_metadata: {
       full_name:  payload.name,
       avatar_url: payload.picture,
     },
+  }).then(({ error: metaError }) => {
+    if (metaError) console.error('Failed to persist Google profile metadata:', metaError.message)
   })
-  if (metaError) console.error('Failed to persist Google profile metadata:', metaError.message)
 
   // Store Calendar tokens automatically — this is the "auto-connect" step.
   // Google only returns a refresh_token on the first-ever grant (or when
@@ -136,15 +138,22 @@ export async function GET(request: NextRequest) {
     }
   }
 
+  await metaUpdate
+
   // Set up (or refresh) the push-notification channel that lets a change
   // made directly in Google Calendar -- e.g. dragging an evaluation's event
-  // to a new time -- flow back into the app automatically. Best-effort:
-  // never block login over it.
-  try {
-    await ensureWatchChannel(data.user.id)
-  } catch (err) {
-    console.error('Failed to set up calendar watch channel:', err)
-  }
+  // to a new time -- flow back into the app automatically. This makes
+  // several round-trips to Google and reads the user's whole calendar to
+  // take a baseline, so it runs after the response has gone out instead of
+  // making login wait for it. Best-effort either way.
+  const userId = data.user.id
+  after(async () => {
+    try {
+      await ensureWatchChannel(userId)
+    } catch (err) {
+      console.error('Failed to set up calendar watch channel:', err)
+    }
+  })
 
   const response = NextResponse.redirect(
     `${appUrl}/auth/complete#access_token=${encodeURIComponent(data.session.access_token)}&refresh_token=${encodeURIComponent(data.session.refresh_token)}`,
