@@ -63,8 +63,6 @@ export async function POST(request: NextRequest) {
       title = [street, prop.suburb].filter(Boolean).join(', ') || 'Unknown address'
     }
   }
-  const mapsLink = prop?.google_maps_url
-    || (mapAddress ? `https://www.google.com/maps/dir/?api=1&destination=${encodeURIComponent(mapAddress)}` : null)
 
   // Same wall-clock convention as the evaluation appointment event -- no
   // timezone conversion, literal Africa/Johannesburg local time.
@@ -76,7 +74,7 @@ export async function POST(request: NextRequest) {
     {
       summary:     `Presentation | ${title}`,
       description: 'Seller presentation for this evaluation.',
-      location:    mapsLink ?? (mapAddress || title),
+      location:    mapAddress || title,
       start,
       end,
       attendees: [PARTNERS_EMAIL],

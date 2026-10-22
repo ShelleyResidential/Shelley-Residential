@@ -74,8 +74,6 @@ export async function POST(request: NextRequest) {
       title = [street, prop.suburb].filter(Boolean).join(', ') || 'Unknown address'
     }
   }
-  const mapsLink = prop?.google_maps_url
-    || (mapAddress ? `https://www.google.com/maps/dir/?api=1&destination=${encodeURIComponent(mapAddress)}` : null)
 
   // ── Description: one bold-headed section per evaluation detail. Any
   // section with no underlying value must literally say "left blank".
@@ -140,7 +138,7 @@ export async function POST(request: NextRequest) {
     {
       summary:     `Evaluation | ${title}`,
       description,
-      location:    mapsLink ?? (mapAddress || title),
+      location:    mapAddress || title,
       start,
       end,
       attendees: [PARTNERS_EMAIL],
@@ -195,7 +193,7 @@ export async function POST(request: NextRequest) {
         {
           summary:     `Shelley Residential Evaluation | ${title}`,
           description: sellerDescription,
-          location:    mapsLink ?? (mapAddress || title),
+          location:    mapAddress || title,
           start,
           end,
           attendees: [sellerEmail],
