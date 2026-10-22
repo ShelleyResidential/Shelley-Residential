@@ -46,6 +46,32 @@ function roundToQuarterHour(value: string): string {
   return `${String(hh).padStart(2, '0')}:${String(mm).padStart(2, '0')}`
 }
 
+// Hour and minute dropdowns instead of a native time input: the native
+// picker lists every minute, but evaluations may only start on :00, :15,
+// :30 or :45. An existing value with any other minutes is shown rounded.
+const HOURS   = Array.from({ length: 24 }, (_, i) => String(i).padStart(2, '0'))
+const MINUTES = ['00', '15', '30', '45']
+
+function QuarterHourSelect({ value, onChange, id }: { value: string; onChange: (v: string) => void; id?: string }) {
+  const rounded = value ? roundToQuarterHour(value) : ''
+  const [hour, minute] = rounded ? rounded.split(':') : ['', '']
+  return (
+    <div className="flex items-center gap-2">
+      <select id={id} value={hour} onChange={e => onChange(e.target.value ? `${e.target.value}:${minute || '00'}` : '')}
+        className={select} aria-label="Hour">
+        <option value="">Hour</option>
+        {HOURS.map(h => <option key={h} value={h}>{h}</option>)}
+      </select>
+      <span className="text-gray-400">:</span>
+      <select value={minute} disabled={!hour} onChange={e => onChange(`${hour}:${e.target.value}`)}
+        className={`${select} disabled:opacity-50`} aria-label="Minutes">
+        {!hour && <option value="">Min</option>}
+        {MINUTES.map(m => <option key={m} value={m}>{m}</option>)}
+      </select>
+    </div>
+  )
+}
+
 // ── Field: same label-above-content layout either way — plain text (no
 // box) in read-only mode, the actual editable control once Edit is clicked.
 function Field({ label, readOnly, value, children }: { label: string; readOnly: boolean; value?: React.ReactNode; children?: React.ReactNode }) {
@@ -1625,7 +1651,7 @@ export function EvaluationForm({ evaluationId, readOnly = false, calendarEventLi
             </div>
             <div>
               <label className="text-xs text-gray-400 mb-1 block">Time</label>
-              <input type="time" step={900} value={schedTime} onChange={e => setSchedTime(roundToQuarterHour(e.target.value))} className={input} />
+              <QuarterHourSelect value={schedTime} onChange={setSchedTime} />
             </div>
           </div>
         </Field>
@@ -1731,7 +1757,7 @@ export function EvaluationForm({ evaluationId, readOnly = false, calendarEventLi
               </div>
               <div>
                 <label className="text-xs text-gray-400 mb-1 block">Time</label>
-                <input type="time" step={900} value={presentationTime} onChange={e => setPresentationTime(roundToQuarterHour(e.target.value))} className={input} />
+                <QuarterHourSelect value={presentationTime} onChange={setPresentationTime} />
               </div>
             </div>
           </Field>
