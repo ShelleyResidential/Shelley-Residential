@@ -175,10 +175,20 @@ export default function EvaluationDetailPage() {
   // Bring the first outlined area into view once its tab has rendered.
   useEffect(() => {
     if (!actionStep) return
-    const t = setTimeout(() => {
-      document.querySelector('[data-action-highlight]')?.scrollIntoView({ behavior: 'smooth', block: 'center' })
-    }, 400)
-    return () => clearTimeout(t)
+    // The form loads its data before it renders, so the outlined area may
+    // not exist yet -- keep looking for it for a few seconds, and scroll
+    // the moment it appears.
+    let tries = 0
+    const timer = setInterval(() => {
+      const el = document.querySelector('[data-action-highlight]')
+      if (el) {
+        el.scrollIntoView({ block: 'center' })
+        clearInterval(timer)
+      } else if (++tries >= 50) {
+        clearInterval(timer)
+      }
+    }, 100)
+    return () => clearInterval(timer)
   }, [actionStep])
 
   async function togglePipelineStep(stepId: string, stepKey: string, currentlyComplete: boolean) {
@@ -411,7 +421,7 @@ export default function EvaluationDetailPage() {
                   </div>
 
                   {!complete && canActOnRole(userDesignation, ownerRole) && (
-                    <button onClick={() => startAction(step.step_key)} className={`${btn.secondary} flex-shrink-0`}>
+                    <button onClick={() => startAction(step.step_key)} className={`${btn.primary} flex-shrink-0`}>
                       Action
                     </button>
                   )}
