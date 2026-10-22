@@ -22,3 +22,7 @@ export const card = 'bg-white rounded-2xl border border-gray-100 shadow-sm'
 export const sectionTitle = 'text-sm font-bold text-[#1a1a1a] uppercase tracking-wide mb-4'
 
 export const label = 'block text-sm font-medium text-gray-500 mb-1'
+
+// Pink outline marking the fields a Pipeline "Action" button wants filled in.
+// An outline (not a border/ring) so it never shifts the layout.
+export const actionHighlight = 'rounded-lg outline outline-2 outline-offset-4 outline-[#E8266F] bg-[#E8266F]/5'

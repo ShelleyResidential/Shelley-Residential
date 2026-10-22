@@ -2,7 +2,7 @@
 
 import { useState, useEffect, useCallback } from 'react'
 import { supabase } from '@/lib/supabase'
-import { btn, card, input, select, sectionTitle } from '@/lib/styles'
+import { btn, card, input, select, sectionTitle, actionHighlight } from '@/lib/styles'
 import { canDelete } from '@/lib/permissions'
 import { Breadcrumbs } from '@/lib/Breadcrumbs'
 import { useRouter, useParams, useSearchParams } from 'next/navigation'
@@ -83,6 +83,9 @@ export default function EvaluationDetailPage() {
   // Documents tab: Transfer Report cards show a single Download button
   // until the header Edit button is clicked, which reveals Replace/Upload.
   const [documentsEditing, setDocumentsEditing] = useState(false)
+  // Set by a Pipeline step's Action button: which step the user is being
+  // sent to complete, so its target tab can outline what still needs doing.
+  const [actionStep, setActionStep] = useState<string | null>(null)
   const [deleting, setDeleting]     = useState(false)
   // Looked up separately rather than embedded via a PostgREST relationship
   // join -- completed_by_user_id has no foreign key constraint, so an
@@ -152,6 +155,31 @@ export default function EvaluationDetailPage() {
   // with Appointment Outcome = Completed -- never a direct click in the
   // Pipeline tab, for anyone, regardless of role.
   const AUTO_ONLY_STEPS = ['captured', 'scheduled', 'evaluation_form_completed', 'cma_conducted', 'property_inspected']
+
+  // Pipeline "Action" button: jump to wherever this step gets done, in edit
+  // mode, with what's still needed outlined in pink.
+  function startAction(stepKey: string) {
+    setActionStep(stepKey)
+    if (['lightstone_uploaded', 'evaluation_pack_prepared', 'mandate_pack_prepared'].includes(stepKey)) {
+      setActiveTab('documents')
+      setDocumentsEditing(true)
+    } else if (stepKey === 'property_inspected') {
+      setActiveTab('inspection')
+      setInspectionEditing(true)
+    } else {
+      setActiveTab('details')
+      setEditing(true)
+    }
+  }
+
+  // Bring the first outlined area into view once its tab has rendered.
+  useEffect(() => {
+    if (!actionStep) return
+    const t = setTimeout(() => {
+      document.querySelector('[data-action-highlight]')?.scrollIntoView({ behavior: 'smooth', block: 'center' })
+    }, 400)
+    return () => clearTimeout(t)
+  }, [actionStep])
 
   async function togglePipelineStep(stepId: string, stepKey: string, currentlyComplete: boolean) {
     if (!userId) return
@@ -260,7 +288,7 @@ export default function EvaluationDetailPage() {
           { key: 'pipeline',   label: 'Pipeline' },
           { key: 'activity',   label: 'Activity' },
         ] as const).map(tab => (
-          <button key={tab.key} onClick={() => setActiveTab(tab.key)}
+          <button key={tab.key} onClick={() => { setActiveTab(tab.key); setActionStep(null) }}
             className={`px-4 py-2 text-sm font-medium border-b-2 -mb-px whitespace-nowrap flex-shrink-0 transition-colors ${
               activeTab === tab.key ? 'border-[#1a1a1a] text-[#1a1a1a]' : 'border-transparent text-gray-400 hover:text-[#1a1a1a]'
             }`}>
@@ -276,8 +304,9 @@ export default function EvaluationDetailPage() {
             evaluationId={id}
             readOnly={!editing}
             calendarEventLink={ev.calendar_event_link}
-            onSaved={() => { setEditing(false); fetchEvaluation() }}
-            onCancel={() => setEditing(false)}
+            actionStep={actionStep}
+            onSaved={() => { setEditing(false); setActionStep(null); fetchEvaluation() }}
+            onCancel={() => { setEditing(false); setActionStep(null) }}
           />
         </div>
       )}
@@ -287,14 +316,14 @@ export default function EvaluationDetailPage() {
         <DocumentsTab
           evaluationId={id} userId={userId} propertyType={ev.properties?.property_type ?? null}
           pipelineSteps={ev.evaluation_pipeline_steps} userDesignation={userDesignation}
-          onStepChanged={fetchEvaluation} editing={documentsEditing}
+          onStepChanged={fetchEvaluation} editing={documentsEditing} actionStep={actionStep}
         />
       )}
 
       {/* ── Inspection tab ── */}
       {activeTab === 'inspection' && (
         <InspectionTab evaluationId={id} userDesignation={userDesignation} onSaved={fetchEvaluation}
-          editing={inspectionEditing} setEditing={setInspectionEditing} />
+          editing={inspectionEditing} setEditing={setInspectionEditing} highlightOutcome={actionStep === 'property_inspected'} />
       )}
 
       {/* ── Pipeline tab ── */}
@@ -380,6 +409,12 @@ export default function EvaluationDetailPage() {
                       </p>
                     ) : null}
                   </div>
+
+                  {!complete && canActOnRole(userDesignation, ownerRole) && (
+                    <button onClick={() => startAction(step.step_key)} className={`${btn.secondary} flex-shrink-0`}>
+                      Action
+                    </button>
+                  )}
                 </div>
               )
             })}
@@ -403,11 +438,12 @@ type EvaluationDocument = {
   uploaded_at: string
 }
 
-function DocumentsTab({ evaluationId, userId, propertyType, pipelineSteps, userDesignation, onStepChanged, editing }: {
+function DocumentsTab({ evaluationId, userId, propertyType, pipelineSteps, userDesignation, onStepChanged, editing, actionStep }: {
   evaluationId: string; userId: string | null; propertyType: string | null
   pipelineSteps: PipelineStep[]; userDesignation: string | null
-  onStepChanged: () => void; editing: boolean
+  onStepChanged: () => void; editing: boolean; actionStep: string | null
 }) {
+  const sectionHl = '!outline !outline-2 !outline-offset-4 !outline-[#E8266F]'
   // Sectional titles get an SS (Sectional Scheme) report; freehold and
   // vacant land don't have one to upload.
   const visibleReportTypes = propertyType === 'sectional_title'
@@ -483,7 +519,7 @@ function DocumentsTab({ evaluationId, userId, propertyType, pipelineSteps, userD
 
   return (
     <>
-    <div className={`${card} p-6`}>
+    <div className={`${card} p-6 ${actionStep === 'lightstone_uploaded' ? sectionHl : ''}`}>
       <h3 className={sectionTitle}>Transfer Reports</h3>
 
       {error && <p className="text-sm text-red-500 bg-red-50 px-4 py-3 rounded-lg mb-4">{error}</p>}
@@ -493,7 +529,8 @@ function DocumentsTab({ evaluationId, userId, propertyType, pipelineSteps, userD
           const doc       = documents.find(d => d.report_type === rt.key)
           const uploading = uploadingType === rt.key
           return (
-            <div key={rt.key} className="border border-gray-200 rounded-xl p-4 flex flex-col gap-3">
+            <div key={rt.key} className={`border border-gray-200 rounded-xl p-4 flex flex-col gap-3 ${actionStep === 'lightstone_uploaded' && !doc ? actionHighlight : ''}`}
+              {...(actionStep === 'lightstone_uploaded' && !doc ? { 'data-action-highlight': true } : {})}>
               <h4 className="text-sm font-bold text-[#1a1a1a]">{rt.label}</h4>
               {doc ? (
                 <>
@@ -533,7 +570,7 @@ function DocumentsTab({ evaluationId, userId, propertyType, pipelineSteps, userD
       </div>
     </div>
 
-    <div className={`${card} p-6 mt-6`}>
+    <div className={`${card} p-6 mt-6 ${actionStep === 'evaluation_pack_prepared' ? sectionHl : ''}`}>
       <h3 className={sectionTitle}>Evaluation Pack</h3>
       <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
         {FORM_TYPES.map(ft => (
@@ -552,7 +589,7 @@ function DocumentsTab({ evaluationId, userId, propertyType, pipelineSteps, userD
     {/* Placeholder -- the actual upload/generation feature for this comes
         later; for now it's just a TC-owned manual completion gate, same
         mechanism as the Evaluation Pack above. */}
-    <div className={`${card} p-6 mt-6`}>
+    <div className={`${card} p-6 mt-6 ${actionStep === 'mandate_pack_prepared' ? sectionHl : ''}`}>
       <h3 className={sectionTitle}>Mandate Pack</h3>
       <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
         <ManualCompleteCard
@@ -725,11 +762,11 @@ const roLabelCls    = 'block text-sm font-medium text-gray-500 mb-1'
 
 // Label + control (edit mode) or label + plain text (read-only), matching
 // the Details tab's Field component.
-function RoField({ label, editing, display, children, className }: {
-  label: string; editing: boolean; display: React.ReactNode; children: React.ReactNode; className?: string
+function RoField({ label, editing, display, children, className, highlight }: {
+  label: string; editing: boolean; display: React.ReactNode; children: React.ReactNode; className?: string; highlight?: boolean
 }) {
   return (
-    <div className={className}>
+    <div className={`${className ?? ''} ${highlight ? actionHighlight : ''}`} {...(highlight ? { 'data-action-highlight': true } : {})}>
       <label className={editing ? fieldLabelCls : roLabelCls}>{label}</label>
       {editing ? children : <p className="text-sm text-[#1a1a1a] py-2.5">{display || '—'}</p>}
     </div>
@@ -826,9 +863,9 @@ const APPOINTMENT_OUTCOMES = [
 // them should be able to advance the evaluation to Inspected.
 const APPOINTMENT_OUTCOMES_REVERT_TO_SCHEDULED = ['rescheduled', 'seller_cancelled', 'no_show', 'unable_to_complete']
 
-function InspectionTab({ evaluationId, userDesignation, onSaved, editing, setEditing }: {
+function InspectionTab({ evaluationId, userDesignation, onSaved, editing, setEditing, highlightOutcome }: {
   evaluationId: string; userDesignation: string | null; onSaved: () => void
-  editing: boolean; setEditing: (v: boolean) => void
+  editing: boolean; setEditing: (v: boolean) => void; highlightOutcome?: boolean
 }) {
   const [form, setForm]                 = useState<InspectionForm>(EMPTY_INSPECTION)
   const [inspectionId, setInspectionId] = useState<string | null>(null)
@@ -1084,7 +1121,7 @@ function InspectionTab({ evaluationId, userDesignation, onSaved, editing, setEdi
 
       {/* ══ APPOINTMENT OUTCOME -- gates the "Inspected" status ══ */}
       <InspSection title="Appointment Outcome">
-        <RoField label="Outcome" editing={editing} display={optLabel(APPOINTMENT_OUTCOMES, form.appointment_outcome)}>
+        <RoField label="Outcome" editing={editing} highlight={highlightOutcome} display={optLabel(APPOINTMENT_OUTCOMES, form.appointment_outcome)}>
           <select value={form.appointment_outcome} onChange={e => set('appointment_outcome', e.target.value)} className={select}>
             <option value="">—</option>
             {APPOINTMENT_OUTCOMES.map(o => <option key={o.value} value={o.value}>{o.label}</option>)}
