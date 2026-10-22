@@ -468,6 +468,9 @@ function DocumentsTab({ evaluationId, userId, propertyType, pipelineSteps, userD
   const canTC = canActOnRole(userDesignation, 'tc')
   const step  = (key: string) => pipelineSteps.find(s => s.step_key === key)
   const mandatePackComplete = step('mandate_pack_prepared')?.status === 'complete'
+  // A section stays outlined only while its step is still open.
+  const stepOpen = (key: string) => pipelineSteps.find(s => s.step_key === key)?.status !== 'complete'
+  const missingReport = visibleReportTypes.some(rt => !documents.find(d => d.report_type === rt.key))
 
   const fetchDocuments = useCallback(async () => {
     const { data } = await supabase
@@ -529,7 +532,7 @@ function DocumentsTab({ evaluationId, userId, propertyType, pipelineSteps, userD
 
   return (
     <>
-    <div className={`${card} p-6 ${actionStep === 'lightstone_uploaded' ? sectionHl : ''}`}>
+    <div className={`${card} p-6 ${actionStep === 'lightstone_uploaded' && missingReport ? sectionHl : ''}`}>
       <h3 className={sectionTitle}>Transfer Reports</h3>
 
       {error && <p className="text-sm text-red-500 bg-red-50 px-4 py-3 rounded-lg mb-4">{error}</p>}
@@ -580,7 +583,7 @@ function DocumentsTab({ evaluationId, userId, propertyType, pipelineSteps, userD
       </div>
     </div>
 
-    <div className={`${card} p-6 mt-6 ${actionStep === 'evaluation_pack_prepared' ? sectionHl : ''}`}>
+    <div className={`${card} p-6 mt-6 ${actionStep === 'evaluation_pack_prepared' && stepOpen('evaluation_pack_prepared') ? sectionHl : ''}`}>
       <h3 className={sectionTitle}>Evaluation Pack</h3>
       <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
         {FORM_TYPES.map(ft => (
@@ -599,7 +602,7 @@ function DocumentsTab({ evaluationId, userId, propertyType, pipelineSteps, userD
     {/* Placeholder -- the actual upload/generation feature for this comes
         later; for now it's just a TC-owned manual completion gate, same
         mechanism as the Evaluation Pack above. */}
-    <div className={`${card} p-6 mt-6 ${actionStep === 'mandate_pack_prepared' ? sectionHl : ''}`}>
+    <div className={`${card} p-6 mt-6 ${actionStep === 'mandate_pack_prepared' && stepOpen('mandate_pack_prepared') ? sectionHl : ''}`}>
       <h3 className={sectionTitle}>Mandate Pack</h3>
       <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
         <ManualCompleteCard
@@ -1131,7 +1134,7 @@ function InspectionTab({ evaluationId, userDesignation, onSaved, editing, setEdi
 
       {/* ══ APPOINTMENT OUTCOME -- gates the "Inspected" status ══ */}
       <InspSection title="Appointment Outcome">
-        <RoField label="Outcome" editing={editing} highlight={highlightOutcome} display={optLabel(APPOINTMENT_OUTCOMES, form.appointment_outcome)}>
+        <RoField label="Outcome" editing={editing} highlight={highlightOutcome && form.appointment_outcome !== 'completed'} display={optLabel(APPOINTMENT_OUTCOMES, form.appointment_outcome)}>
           <select value={form.appointment_outcome} onChange={e => set('appointment_outcome', e.target.value)} className={select}>
             <option value="">—</option>
             {APPOINTMENT_OUTCOMES.map(o => <option key={o.value} value={o.value}>{o.label}</option>)}

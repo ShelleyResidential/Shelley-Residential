@@ -333,8 +333,7 @@ type RawEvaluationRow = {
 
 // Which form fields each Pipeline step needs. The Pipeline tab's Action
 // button sets `actionStep`; the fields still missing for that step get the
-// pink outline (or all of them, if nothing is missing -- e.g. a step that
-// is pending only because its calendar event failed).
+// pink outline, and each outline disappears as soon as its field is done.
 const STEP_FIELDS: Record<string, string[]> = {
   scheduled:                 ['evaluation_datetime'],
   evaluation_form_completed: ['lead_generated_by', 'lead_source', 'contacts', 'evaluation_datetime', 'agent', 'tc'],
@@ -1239,7 +1238,7 @@ export function EvaluationForm({ evaluationId, readOnly = false, calendarEventLi
   }
   const wantedFields = actionStep ? (STEP_FIELDS[actionStep] ?? []) : []
   const missingFields = wantedFields.filter(k => !fieldDone[k])
-  const highlighted = new Set(missingFields.length > 0 ? missingFields : wantedFields)
+  const highlighted = new Set(missingFields)
   const hl = (key: string) => highlighted.has(key)
   const cmaApprovedByProfile   = profiles.find(p => p.id === cmaApprovedByUserId)
   const cmaRejectedByProfile   = profiles.find(p => p.id === cmaRejectedByUserId)
