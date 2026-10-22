@@ -32,7 +32,7 @@ export function canActOnRole(designation: string | null | undefined, role: Pipel
 // for what calls each one.
 export const PIPELINE_STEPS: { key: string; label: string; ownerRole: PipelineRole }[] = [
   { key: 'captured',                  label: 'Evaluation Captured',           ownerRole: 'agent' },
-  { key: 'scheduled',                 label: 'Evaluation Scheduled',          ownerRole: 'agent' },
+  { key: 'scheduled',                 label: 'Evaluation Event Scheduled',         ownerRole: 'agent' },
   { key: 'evaluation_form_completed', label: 'Evaluation Form Completed',     ownerRole: 'agent' },
   { key: 'lightstone_uploaded',       label: 'Transfer Reports Uploaded',     ownerRole: 'tc' },
   { key: 'evaluation_pack_prepared',  label: 'Evaluation Pack Prepared',      ownerRole: 'tc' },
