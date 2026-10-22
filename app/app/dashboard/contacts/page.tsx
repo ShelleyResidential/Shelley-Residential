@@ -237,9 +237,15 @@ export default function ContactsPage() {
     setSyncing(false)
   }
 
+  // Only the agent who captured a contact can edit it (same rule as the
+  // contact's own page, including legacy contacts with no recorded creator),
+  // so everyone else only gets Details.
+  const selectedContact = contacts.find(c => c.id === selectedId)
+  const canEditSelected = !!selectedContact && (!selectedContact.created_by || selectedContact.created_by === userId)
+
   const rowActionControls = selectedId && (
     <RowActionButtons
-      onEdit={() => router.push(`/dashboard/contacts/${selectedId}?edit=1`)}
+      onEdit={canEditSelected ? () => router.push(`/dashboard/contacts/${selectedId}?edit=1`) : undefined}
       onDetails={() => router.push(`/dashboard/contacts/${selectedId}`)}
     />
   )
@@ -536,9 +542,11 @@ function SearchIcon() {
 function RowActionButtons({ onEdit, onDetails }: { onEdit?: () => void; onDetails?: () => void }) {
   return (
     <div className="flex items-center gap-2 flex-wrap justify-end">
-      <button disabled={!onEdit} onClick={onEdit} className={`${btn.secondary} cursor-pointer disabled:cursor-not-allowed`}>
-        Edit
-      </button>
+      {onEdit && (
+        <button onClick={onEdit} className={`${btn.secondary} cursor-pointer`}>
+          Edit
+        </button>
+      )}
       <button disabled={!onDetails} onClick={onDetails} className={`${btn.secondary} cursor-pointer disabled:cursor-not-allowed`}>
         Details
       </button>
