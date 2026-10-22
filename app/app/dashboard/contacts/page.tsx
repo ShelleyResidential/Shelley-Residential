@@ -63,6 +63,7 @@ export default function ContactsPage() {
   const [searchOpen, setSearchOpen]   = useState(false)
   const searchInputRef = useRef<HTMLInputElement>(null)
   const [myOnly, setMyOnly]           = useState(false)
+  const [filterStatus, setFilterStatus] = useState<'all' | 'Active' | 'Inactive'>('all')
   const [userId, setUserId]           = useState<string | null>(null)
   const [page, setPage]               = useState(1)
   const [totalCount, setTotalCount]   = useState(0)
@@ -91,6 +92,7 @@ export default function ContactsPage() {
       let base = supabase.from('contacts').select(SELECT_COLUMNS)
         .or(`first_name.ilike.%${trimmedSearch}%,last_name.ilike.%${trimmedSearch}%,name.ilike.%${trimmedSearch}%`)
       if (myOnly && userId) base = base.eq('agent_id', userId)
+      if (filterStatus !== 'all') base = base.eq('status', filterStatus)
 
       let all: Contact[] = []
       for (let from = 0; ; from += 1000) {
@@ -119,6 +121,7 @@ export default function ContactsPage() {
     if (sortColumn === 'created_by') {
       let base = supabase.from('contacts').select(SELECT_COLUMNS)
       if (myOnly && userId) base = base.eq('agent_id', userId)
+      if (filterStatus !== 'all') base = base.eq('status', filterStatus)
 
       let all: Contact[] = []
       for (let from = 0; ; from += 1000) {
@@ -152,6 +155,7 @@ export default function ContactsPage() {
     }
 
     if (myOnly && userId) query = query.eq('agent_id', userId)
+    if (filterStatus !== 'all') query = query.eq('status', filterStatus)
 
     const from = (page - 1) * PAGE_SIZE
     query = query.range(from, from + PAGE_SIZE - 1)
@@ -160,7 +164,7 @@ export default function ContactsPage() {
     setContacts(data ?? [])
     setTotalCount(count ?? 0)
     setLoading(false)
-  }, [search, myOnly, userId, page, sortColumn, sortDirection, profiles])
+  }, [search, myOnly, filterStatus, userId, page, sortColumn, sortDirection, profiles])
 
   function handleSort(column: SortColumn, direction: SortDirection) {
     setSortColumn(column)
@@ -179,7 +183,7 @@ export default function ContactsPage() {
   // Any change to the filters should snap back to page 1.
   useEffect(() => {
     setPage(1)
-  }, [search, myOnly])
+  }, [search, myOnly, filterStatus])
 
   // Focus the input the moment it's revealed on mobile, so tapping the
   // search icon doesn't need a second tap to start typing.
@@ -293,6 +297,25 @@ export default function ContactsPage() {
         </div>
       </div>
       {syncMessage && <p className="text-xs text-gray-400 -mt-2 mb-4">{syncMessage}</p>}
+
+      {/* Status filter tabs -- same look as the Evaluations page's. */}
+      <div className="flex gap-1 mb-6 border-b border-gray-200 overflow-x-auto">
+        {([
+          { key: 'all',      label: 'All' },
+          { key: 'Active',   label: 'Active' },
+          { key: 'Inactive', label: 'Inactive' },
+        ] as const).map(tab => (
+          <button
+            key={tab.key}
+            onClick={() => setFilterStatus(tab.key)}
+            className={`px-4 py-2 text-sm font-medium border-b-2 -mb-px whitespace-nowrap flex-shrink-0 transition-colors ${
+              filterStatus === tab.key ? 'border-[#1a1a1a] text-[#1a1a1a]' : 'border-transparent text-gray-400 hover:text-[#1a1a1a]'
+            }`}
+          >
+            {tab.label}
+          </button>
+        ))}
+      </div>
 
       {/* Search -- collapsed on mobile (toggled from the header row above)
           so the records list sits higher up; always expanded on desktop. */}
