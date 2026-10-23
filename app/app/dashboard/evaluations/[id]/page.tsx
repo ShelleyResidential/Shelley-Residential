@@ -137,8 +137,12 @@ export default function EvaluationDetailPage() {
       supabase.from('profiles').select('designation').eq('id', data.user.id).single()
         .then(({ data: profile }) => setUserDesignation(profile?.designation ?? null))
     })
-    fetchEvaluation()
-  }, [router, fetchEvaluation])
+    // Fill in any outcome whose appointment/presentation time has passed
+    // BEFORE loading, so what's shown is already up to date.
+    fetch('/api/evaluations/auto-complete', {
+      method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ evaluationId: id }),
+    }).catch(() => {}).finally(() => { fetchEvaluation() })
+  }, [router, fetchEvaluation, id])
 
   async function deleteEvaluation() {
     if (!confirm('Delete this evaluation? This cannot be undone.')) return

@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { supabaseAdmin } from '@/lib/supabase-admin'
 import { ensureWatchChannel } from '@/lib/calendar-watch'
+import { autoCompleteOverdueOutcomes } from '@/lib/auto-outcomes'
 
 // Google Calendar watch channels expire (typically within about a week).
 // This runs on a daily schedule (see vercel.json) and re-creates any
@@ -20,8 +21,14 @@ export async function GET(request: NextRequest) {
 
   const results = await Promise.all((expiring ?? []).map(row => ensureWatchChannel(row.user_id)))
 
+  // Same daily run also fills in outcomes for appointments and
+  // presentations whose time has passed (Hobby plans only allow two cron
+  // jobs, so this shares one).
+  const outcomesCompleted = await autoCompleteOverdueOutcomes().catch(() => 0)
+
   return NextResponse.json({
     checked: expiring?.length ?? 0,
     renewed: results.filter(r => r.ok).length,
+    outcomesCompleted,
   })
 }

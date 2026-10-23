@@ -331,10 +331,20 @@ export default function EvaluationsPage() {
     if (searchOpen) searchInputRef.current?.focus()
   }, [searchOpen])
 
+  // Fill in outcomes for any appointment/presentation whose time has passed,
+  // then reload the list if that changed anything.
+  const [outcomesTick, setOutcomesTick] = useState(0)
+  useEffect(() => {
+    fetch('/api/evaluations/auto-complete', { method: 'POST' })
+      .then(r => r.json())
+      .then(j => { if (j.changed) setOutcomesTick(t => t + 1) })
+      .catch(() => {})
+  }, [])
+
   useEffect(() => {
     const timer = setTimeout(fetchEvaluations, 300)
     return () => clearTimeout(timer)
-  }, [fetchEvaluations])
+  }, [fetchEvaluations, outcomesTick])
 
   function toggleSelected(id: string) {
     setSelectedId(prev => prev === id ? null : id)
