@@ -917,6 +917,16 @@ export function EvaluationForm({ evaluationId, readOnly = false, calendarEventLi
   async function approveCma() {
     if (!evaluationId || !userId) return
     setApprovingCma(true)
+    setError('')
+    // Don't trust the screen: confirm both prices are really in the database.
+    const { data: priceRow } = await supabase.from('evaluations')
+      .select('evaluation_price, marketing_price').eq('id', evaluationId).single()
+    if (!priceRow || !(Number(priceRow.evaluation_price) > 0) || !(Number(priceRow.marketing_price) > 0)) {
+      setError('The Evaluation Price and Marketing Price must be saved before the CMA can be approved.')
+      setApprovingCma(false)
+      await fetchEvaluation()
+      return
+    }
     const nowIso = new Date().toISOString()
     await supabase.from('evaluations').update({
       cma_approved_by_user_id: userId, cma_approved_at: nowIso,
@@ -1257,6 +1267,15 @@ export function EvaluationForm({ evaluationId, readOnly = false, calendarEventLi
   const currentUserDesignation = profiles.find(p => p.id === userId)?.designation ?? null
   const currentUserRoles       = getPipelineRoles(currentUserDesignation)
 
+  // The CMA can only be approved against prices that are SAVED -- typing
+  // numbers into the fields isn't enough, and neither is a saved price that
+  // has since been edited but not saved again.
+  const savedEvaluationPrice = fetchedRow?.evaluation_price != null ? String(fetchedRow.evaluation_price) : ''
+  const savedMarketingPrice  = fetchedRow?.marketing_price != null ? String(fetchedRow.marketing_price) : ''
+  const pricesSaved   = Number(savedEvaluationPrice) > 0 && Number(savedMarketingPrice) > 0
+  const pricesUnsaved = evaluationPrice !== savedEvaluationPrice || marketingPrice !== savedMarketingPrice
+  const canApproveCma = pricesSaved && !pricesUnsaved && currentUserRoles.isCmaApprover
+
   // Fields the Pipeline "Action" button wants filled in -- see STEP_FIELDS.
   const fieldDone: Record<string, boolean> = {
     lead_generated_by:     !!leadGeneratedBy,
@@ -1268,7 +1287,7 @@ export function EvaluationForm({ evaluationId, readOnly = false, calendarEventLi
     evaluation_price:      !!evaluationPrice,
     marketing_price:       !!marketingPrice,
     // Approving only becomes the thing to do once both prices are in.
-    cma_approval:          !evaluationPrice || !marketingPrice,
+    cma_approval:          !pricesSaved || pricesUnsaved,
     presentation_datetime: !!presentationDate && !!presentationTime,
     presentation_outcome:  presentationOutcome === 'completed',
     evaluation_outcome:    !!evaluationOutcome,
@@ -1791,8 +1810,10 @@ export function EvaluationForm({ evaluationId, readOnly = false, calendarEventLi
                 </p>
               )}
               <p className="text-sm text-gray-400">
-                {!evaluationPrice || !marketingPrice
-                  ? 'Capture the Evaluation Price and Marketing Price above before a CMA can be approved.'
+                {!pricesSaved
+                  ? 'Capture and save the Evaluation Price and Marketing Price above before a CMA can be approved.'
+                  : pricesUnsaved
+                    ? 'Save your changes to the prices above before approving.'
                   : currentUserRoles.isCmaApprover
                     ? 'Pricing is ready for CMA approval.'
                     : 'Only a Co-Founder can approve or reject a CMA.'}
@@ -1816,12 +1837,12 @@ export function EvaluationForm({ evaluationId, readOnly = false, calendarEventLi
               ) : (
                 <div className="flex gap-2 mt-2">
                   <button type="button" onClick={approveCma}
-                    disabled={approvingCma || !evaluationPrice || !marketingPrice || !currentUserRoles.isCmaApprover}
+                    disabled={approvingCma || !canApproveCma}
                     className={`${btn.primary} disabled:opacity-40 disabled:cursor-not-allowed`}>
                     {approvingCma ? 'Approving…' : 'Approve CMA'}
                   </button>
                   <button type="button" onClick={() => setShowRejectCmaInput(true)}
-                    disabled={!evaluationPrice || !marketingPrice || !currentUserRoles.isCmaApprover}
+                    disabled={!canApproveCma}
                     className={`${btn.danger} disabled:opacity-40 disabled:cursor-not-allowed`}>
                     Reject CMA
                   </button>
