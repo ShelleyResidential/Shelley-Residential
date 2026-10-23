@@ -354,13 +354,18 @@ const STEP_FIELDS: Record<string, string[]> = {
   evaluation_closed:         ['evaluation_outcome'],
 }
 
-export function EvaluationForm({ evaluationId, readOnly = false, calendarEventLink, onSaved, onCancel, actionStep }: {
+export function EvaluationForm({ evaluationId, readOnly = false, calendarEventLink, onSaved, onCancel, actionStep, afterEvaluationDetails, afterCmaApproval }: {
   evaluationId?: string
   readOnly?: boolean
   calendarEventLink?: string | null
   onSaved?: () => void
   onCancel?: () => void
   actionStep?: string | null
+  // Document sections the page slots in so the form reads down the pipeline
+  // in order: Transfer Reports and Evaluation Pack follow Evaluation Details,
+  // the Mandate Pack follows CMA Approval.
+  afterEvaluationDetails?: React.ReactNode
+  afterCmaApproval?: React.ReactNode
 }) {
   const router = useRouter()
   const searchParams = useSearchParams()
@@ -1708,7 +1713,12 @@ export function EvaluationForm({ evaluationId, readOnly = false, calendarEventLi
             {' · '}Rescheduled {rescheduleCount}x
           </p>
         )}
+      </Section>
 
+      {evaluationId && afterEvaluationDetails}
+
+      {/* ── CMA Pricing — the CMA Conducted step ── */}
+      <Section title="CMA Pricing">
         <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
           <Field label="Evaluation Price" readOnly={readOnly} highlight={hl('evaluation_price')} value={evaluationPrice ? formatZAR(evaluationPrice) : undefined}>
             <input type="text" inputMode="numeric" value={withCommas(evaluationPrice)} onChange={e => setEvaluationPrice(digitsOnly(e.target.value))}
@@ -1781,6 +1791,8 @@ export function EvaluationForm({ evaluationId, readOnly = false, calendarEventLi
           )}
         </Section>
       )}
+
+      {evaluationId && afterCmaApproval}
 
       {/* ── Presentation — its own date/time, calendar event, and outcome ── */}
       {evaluationId && (

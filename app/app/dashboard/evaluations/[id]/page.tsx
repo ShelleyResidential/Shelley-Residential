@@ -310,14 +310,24 @@ export default function EvaluationDetailPage() {
       {/* ── Details tab ── */}
       {activeTab === 'details' && (
         <div className="space-y-6">
-          <EvaluationForm
-            evaluationId={id}
-            readOnly={!editing}
-            calendarEventLink={ev.calendar_event_link}
-            actionStep={actionStep}
-            onSaved={() => { setEditing(false); setActionStep(null); fetchEvaluation() }}
-            onCancel={() => { setEditing(false); setActionStep(null) }}
-          />
+          <DocumentsSections
+            evaluationId={id} userId={userId} propertyType={ev.properties?.property_type ?? null}
+            pipelineSteps={ev.evaluation_pipeline_steps} userDesignation={userDesignation}
+            onStepChanged={fetchEvaluation} editing={editing} actionStep={actionStep}
+          >
+            {s => (
+              <EvaluationForm
+                evaluationId={id}
+                readOnly={!editing}
+                calendarEventLink={ev.calendar_event_link}
+                actionStep={actionStep}
+                afterEvaluationDetails={<>{s.transferReports}{s.evaluationPack}</>}
+                afterCmaApproval={s.mandatePack}
+                onSaved={() => { setEditing(false); setActionStep(null); fetchEvaluation() }}
+                onCancel={() => { setEditing(false); setActionStep(null) }}
+              />
+            )}
+          </DocumentsSections>
         </div>
       )}
 
@@ -448,10 +458,17 @@ type EvaluationDocument = {
   uploaded_at: string
 }
 
-function DocumentsTab({ evaluationId, userId, propertyType, pipelineSteps, userDesignation, onStepChanged, editing, actionStep }: {
+type DocumentSections = { transferReports: React.ReactNode; evaluationPack: React.ReactNode; mandatePack: React.ReactNode }
+
+// Owns the documents state and builds the three document sections, handing
+// them to a render-prop child so they can be placed wherever they belong:
+// all together on the Documents tab, or spread through the Details form in
+// pipeline order.
+function DocumentsSections({ evaluationId, userId, propertyType, pipelineSteps, userDesignation, onStepChanged, editing, actionStep, children }: {
   evaluationId: string; userId: string | null; propertyType: string | null
   pipelineSteps: PipelineStep[]; userDesignation: string | null
   onStepChanged: () => void; editing: boolean; actionStep: string | null
+  children: (sections: DocumentSections) => React.ReactNode
 }) {
   const sectionHl = '!outline !outline-2 !outline-offset-4 !outline-[#E8266F]'
   // Sectional titles get an SS (Sectional Scheme) report; freehold and
@@ -528,10 +545,9 @@ function DocumentsTab({ evaluationId, userId, propertyType, pipelineSteps, userD
     onStepChanged()
   }
 
-  if (loading) return <div className="text-center py-16 text-gray-400 text-sm">Loading documents…</div>
+  if (loading) return <>{children({ transferReports: null, evaluationPack: null, mandatePack: null })}</>
 
-  return (
-    <>
+  const transferReports = (
     <div className={`${card} p-6 ${actionStep === 'lightstone_uploaded' && missingReport ? sectionHl : ''}`}>
       <h3 className={sectionTitle}>Transfer Reports</h3>
 
@@ -582,8 +598,10 @@ function DocumentsTab({ evaluationId, userId, propertyType, pipelineSteps, userD
         })}
       </div>
     </div>
+  )
 
-    <div className={`${card} p-6 mt-6 ${actionStep === 'evaluation_pack_prepared' && stepOpen('evaluation_pack_prepared') ? sectionHl : ''}`}>
+  const evaluationPack = (
+    <div className={`${card} p-6 ${actionStep === 'evaluation_pack_prepared' && stepOpen('evaluation_pack_prepared') ? sectionHl : ''}`}>
       <h3 className={sectionTitle}>Evaluation Pack</h3>
       <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
         {FORM_TYPES.map(ft => (
@@ -598,11 +616,13 @@ function DocumentsTab({ evaluationId, userId, propertyType, pipelineSteps, userD
         ))}
       </div>
     </div>
+  )
 
-    {/* Placeholder -- the actual upload/generation feature for this comes
-        later; for now it's just a TC-owned manual completion gate, same
-        mechanism as the Evaluation Pack above. */}
-    <div className={`${card} p-6 mt-6 ${actionStep === 'mandate_pack_prepared' && stepOpen('mandate_pack_prepared') ? sectionHl : ''}`}>
+  // Placeholder -- the actual upload/generation feature for this comes
+  // later; for now it's just a TC-owned manual completion gate, same
+  // mechanism as the Evaluation Pack above.
+  const mandatePack = (
+    <div className={`${card} p-6 ${actionStep === 'mandate_pack_prepared' && stepOpen('mandate_pack_prepared') ? sectionHl : ''}`}>
       <h3 className={sectionTitle}>Mandate Pack</h3>
       <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
         <ManualCompleteCard
@@ -613,7 +633,23 @@ function DocumentsTab({ evaluationId, userId, propertyType, pipelineSteps, userD
         />
       </div>
     </div>
-    </>
+  )
+
+  return <>{children({ transferReports, evaluationPack, mandatePack })}</>
+}
+
+// The Documents tab: every document section, one after the other.
+function DocumentsTab(props: Omit<React.ComponentProps<typeof DocumentsSections>, 'children'>) {
+  return (
+    <DocumentsSections {...props}>
+      {s => (
+        <div className="space-y-6">
+          {s.transferReports}
+          {s.evaluationPack}
+          {s.mandatePack}
+        </div>
+      )}
+    </DocumentsSections>
   )
 }
 
