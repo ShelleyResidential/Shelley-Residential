@@ -289,10 +289,10 @@ export default function EvaluationDetailPage() {
           five. ── */}
       <div className="flex gap-1 mb-6 border-b border-gray-200 overflow-x-auto">
         {([
-          { key: 'details',    label: 'Details' },
-          { key: 'documents',  label: 'Documents' },
-          { key: 'inspection', label: 'Inspection' },
           { key: 'pipeline',   label: 'Pipeline' },
+          { key: 'details',    label: 'Details' },
+          { key: 'inspection', label: 'Inspection' },
+          { key: 'documents',  label: 'Documents' },
           { key: 'activity',   label: 'Activity' },
         ] as const).map(tab => (
           <button key={tab.key} onClick={() => { setActiveTab(tab.key); setActionStep(null) }}
