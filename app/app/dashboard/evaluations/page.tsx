@@ -347,7 +347,7 @@ export default function EvaluationsPage() {
       evaluationId={selectedId}
       propertyType={selectedEvaluation?.properties?.property_type ?? null}
       onEdit={() => router.push(`/dashboard/evaluations/${selectedId}?edit=1`)}
-      onDetails={() => router.push(`/dashboard/evaluations/${selectedId}`)}
+      onDetails={() => router.push(`/dashboard/evaluations/${selectedId}?tab=details`)}
     />
   )
 

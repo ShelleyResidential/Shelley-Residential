@@ -71,7 +71,15 @@ export default function EvaluationDetailPage() {
 
   const [evaluation, setEvaluation] = useState<Evaluation | null>(null)
   const [loading, setLoading]       = useState(true)
-  const [activeTab, setActiveTab]   = useState<'details' | 'documents' | 'inspection' | 'pipeline' | 'activity'>('details')
+  const [activeTab, setActiveTab]   = useState<'details' | 'documents' | 'inspection' | 'pipeline' | 'activity'>(() => {
+    // Opens on Pipeline unless sent somewhere specific: the records table's
+    // Details button (?tab=details), Edit (?edit=1), or coming back from
+    // adding a contact -- those all belong on the Details form.
+    const tab = searchParams.get('tab')
+    if (tab === 'details' || tab === 'documents' || tab === 'inspection' || tab === 'activity') return tab
+    if (searchParams.get('edit') === '1' || searchParams.get('newContactId') !== null || searchParams.get('resume') === '1') return 'details'
+    return 'pipeline'
+  })
   const [userId, setUserId]         = useState<string | null>(null)
   const [userEmail, setUserEmail]   = useState<string | null>(null)
   const [userDesignation, setUserDesignation] = useState<string | null>(null)
