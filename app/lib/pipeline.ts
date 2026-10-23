@@ -222,3 +222,31 @@ export async function saveAppointmentOutcome(evaluationId: string, userId: strin
   }
   return {}
 }
+
+// A changed Evaluation or Marketing Price cancels an existing CMA approval --
+// the new numbers have to be approved afresh. Clears the approval, re-opens
+// the CMA Approved step, and if that approval is what put the evaluation at
+// Evaluated, drops it back to the furthest status its other steps still
+// support. An evaluation already past Evaluated is left where it is, same
+// "never demote" rule as everywhere else.
+export async function revokeCmaApproval(evaluationId: string) {
+  await supabase.from('evaluations').update({
+    cma_approved_by_user_id: null, cma_approved_at: null,
+  }).eq('id', evaluationId)
+
+  await supabase.from('evaluation_pipeline_steps').update({
+    status: 'pending', is_complete: false, completed_at: null, completed_by_user_id: null,
+  }).eq('evaluation_id', evaluationId).eq('step_key', 'cma_approved')
+
+  const { data: ev } = await supabase.from('evaluations').select('status').eq('id', evaluationId).single()
+  if (ev?.status !== 'evaluated') return
+
+  const { data: steps } = await supabase.from('evaluation_pipeline_steps')
+    .select('step_key, status').eq('evaluation_id', evaluationId)
+  const done = (k: string) => (steps ?? []).find(s => s.step_key === k)?.status === 'complete'
+  const fallback = done('property_inspected') ? 'inspected'
+    : PREPARED_GATE_KEYS.every(done) ? 'prepared'
+    : done('scheduled') ? 'scheduled'
+    : 'new'
+  await supabase.from('evaluations').update({ status: fallback }).eq('id', evaluationId)
+}

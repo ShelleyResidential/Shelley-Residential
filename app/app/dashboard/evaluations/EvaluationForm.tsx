@@ -10,7 +10,7 @@ import Link from 'next/link'
 import { LEAD_SOURCES, REFERRAL_TYPES, MOTIVATIONS, TIMELINES, REASONS_LOST, REASONS_CANCELLED, CONTACT_TAGS, APPOINTMENT_OUTCOMES, APPOINTMENT_OUTCOMES_REVERT_TO_SCHEDULED } from '@/lib/evaluationOptions'
 import {
   STATUS_LABELS, PIPELINE_STEPS, getPipelineRoles,
-  checkEvaluationFormGate, checkCmaConductedGate, markStepComplete, promoteStatus, saveAppointmentOutcome,
+  checkEvaluationFormGate, checkCmaConductedGate, markStepComplete, promoteStatus, saveAppointmentOutcome, revokeCmaApproval,
 } from '@/lib/pipeline'
 
 const DRAFT_STORAGE_KEY = 'evaluationFormDraft'
@@ -409,6 +409,7 @@ export function EvaluationForm({ evaluationId, readOnly = false, calendarEventLi
 
   // CMA approval -- read-only display, set only via the Approve/Reject CMA actions
   const [cmaApprovedByUserId, setCmaApprovedByUserId] = useState<string | null>(null)
+  const [cmaReapprovalNeeded, setCmaReapprovalNeeded]   = useState(false)
   const [cmaApprovedAt, setCmaApprovedAt]             = useState<string | null>(null)
   const [approvingCma, setApprovingCma]               = useState(false)
   const [cmaRejectedByUserId, setCmaRejectedByUserId] = useState<string | null>(null)
@@ -1086,6 +1087,17 @@ export function EvaluationForm({ evaluationId, readOnly = false, calendarEventLi
       const updatePayload = evaluationOutcome ? { ...payload, status: 'closed' } : payload
       const { error: evErr } = await supabase.from('evaluations').update(updatePayload).eq('id', evaluationId)
       if (evErr) { setError(evErr.message); setSaving(false); return }
+
+      // New prices need approving again: an approval only ever covers the
+      // numbers it was given for.
+      const pricesChanged = Number(savedEvaluationPrice || 0) !== Number(evaluationPrice || 0)
+        || Number(savedMarketingPrice || 0) !== Number(marketingPrice || 0)
+      if (cmaApprovedByUserId && pricesChanged) {
+        await revokeCmaApproval(evaluationId)
+        setCmaApprovedByUserId(null)
+        setCmaApprovedAt(null)
+        setCmaReapprovalNeeded(true)
+      }
 
       // An Evaluation Date and Time captured on save automatically creates/
       // updates the Google Calendar event; the "Evaluation Scheduled" step
@@ -1792,6 +1804,10 @@ export function EvaluationForm({ evaluationId, readOnly = false, calendarEventLi
           </Field>
         </div>
 
+        {!readOnly && cmaApprovedByUserId && (
+          <p className="text-xs text-amber-700">This CMA is approved. Changing either price cancels the approval and it will need approving again.</p>
+        )}
+
         {evaluationId && (<>
           {cmaApprovedByUserId ? (
             <p className="text-sm text-[#1a1a1a]">
@@ -1807,6 +1823,11 @@ export function EvaluationForm({ evaluationId, readOnly = false, calendarEventLi
                   {cmaRejectedAt && <span> on {new Date(cmaRejectedAt).toLocaleDateString('en-ZA', { day: 'numeric', month: 'long', year: 'numeric' })}</span>}
                   {cmaRejectionReason && <>: {cmaRejectionReason}</>}
                   <span className="block text-red-400 mt-1">Revise the pricing above, then Approve once it&apos;s ready.</span>
+                </p>
+              )}
+              {cmaReapprovalNeeded && (
+                <p className="text-sm text-amber-700 bg-amber-50 px-3 py-2 rounded-lg mb-3">
+                  The prices changed, so the earlier approval was cancelled. The CMA needs approving again.
                 </p>
               )}
               <p className="text-sm text-gray-400">
