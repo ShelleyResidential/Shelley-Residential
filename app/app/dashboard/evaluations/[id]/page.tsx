@@ -825,7 +825,7 @@ type InspectionForm = {
   // Exterior
   road_level_position: string
   land_size: string
-  gate_fencing_type: string
+  gate_fencing_types: string[]
   views_present: boolean | null
   garages_quantity: number
   garages_descriptor: string
@@ -872,7 +872,7 @@ type InspectionForm = {
 
 const EMPTY_INSPECTION: InspectionForm = {
   road_level_position: '',
-  land_size: '', gate_fencing_type: '', views_present: null,
+  land_size: '', gate_fencing_types: [], views_present: null,
   garages_quantity: 0, garages_descriptor: '', carports_quantity: 0, parking_capacity: '',
   garden_present: null, garden_size: '', garden_description: '',
   patio_quantity: 0, patio_selections: [],
@@ -933,7 +933,7 @@ function InspectionTab({ evaluationId, userDesignation, onSaved, editing, setEdi
       setForm({
         road_level_position:           data.road_level_position ?? '',
         land_size:                     data.land_size ?? '',
-        gate_fencing_type:             data.gate_fencing_type ?? '',
+        gate_fencing_types:            data.gate_fencing_type ? data.gate_fencing_type.split(',') : [],
         views_present:                 data.views_present ?? null,
         garages_quantity:              data.garages_quantity ?? 0,
         garages_descriptor:            data.garages_descriptor ?? '',
@@ -1004,6 +1004,19 @@ function InspectionTab({ evaluationId, userDesignation, onSaved, editing, setEdi
     setForm(f => ({ ...f, [field]: value }))
   }
 
+  // Gate / Fencing allows several answers at once, except "None", which
+  // excludes the others. Stored as comma-joined option values (a single old
+  // value is just a one-item list).
+  function toggleGateFencing(label: string) {
+    const value = GATE_FENCING_OPTS.find(o => o.label === label)?.value
+    if (!value) return
+    setForm(f => {
+      const cur = f.gate_fencing_types
+      if (cur.includes(value)) return { ...f, gate_fencing_types: cur.filter(v => v !== value) }
+      return { ...f, gate_fencing_types: value === 'none' ? ['none'] : [...cur.filter(v => v !== 'none'), value] }
+    })
+  }
+
   function toggleStr(field: 'security_features' | 'additional_features', label: string) {
     setForm(f => {
       const cur = f[field] as string[]
@@ -1063,7 +1076,7 @@ function InspectionTab({ evaluationId, userDesignation, onSaved, editing, setEdi
       captured_by_user_id:           userId,
       road_level_position:           form.road_level_position || null,
       land_size:                     form.land_size || null,
-      gate_fencing_type:             form.gate_fencing_type || null,
+      gate_fencing_type:             form.gate_fencing_types.length > 0 ? form.gate_fencing_types.join(',') : null,
       views_present:                 form.views_present,
       garages_quantity:              form.garages_quantity,
       garages_descriptor:            form.garages_descriptor || null,
@@ -1153,11 +1166,10 @@ function InspectionTab({ evaluationId, userDesignation, onSaved, editing, setEdi
               {LAND_SIZE_OPTS.map(o => <option key={o.value} value={o.value}>{o.label}</option>)}
             </select>
           </RoField>
-          <RoField label="Gate / Fencing" editing={editing} display={optLabel(GATE_FENCING_OPTS, form.gate_fencing_type)}>
-            <select value={form.gate_fencing_type} onChange={e => set('gate_fencing_type', e.target.value)} className={select}>
-              <option value="">—</option>
-              {GATE_FENCING_OPTS.map(o => <option key={o.value} value={o.value}>{o.label}</option>)}
-            </select>
+          <RoField label="Gate / Fencing" editing={editing} display={form.gate_fencing_types.map(v => optLabel(GATE_FENCING_OPTS, v)).join(', ')}>
+            <MultiSelect options={GATE_FENCING_OPTS.map(o => o.label)}
+              selected={form.gate_fencing_types.map(v => optLabel(GATE_FENCING_OPTS, v))}
+              onToggle={toggleGateFencing} />
           </RoField>
         </div>
 

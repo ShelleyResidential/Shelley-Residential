@@ -23,6 +23,9 @@ type Opt = { value: string; label: string }
 function checkLine(opts: Opt[], selected: string): string {
   return opts.map(o => `${o.value === selected ? '☑' : '❏'} ${o.label}`).join('   ')
 }
+function checkLineMulti(opts: Opt[], selected: string[]): string {
+  return opts.map(o => `${selected.includes(o.value) ? '☑' : '❏'} ${o.label}`).join('   ')
+}
 function checkLineStrings(opts: string[], selected: string[]): string {
   return opts.map(o => `${selected.includes(o) ? '☑' : '❏'} ${o}`).join('   ')
 }
@@ -219,7 +222,7 @@ export async function generateInspectionForm(evaluationId: string, userId: strin
 
     '{{road_level_position}}': checkLine(ROAD_LEVEL_OPTS, insp.road_level_position ?? ''),
     '{{land_size}}':           checkLine(LAND_SIZE_OPTS, insp.land_size ?? ''),
-    '{{gate_fencing_type}}':   checkLine(GATE_FENCING_OPTS, insp.gate_fencing_type ?? ''),
+    '{{gate_fencing_type}}':   checkLineMulti(GATE_FENCING_OPTS, insp.gate_fencing_type ? insp.gate_fencing_type.split(',') : []),
 
     '{{garages_quantity}}':   String(insp.garages_quantity ?? 0),
     '{{garages_descriptor}}': checkLine(GARAGE_DESC_OPTS, insp.garages_descriptor ?? ''),
