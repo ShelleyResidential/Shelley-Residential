@@ -1717,8 +1717,9 @@ export function EvaluationForm({ evaluationId, readOnly = false, calendarEventLi
 
       {evaluationId && afterEvaluationDetails}
 
-      {/* ── CMA Pricing — the CMA Conducted step ── */}
-      <Section title="CMA Pricing">
+      {/* ── CMA — the prices (CMA Conducted step) and, once the evaluation
+          exists, the Co-Founder approval (gates status "Evaluated"). ── */}
+      <Section title={evaluationId ? 'CMA Approval' : 'CMA Pricing'} highlight={hl('cma_approval')}>
         <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
           <Field label="Evaluation Price" readOnly={readOnly} highlight={hl('evaluation_price')} value={evaluationPrice ? formatZAR(evaluationPrice) : undefined}>
             <input type="text" inputMode="numeric" value={withCommas(evaluationPrice)} onChange={e => setEvaluationPrice(digitsOnly(e.target.value))}
@@ -1729,11 +1730,8 @@ export function EvaluationForm({ evaluationId, readOnly = false, calendarEventLi
               className={input} placeholder="0" />
           </Field>
         </div>
-      </Section>
 
-      {/* ── CMA Approval — Co-Founders only, gates status "Evaluated" ── */}
-      {evaluationId && (
-        <Section title="CMA Approval" highlight={hl('cma_approval')}>
+        {evaluationId && (<>
           {cmaApprovedByUserId ? (
             <p className="text-sm text-[#1a1a1a]">
               Approved by {cmaApprovedByProfile?.full_name ?? cmaApprovedByProfile?.email ?? '—'}
@@ -1789,8 +1787,8 @@ export function EvaluationForm({ evaluationId, readOnly = false, calendarEventLi
               )}
             </>
           )}
-        </Section>
-      )}
+        </>)}
+      </Section>
 
       {evaluationId && afterCmaApproval}
 
