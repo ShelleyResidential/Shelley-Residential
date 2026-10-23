@@ -109,7 +109,10 @@ export async function generateInspectionForm(evaluationId: string, userId: strin
     .eq('evaluation_id', evaluationId)
     .maybeSingle()
 
-  if (!insp) return { ok: false, error: 'Complete the Inspection tab before generating this form.' }
+  // A record holding only the Appointment Outcome (set from the Details page)
+  // isn't a filled-in inspection.
+  const hasInspectionData = !!(insp && (insp.road_level_position || insp.land_size || insp.gate_fencing_type || insp.general_condition || insp.parking_capacity || insp.views_present != null))
+  if (!insp || !hasInspectionData) return { ok: false, error: 'Complete the Inspection tab before generating this form.' }
 
   // Decoded exactly the way InspectionTab.loadInspection decodes the same
   // row for the app's own UI -- comma-joined TEXT columns, JSON-TEXT columns.

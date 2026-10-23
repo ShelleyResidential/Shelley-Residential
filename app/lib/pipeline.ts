@@ -193,3 +193,32 @@ export async function checkCmaConductedGate(
 }
 
 export { isStepComplete, promoteStatus }
+
+// Saves the Property Inspection's Appointment Outcome (set from the Details
+// page) onto the evaluation's inspection record, creating a bare record if
+// the Inspection tab hasn't been filled in yet, then applies the pipeline
+// effect: only "Completed" completes "Property Inspection Completed" and
+// advances to Inspected; any other recorded outcome sends the evaluation
+// back to Scheduled.
+export async function saveAppointmentOutcome(evaluationId: string, userId: string, outcome: string) {
+  const { data: existing } = await supabase.from('property_inspections')
+    .select('id').eq('evaluation_id', evaluationId).maybeSingle()
+
+  if (existing) {
+    const { error } = await supabase.from('property_inspections')
+      .update({ appointment_outcome: outcome || null }).eq('id', existing.id)
+    if (error) return { error: error.message }
+  } else if (outcome) {
+    const { error } = await supabase.from('property_inspections')
+      .insert({ evaluation_id: evaluationId, captured_by_user_id: userId, appointment_outcome: outcome })
+    if (error) return { error: error.message }
+  }
+
+  if (outcome === 'completed') {
+    await markStepComplete(evaluationId, 'property_inspected', userId)
+    await promoteStatus(evaluationId, 'inspected')
+  } else if (['rescheduled', 'seller_cancelled', 'no_show', 'unable_to_complete'].includes(outcome)) {
+    await supabase.from('evaluations').update({ status: 'scheduled' }).eq('id', evaluationId)
+  }
+  return {}
+}

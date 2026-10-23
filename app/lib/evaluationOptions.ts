@@ -79,3 +79,15 @@ export const REASONS_CANCELLED = [
 ]
 
 export const CONTACT_TAGS = ['Seller', 'Attorney', 'Managing Agent', 'Tenant']
+
+export const APPOINTMENT_OUTCOMES = [
+  { value: 'completed',            label: 'Completed' },
+  { value: 'rescheduled',          label: 'Rescheduled' },
+  { value: 'seller_cancelled',     label: 'Seller Cancelled' },
+  { value: 'no_show',              label: 'No Show' },
+  { value: 'unable_to_complete',   label: 'Unable to Complete' },
+]
+
+// Every non-Completed outcome means the visit didn't happen -- none of them
+// move the pipeline forward; they all route back to scheduling.
+export const APPOINTMENT_OUTCOMES_REVERT_TO_SCHEDULED = ['rescheduled', 'seller_cancelled', 'no_show', 'unable_to_complete']

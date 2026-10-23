@@ -7,10 +7,10 @@ import { WarningIcon } from '@/lib/icons'
 import { formatPhoneDisplay } from '@/lib/phone'
 import { useRouter, useSearchParams } from 'next/navigation'
 import Link from 'next/link'
-import { LEAD_SOURCES, REFERRAL_TYPES, MOTIVATIONS, TIMELINES, REASONS_LOST, REASONS_CANCELLED, CONTACT_TAGS } from '@/lib/evaluationOptions'
+import { LEAD_SOURCES, REFERRAL_TYPES, MOTIVATIONS, TIMELINES, REASONS_LOST, REASONS_CANCELLED, CONTACT_TAGS, APPOINTMENT_OUTCOMES, APPOINTMENT_OUTCOMES_REVERT_TO_SCHEDULED } from '@/lib/evaluationOptions'
 import {
   STATUS_LABELS, PIPELINE_STEPS, getPipelineRoles,
-  checkEvaluationFormGate, checkCmaConductedGate, markStepComplete, promoteStatus,
+  checkEvaluationFormGate, checkCmaConductedGate, markStepComplete, promoteStatus, saveAppointmentOutcome,
 } from '@/lib/pipeline'
 
 const DRAFT_STORAGE_KEY = 'evaluationFormDraft'
@@ -346,6 +346,7 @@ type RawEvaluationRow = {
 // pink outline, and each outline disappears as soon as its field is done.
 const STEP_FIELDS: Record<string, string[]> = {
   scheduled:                 ['evaluation_datetime'],
+  property_inspected:        ['appointment_outcome'],
   evaluation_form_completed: ['lead_generated_by', 'lead_source', 'contacts', 'evaluation_datetime', 'agent', 'tc'],
   cma_conducted:             ['evaluation_price', 'marketing_price'],
   cma_approved:              ['evaluation_price', 'marketing_price', 'cma_approval'],
@@ -433,6 +434,20 @@ export function EvaluationForm({ evaluationId, readOnly = false, calendarEventLi
   const [followUpCount, setFollowUpCount]               = useState(0)
   const [loggingFollowUp, setLoggingFollowUp]           = useState(false)
   const [evaluationOutcome, setEvaluationOutcome]     = useState('')
+  // The Property Inspection's Appointment Outcome lives on the inspection
+  // record, not the evaluation row, so it's loaded and saved separately.
+  const [appointmentOutcome, setAppointmentOutcome]   = useState('')
+  const [savedAppointmentOutcome, setSavedAppointmentOutcome] = useState('')
+
+  useEffect(() => {
+    if (!evaluationId) return
+    supabase.from('property_inspections').select('appointment_outcome')
+      .eq('evaluation_id', evaluationId).maybeSingle()
+      .then(({ data }) => {
+        setAppointmentOutcome(data?.appointment_outcome ?? '')
+        setSavedAppointmentOutcome(data?.appointment_outcome ?? '')
+      })
+  }, [evaluationId])
 
   // Lead info
   const [leadGeneratedBy, setLeadGeneratedBy]     = useState('')
@@ -887,6 +902,7 @@ export function EvaluationForm({ evaluationId, readOnly = false, calendarEventLi
   function handleCancel() {
     if (evaluationId) {
       if (fetchedRow) populateFromRow(fetchedRow)
+      setAppointmentOutcome(savedAppointmentOutcome)
       setError('')
       onCancel?.()
     } else {
@@ -1088,6 +1104,12 @@ export function EvaluationForm({ evaluationId, readOnly = false, calendarEventLi
         })
       }
 
+      if (appointmentOutcome !== savedAppointmentOutcome) {
+        const outcomeResult = await saveAppointmentOutcome(evaluationId, userId, appointmentOutcome)
+        if (outcomeResult.error) { setError(outcomeResult.error); setSaving(false); return }
+        setSavedAppointmentOutcome(appointmentOutcome)
+      }
+
       await checkEvaluationFormGate(evaluationId, userId, evaluationFormComplete)
       await checkCmaConductedGate(evaluationId, userId, evaluationPrice, marketingPrice)
 
@@ -1250,6 +1272,7 @@ export function EvaluationForm({ evaluationId, readOnly = false, calendarEventLi
     presentation_datetime: !!presentationDate && !!presentationTime,
     presentation_outcome:  presentationOutcome === 'completed',
     evaluation_outcome:    !!evaluationOutcome,
+    appointment_outcome:   appointmentOutcome === 'completed',
   }
   const wantedFields = actionStep ? (STEP_FIELDS[actionStep] ?? []) : []
   const missingFields = wantedFields.filter(k => !fieldDone[k])
@@ -1716,6 +1739,25 @@ export function EvaluationForm({ evaluationId, readOnly = false, calendarEventLi
       </Section>
 
       {evaluationId && afterEvaluationDetails}
+
+      {/* ── Property Inspection -- the Appointment Outcome gates Inspected ── */}
+      {evaluationId && (
+        <Section title="Property Inspection">
+          <Field label="Appointment Outcome" readOnly={readOnly || !currentUserRoles.isAgent} highlight={hl('appointment_outcome')}
+            value={APPOINTMENT_OUTCOMES.find(o => o.value === appointmentOutcome)?.label}>
+            <select value={appointmentOutcome} onChange={e => setAppointmentOutcome(e.target.value)} className={select}>
+              <option value="">—</option>
+              {APPOINTMENT_OUTCOMES.map(o => <option key={o.value} value={o.value}>{o.label}</option>)}
+            </select>
+            {APPOINTMENT_OUTCOMES_REVERT_TO_SCHEDULED.includes(appointmentOutcome) && (
+              <p className="text-xs text-gray-400 mt-2">Saving will move this evaluation back to Scheduled.</p>
+            )}
+          </Field>
+          {!readOnly && !currentUserRoles.isAgent && (
+            <p className="text-xs text-gray-400">Only an Agent can record the Appointment Outcome.</p>
+          )}
+        </Section>
+      )}
 
       {/* ── CMA — the prices (CMA Conducted step) and, once the evaluation
           exists, the Co-Founder approval (gates status "Evaluated"). ── */}

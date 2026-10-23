@@ -163,9 +163,6 @@ export default function EvaluationDetailPage() {
     if (['lightstone_uploaded', 'evaluation_pack_prepared', 'mandate_pack_prepared'].includes(stepKey)) {
       setActiveTab('documents')
       setDocumentsEditing(true)
-    } else if (stepKey === 'property_inspected') {
-      setActiveTab('inspection')
-      setInspectionEditing(true)
     } else {
       setActiveTab('details')
       setEditing(true)
@@ -343,7 +340,7 @@ export default function EvaluationDetailPage() {
       {/* ── Inspection tab ── */}
       {activeTab === 'inspection' && (
         <InspectionTab evaluationId={id} userDesignation={userDesignation} onSaved={fetchEvaluation}
-          editing={inspectionEditing} setEditing={setInspectionEditing} highlightOutcome={actionStep === 'property_inspected'} />
+          editing={inspectionEditing} setEditing={setInspectionEditing} />
       )}
 
       {/* ── Pipeline tab ── */}
@@ -391,7 +388,7 @@ export default function EvaluationDetailPage() {
                     disabled={!canAct}
                     title={autoOnly
                       ? (step.step_key === 'property_inspected'
-                          ? 'Completed by saving the Property Inspection with Appointment Outcome = Completed'
+                          ? 'Completes when the Appointment Outcome is set to Completed'
                           : 'Completes automatically -- not manually toggleable')
                       : !canAct ? `Only ${ownerRole === 'tc' ? 'a Transaction Coordinator' : ownerRole === 'cma_approver' ? 'a CMA Approver' : 'an Agent'} can toggle this step` : undefined}
                     className={`w-6 h-6 rounded-full border-2 flex-shrink-0 flex items-center justify-center transition-all ${
@@ -825,8 +822,6 @@ function RoField({ label, editing, display, children, className, highlight }: {
 type ConditionItem = { feature: string; condition: string }
 
 type InspectionForm = {
-  // Appointment Outcome -- the Status Model's gate for "Inspected"
-  appointment_outcome: string
   // Exterior
   road_level_position: string
   land_size: string
@@ -876,7 +871,6 @@ type InspectionForm = {
 }
 
 const EMPTY_INSPECTION: InspectionForm = {
-  appointment_outcome: '',
   road_level_position: '',
   land_size: '', gate_fencing_type: '', views_present: null,
   garages_quantity: 0, garages_descriptor: '', carports_quantity: 0, parking_capacity: '',
@@ -900,21 +894,9 @@ const EMPTY_INSPECTION: InspectionForm = {
   additional_features: [],
 }
 
-const APPOINTMENT_OUTCOMES = [
-  { value: 'completed',            label: 'Completed' },
-  { value: 'rescheduled',          label: 'Rescheduled' },
-  { value: 'seller_cancelled',     label: 'Seller Cancelled' },
-  { value: 'no_show',              label: 'No Show' },
-  { value: 'unable_to_complete',   label: 'Unable to Complete' },
-]
-
-// Every non-Completed outcome means the visit didn't happen -- none of
-// them should be able to advance the evaluation to Inspected.
-const APPOINTMENT_OUTCOMES_REVERT_TO_SCHEDULED = ['rescheduled', 'seller_cancelled', 'no_show', 'unable_to_complete']
-
-function InspectionTab({ evaluationId, userDesignation, onSaved, editing, setEditing, highlightOutcome }: {
+function InspectionTab({ evaluationId, userDesignation, onSaved, editing, setEditing }: {
   evaluationId: string; userDesignation: string | null; onSaved: () => void
-  editing: boolean; setEditing: (v: boolean) => void; highlightOutcome?: boolean
+  editing: boolean; setEditing: (v: boolean) => void
 }) {
   const [form, setForm]                 = useState<InspectionForm>(EMPTY_INSPECTION)
   const [inspectionId, setInspectionId] = useState<string | null>(null)
@@ -935,7 +917,10 @@ function InspectionTab({ evaluationId, userDesignation, onSaved, editing, setEdi
       .eq('evaluation_id', evaluationId)
       .maybeSingle()
 
-    if (data) {
+    // A record that only holds the Appointment Outcome (set on the Details
+    // page) isn't a filled-in inspection yet, so it still opens editable.
+    const hasInspectionData = !!(data && (data.road_level_position || data.land_size || data.gate_fencing_type || data.general_condition || data.parking_capacity || data.views_present != null))
+    if (data && hasInspectionData) {
       setInspectionId(data.id)
       let gc: ConditionItem[] = []
       try { gc = data.general_condition ? JSON.parse(data.general_condition) : [] } catch { gc = [] }
@@ -946,7 +931,6 @@ function InspectionTab({ evaluationId, userDesignation, onSaved, editing, setEdi
       let patioDescs: string[][] = []
       try { patioDescs = data.patio_descriptions ? JSON.parse(data.patio_descriptions) : [] } catch { patioDescs = [] }
       setForm({
-        appointment_outcome:           data.appointment_outcome ?? '',
         road_level_position:           data.road_level_position ?? '',
         land_size:                     data.land_size ?? '',
         gate_fencing_type:             data.gate_fencing_type ?? '',
@@ -992,7 +976,7 @@ function InspectionTab({ evaluationId, userDesignation, onSaved, editing, setEdi
         additional_features:           data.additional_features ? data.additional_features.split(',') : [],
       })
     } else {
-      setInspectionId(null)
+      setInspectionId(data?.id ?? null)
       setForm(EMPTY_INSPECTION)
       // Nothing saved yet -- there's no read-only state to sit in, so a
       // brand-new inspection opens editable.
@@ -1077,7 +1061,6 @@ function InspectionTab({ evaluationId, userDesignation, onSaved, editing, setEdi
     const payload = {
       evaluation_id:                 evaluationId,
       captured_by_user_id:           userId,
-      appointment_outcome:           form.appointment_outcome || null,
       road_level_position:           form.road_level_position || null,
       land_size:                     form.land_size || null,
       gate_fencing_type:             form.gate_fencing_type || null,
@@ -1126,29 +1109,13 @@ function InspectionTab({ evaluationId, userDesignation, onSaved, editing, setEdi
       additional_features:           form.additional_features.length > 0 ? form.additional_features.join(',') : null,
     }
 
-    let newInspectionId = inspectionId
     if (inspectionId) {
       const { error: err } = await supabase.from('property_inspections').update(payload).eq('id', inspectionId)
       if (err) { setError(err.message); setSaving(false); return }
     } else {
       const { data, error: err } = await supabase.from('property_inspections').insert(payload).select('id').single()
       if (err || !data) { setError(err?.message ?? 'Failed to save.'); setSaving(false); return }
-      newInspectionId = data.id
       setInspectionId(data.id)
-    }
-
-    if (newInspectionId) {
-      // "Property Inspection Completed" only actually completes -- and
-      // advances the evaluation to Inspected -- once the Appointment
-      // Outcome says the visit happened. Any other recorded outcome
-      // (Rescheduled, Seller Cancelled, No Show, Unable to Complete)
-      // routes back to scheduling instead of moving the pipeline forward.
-      if (form.appointment_outcome === 'completed') {
-        await markStepComplete(evaluationId, 'property_inspected', userId)
-        await promoteStatus(evaluationId, 'inspected')
-      } else if (APPOINTMENT_OUTCOMES_REVERT_TO_SCHEDULED.includes(form.appointment_outcome)) {
-        await supabase.from('evaluations').update({ status: 'scheduled' }).eq('id', evaluationId)
-      }
     }
 
     setSaved(true)
@@ -1167,19 +1134,6 @@ function InspectionTab({ evaluationId, userDesignation, onSaved, editing, setEdi
           (via RoField / the readOnly prop on YesNo/Counter/MultiSelect)
           when a saved inspection is being viewed -- same dual-mode idea as
           the Details tab's Field component. */}
-
-      {/* ══ APPOINTMENT OUTCOME -- gates the "Inspected" status ══ */}
-      <InspSection title="Appointment Outcome">
-        <RoField label="Outcome" editing={editing} highlight={highlightOutcome && form.appointment_outcome !== 'completed'} display={optLabel(APPOINTMENT_OUTCOMES, form.appointment_outcome)}>
-          <select value={form.appointment_outcome} onChange={e => set('appointment_outcome', e.target.value)} className={select}>
-            <option value="">—</option>
-            {APPOINTMENT_OUTCOMES.map(o => <option key={o.value} value={o.value}>{o.label}</option>)}
-          </select>
-          {APPOINTMENT_OUTCOMES_REVERT_TO_SCHEDULED.includes(form.appointment_outcome) && (
-            <p className="text-xs text-gray-400 mt-2">Saving will move this evaluation back to Scheduled.</p>
-          )}
-        </RoField>
-      </InspSection>
 
       {/* ══ EXTERIOR ══ */}
       <InspSection title="Exterior">
