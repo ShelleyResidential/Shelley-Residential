@@ -611,6 +611,7 @@ function DocumentsSections({ evaluationId, userId, propertyType, pipelineSteps, 
             onGenerated={fetchDocuments}
           />
         ))}
+        <BlankFormCard evaluationId={evaluationId} userId={userId} />
       </div>
     </div>
   )
@@ -712,6 +713,52 @@ function FormCard({ evaluationId, userId, formType, doc, onGenerated }: {
         {doc ? doc.file_name : 'Not generated yet.'}
       </p>
       <button type="button" onClick={regenerateAndDownload} disabled={working}
+        className={`${btn.primary} text-center ${working ? 'opacity-50 cursor-not-allowed' : ''}`}>
+        {working ? 'Downloading…' : 'Download'}
+      </button>
+    </div>
+  )
+}
+
+// The paper copy of the Inspection Form -- the same layout with nothing ticked
+// and no quantities, for agents who fill it in by hand. Built fresh and
+// downloaded straight away; nothing is stored.
+function BlankFormCard({ evaluationId, userId }: { evaluationId: string; userId: string | null }) {
+  const [working, setWorking] = useState(false)
+  const [error, setError]     = useState('')
+
+  async function download() {
+    if (!userId) return
+    setWorking(true)
+    setError('')
+    const res = await fetch(`/api/evaluations/${evaluationId}/blank-inspection-form`, {
+      method:  'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body:    JSON.stringify({ userId }),
+    })
+    if (!res.ok) {
+      const json = await res.json().catch(() => ({}))
+      setError(json.error ?? 'Could not build the blank form.')
+    } else {
+      const name = /filename="([^"]+)"/.exec(res.headers.get('Content-Disposition') ?? '')?.[1] ?? 'Blank Inspection Form.pdf'
+      const url  = URL.createObjectURL(await res.blob())
+      const a    = document.createElement('a')
+      a.href = url
+      a.download = name
+      document.body.appendChild(a)
+      a.click()
+      a.remove()
+      setTimeout(() => URL.revokeObjectURL(url), 10000)
+    }
+    setWorking(false)
+  }
+
+  return (
+    <div className="border border-gray-200 rounded-xl p-4 flex flex-col gap-3">
+      <h4 className="text-sm font-bold text-[#1a1a1a]">Blank Inspection Form</h4>
+      {error && <p className="text-xs text-red-500">{error}</p>}
+      <p className="text-xs text-gray-500">Nothing filled in -- to complete by hand.</p>
+      <button type="button" onClick={download} disabled={working}
         className={`${btn.primary} text-center ${working ? 'opacity-50 cursor-not-allowed' : ''}`}>
         {working ? 'Downloading…' : 'Download'}
       </button>

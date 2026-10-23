@@ -14,7 +14,7 @@ import {
 
 const TEMPLATE_DOC_ID = process.env.GOOGLE_INSPECTION_FORM_TEMPLATE_ID
 
-type Result = { ok: boolean; error?: string; documentId?: string }
+type Result = { ok: boolean; error?: string; documentId?: string; bytes?: ArrayBuffer; fileName?: string }
 type Opt = { value: string; label: string }
 
 // A ☑/❏ line for every option, matching the printed template's own
@@ -54,7 +54,11 @@ const REPEATING_SECTIONS = [
 // stores it the same way Cover Letter does. Purely Generate-button-driven --
 // unlike the Cover Letter, this never auto-generates, since there's nothing
 // to fill in until the agent has actually saved an inspection.
-export async function generateInspectionForm(evaluationId: string, userId: string): Promise<Result> {
+// With { blank: true } it builds the paper version instead: every slot kept,
+// every box unticked and every quantity left empty for filling in by hand,
+// returned as bytes for download rather than stored.
+export async function generateInspectionForm(evaluationId: string, userId: string, opts: { blank?: boolean } = {}): Promise<Result> {
+  const blank = !!opts.blank
   if (!TEMPLATE_DOC_ID) return { ok: false, error: 'Inspection form template is not configured' }
 
   const accessToken = await getValidAccessToken(userId)
@@ -90,32 +94,32 @@ export async function generateInspectionForm(evaluationId: string, userId: strin
     ?? contactRows.find(c => c.is_primary)
     ?? contactRows[0]
 
-  if (!seller?.contacts) {
+  if (!blank && !seller?.contacts) {
     return { ok: false, error: 'Add a contact to this evaluation before generating an inspection form.' }
   }
-  if (!ev.sellers_agent_user_id) {
+  if (!blank && !ev.sellers_agent_user_id) {
     return { ok: false, error: 'Set an Agent on this evaluation before generating an inspection form.' }
   }
-  const { data: agent } = await supabaseAdmin
-    .from('profiles')
-    .select('full_name, email')
-    .eq('id', ev.sellers_agent_user_id)
-    .single()
-  if (!agent) return { ok: false, error: 'Set an Agent on this evaluation before generating an inspection form.' }
+  const { data: agentRow } = ev.sellers_agent_user_id
+    ? await supabaseAdmin.from('profiles').select('full_name, email').eq('id', ev.sellers_agent_user_id).single()
+    : { data: null }
+  if (!blank && !agentRow) return { ok: false, error: 'Set an Agent on this evaluation before generating an inspection form.' }
+  const agent = agentRow ?? { full_name: '', email: '' }
+  const sellerContact = seller?.contacts ?? { first_name: '', last_name: '', phone_number: null, email_address: null }
 
   const prop = ev.properties as unknown as { street_number: string | null; street_name: string | null; suburb: string | null } | null
   const addressLabel = [prop?.street_number, prop?.street_name].filter(Boolean).join(' ') || 'Property'
 
-  const { data: insp } = await supabaseAdmin
-    .from('property_inspections')
-    .select('*')
-    .eq('evaluation_id', evaluationId)
-    .maybeSingle()
+  const { data: savedInsp } = blank
+    ? { data: null }
+    : await supabaseAdmin.from('property_inspections').select('*').eq('evaluation_id', evaluationId).maybeSingle()
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  const insp: any = blank ? {} : savedInsp
 
   // A record holding only the Appointment Outcome (set from the Details page)
   // isn't a filled-in inspection.
   const hasInspectionData = !!(insp && (insp.road_level_position || insp.land_size || insp.gate_fencing_type || insp.general_condition || insp.parking_capacity || insp.views_present != null))
-  if (!insp || !hasInspectionData) return { ok: false, error: 'Complete the Inspection tab before generating this form.' }
+  if (!blank && (!insp || !hasInspectionData)) return { ok: false, error: 'Complete the Inspection tab before generating this form.' }
 
   // Decoded exactly the way InspectionTab.loadInspection decodes the same
   // row for the app's own UI -- comma-joined TEXT columns, JSON-TEXT columns.
@@ -131,14 +135,17 @@ export async function generateInspectionForm(evaluationId: string, userId: strin
   const securityFeatures   = insp.security_features ? insp.security_features.split(',') : []
   const additionalFeatures = insp.additional_features ? insp.additional_features.split(',') : []
 
-  const actualByPrefix: Record<string, number> = {
-    patio:     insp.patio_quantity ?? 0,
-    flatlet:   insp.flatlet_quantity ?? 0,
-    bedroom:   insp.bedrooms_quantity ?? 0,
-    study:     insp.study_quantity ?? 0,
-    bathroom:  insp.bathrooms_quantity ?? 0,
-    guest_loo: insp.guest_loo_quantity ?? 0,
-  }
+  // The blank form keeps every slot the template has.
+  const actualByPrefix: Record<string, number> = blank
+    ? Object.fromEntries(REPEATING_SECTIONS.map(sec => [sec.prefix, sec.slots]))
+    : {
+        patio:     insp.patio_quantity ?? 0,
+        flatlet:   insp.flatlet_quantity ?? 0,
+        bedroom:   insp.bedrooms_quantity ?? 0,
+        study:     insp.study_quantity ?? 0,
+        bathroom:  insp.bathrooms_quantity ?? 0,
+        guest_loo: insp.guest_loo_quantity ?? 0,
+      }
 
   // 1. Copy the template into a throwaway file the caller owns.
   const copy = await copyDriveFile(accessToken, TEMPLATE_DOC_ID, `Inspection Form - ${addressLabel}`)
@@ -215,9 +222,9 @@ export async function generateInspectionForm(evaluationId: string, userId: strin
     '{{Suburb}}':          prop?.suburb ?? '',
     "{{Agent's Name}}":    agent.full_name ?? agent.email ?? '',
     '{{ Seller Name | Seller Number | Seller Email }}': [
-      [seller.contacts.first_name, seller.contacts.last_name].filter(Boolean).join(' '),
-      seller.contacts.phone_number,
-      seller.contacts.email_address,
+      [sellerContact.first_name, sellerContact.last_name].filter(Boolean).join(' '),
+      sellerContact.phone_number,
+      sellerContact.email_address,
     ].filter(Boolean).join(' | '),
 
     '{{road_level_position}}': checkLine(ROAD_LEVEL_OPTS, insp.road_level_position ?? ''),
@@ -300,6 +307,11 @@ export async function generateInspectionForm(evaluationId: string, userId: strin
     replacements[`{{guest_loo_${i + 1}}}`] = checkLine(FINISH_OPTS, guestLooConditions[i] ?? '')
   }
 
+  // Blank form: quantities are left empty to be written in by hand.
+  if (blank) {
+    for (const k of Object.keys(replacements)) if (k.endsWith('_quantity}}')) replacements[k] = ''
+  }
+
   // Sections with 0 units kept slot 1's paragraph (it was never deleted
   // above) -- resolve its placeholder to nothing rather than leaving the
   // literal "{{x_1}}" text showing.
@@ -322,6 +334,8 @@ export async function generateInspectionForm(evaluationId: string, userId: strin
 
   // 5. Discard the intermediate Doc copy -- only the PDF sticks around.
   await deleteDriveFile(accessToken, copy.id)
+
+  if (blank) return { ok: true, bytes: pdf.bytes, fileName: `Blank Inspection Form - ${addressLabel}.pdf` }
 
   // 6. Store it exactly like Cover Letter: replace any previous inspection
   // form for this evaluation.
